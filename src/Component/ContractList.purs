@@ -14,6 +14,7 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (link, linkWithIcon)
 import Contrib.Fetch (FetchError)
+import React.Basic.DOM as R
 import Contrib.React.Bootstrap (overlayTrigger, tooltip)
 import Contrib.React.Bootstrap.Icons as Icons
 import Contrib.React.Bootstrap.Table (striped) as Table
@@ -85,10 +86,7 @@ type ContractListState =
   { newContract :: Boolean
   , newInput :: 
       Maybe 
-        { party ::V1.Party 
-        , token :: Token
-        , value :: BigInt.BigInt
-        , transactionsEndpoint :: TransactionsEndpoint
+        { transactionsEndpoint :: TransactionsEndpoint
         , marloweInfo :: Maybe MarloweInfo
         }
   , metadata :: Maybe Metadata
@@ -144,14 +142,13 @@ mkContractList = do
     let
       onAddContractClick = updateState _ { newContract = true }
 
-      onApplyInputs { party, token, value, transactionsEndpoint, marloweInfo } cw = do
+      onApplyInputs { transactionsEndpoint, marloweInfo } { party, token, value } cw = handler_ do
         now <- nowDateTime
         -- FIXME: move aff flow into `useAff` on the component level
         launchAff_ $ do
           case possibleWalletContext of
             Just { changeAddress: Just changeAddress } -> do
-              let
-                WalletInfo { wallet: walletApi } = cw
+              let WalletInfo { wallet: walletApi } = cw
               addresses <- walletAddresses cardanoMultiplatformLib walletApi
 
               let
@@ -207,12 +204,12 @@ mkContractList = do
               -- Note: this happens, when the contract is in status `Unsigned`
               pure unit
 
-        -- updateState _ { newContract = false }
+        updateState _ { newInput = Nothing }
 
     pure $
       DOOM.div_
-        [ case state.newContract, connectedWallet of
-            true, Just cw -> createContractComponent
+        [ case state.newContract, state.newInput, connectedWallet of
+            true, _, Just cw -> createContractComponent
               { connectedWallet: cw
               , onDismiss: updateState _ { newContract = false }
               , onSuccess: \_ -> do
@@ -223,7 +220,56 @@ mkContractList = do
                   updateState _ { newContract = false }
               , inModal: true
               }
-            _, _ -> mempty
+            _, Just input, Just cw -> modal $
+                { body:
+                    DOM.form {} $
+                      [ DOM.div { className: "form-group" }
+                          [ DOM.label
+                              { className: "form-control-label" }
+                              "Amount"
+                          , R.input
+                              { className: "form-control"
+                              , type: "text"
+                              , value: ""
+                              }
+                          ]
+                      , DOM.div { className: "form-group" }
+                          [ DOM.label
+                              { className: "form-control-label" }
+                              "Token"
+                          , R.input
+                              { className: "form-control"
+                              , type: "text"
+                              , value: ""
+                              }
+                          ]
+                      , DOM.div { className: "form-group" }
+                          [ DOM.label
+                              { className: "form-control-label" }
+                              "Party"
+                          , R.input
+                              { className: "form-control"
+                              , type: "text"
+                              , value: ""
+                              }
+                          ]
+                      ]
+                , onDismiss: updateState _ { newInput = Nothing }
+                , title: text "Apply inputs"
+                , footer: DOOM.fragment
+                    [ link
+                        { label: DOOM.text "Cancel"
+                        , onClick: updateState _ { newInput = Nothing }
+                        , showBorders: true
+                        }
+                    , DOM.button
+                        { className: "btn btn-primary"
+                        , onClick: onApplyInputs input { value: BigInt.fromInt 1, token: V1.Token "" "", party: V1.Address "" } cw
+                        }
+                        [ R.text "Submit" ]
+                    ]
+                }
+            _, _, _ -> mempty
         , DOM.div { className: "row justify-content-end" } $ Array.singleton $ do
             let
               disabled = isNothing connectedWallet
@@ -251,6 +297,7 @@ mkContractList = do
               { body: text $ maybe "Empty Metadata" (show <<< _.contractTerms <<< unwrap) $ M.decodeMetadata metadata -- TODO: encode contractTerms as JSON
               , onDismiss: updateState _ { metadata = Nothing }
               , title: text "Contract Terms"
+              , footer: text ""
               }
             Nothing -> mempty
         , table { striped: Table.striped.boolean true, hover: true }
@@ -269,7 +316,7 @@ mkContractList = do
                     ]
                 ]
             , DOM.tbody {} $ map
-                ( \ci@(ContractInfo { _runtime }) ->
+                ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo }) ->
                     let
                       ContractHeader { contractId, status } = _runtime.contractHeader
                       tdCentered = DOM.td { className: "text-center" }
@@ -291,9 +338,9 @@ mkContractList = do
                               , placement: OverlayTrigger.placement.bottom
                               } $ DOM.span {} [ show status ]
                         , tdCentered
-                            [ case state.newInput, connectedWallet of
-                                Just input, Just cw -> linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: onApplyInputs input cw }
-                                _, _ -> mempty
+                            [ case endpoints.transactions of
+                                Just transactionsEndpoint -> linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: updateState _ { newInput = Just { transactionsEndpoint, marloweInfo} } }
+                                _ -> mempty
                             ]
                         ]
                 )
