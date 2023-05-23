@@ -8,7 +8,7 @@ import Actus.Domain (CashFlow(..), Value'(..))
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (mkContractList)
-import Component.EventList (mkEventList)
+-- import Component.EventList (mkEventList)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
 import Component.Types (ActusContractRole(..), CashFlowInfo(..), ContractInfo(..), MessageContent(Success, Info), MessageHub(MessageHub), MkComponentMBase, UserCashFlowDirection(..), UserContractRole(..), WalletInfo(..))
@@ -359,16 +359,6 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
     walletChanged = prevWalletContext /= walletContext
     usedAddresses = fromMaybe [] $ _.usedAddresses <<< un WalletContext <$> walletContext
 
-    mkUserContractRole prevRole party counterParty = do
-      if walletChanged then case partyToBech32 party, partyToBech32 counterParty of
-        Just addr1, Just addr2 -> case Array.elem addr1 usedAddresses, Array.elem addr2 usedAddresses of
-          true, true -> Just BothParties
-          true, false -> Just ContractParty
-          false, true -> Just ContractCounterParty
-          false, false -> Nothing
-        _, _ -> Nothing
-      else prevRole
-
     map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block }), links: endpoints }, contractState, transactions } -> do
       let
         marloweInfo = do
@@ -381,52 +371,20 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
 
       case contractId `Map.lookup` prev of
         Just (ContractInfo contractInfo) -> do
-          let
-            userContractRole = mkUserContractRole
-              contractInfo.userContractRole
-              contractInfo.party
-              contractInfo.counterParty
-
-            cashFlowInfo =
-              Lazy.defer \_ -> contractCashFlowInfo
-                block
-                contractInfo.contractTerms
-                contractInfo.party
-                contractInfo.counterParty
-                contractInfo.marloweInfo
-                userContractRole
-                transactions
-
           pure $ ContractInfo $ contractInfo
-            { cashFlowInfo = cashFlowInfo
-            , userContractRole = userContractRole
-            , marloweInfo = marloweInfo
+            { marloweInfo = marloweInfo
             , _runtime
                 { contractHeader = contractHeader
                 , transactions = transactions
                 }
             }
         Nothing -> do
-          Actus.Metadata { party, counterParty, contractTerms } <- Actus.Metadata.fromRuntimeResource contractHeader
           let
             Runtime.ContractHeader { contractId } = contractHeader
-            userContractRole = mkUserContractRole Nothing party counterParty
           pure $ ContractInfo $
-            { cashFlowInfo: Lazy.defer \_ -> contractCashFlowInfo
-                block
-                contractTerms
-                party
-                counterParty
-                marloweInfo
-                userContractRole
-                transactions
-            , contractId
-            , contractTerms
-            , counterParty
+            { contractId
             , endpoints
             , marloweInfo
-            , party
-            , userContractRole
             , _runtime: { contractHeader, transactions }
             }
   AppContractInfoMap { walletContext, map }

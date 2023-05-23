@@ -56,17 +56,17 @@ newtype MarloweInfo = MarloweInfo
   }
 
 newtype ContractInfo = ContractInfo
-  { cashFlowInfo :: Lazy (Array CashFlowInfo)
-  , counterParty :: V1.Party
-  , contractId :: Runtime.ContractId
-  , contractTerms :: Actus.ContractTerms
+  { -- cashFlowInfo :: Lazy (Array CashFlowInfo)
+  -- , counterParty :: V1.Party
+  contractId :: Runtime.ContractId
+  -- , contractTerms :: Actus.ContractTerms
   , marloweInfo :: Maybe MarloweInfo
   , endpoints ::
       { contract :: Runtime.ContractEndpoint
       , transactions :: Maybe Runtime.TransactionsEndpoint
       }
-  , party :: V1.Party
-  , userContractRole :: Maybe UserContractRole
+  -- , party :: V1.Party
+  -- , userContractRole :: Maybe UserContractRole
   -- Use this only for debugging - all domain specific data
   -- should be precomputed and exposed as separated fields.
   , _runtime ::
@@ -83,12 +83,12 @@ derive instance Newtype ActusContractId _
 derive newtype instance Eq ActusContractId
 derive newtype instance Ord ActusContractId
 
-actusContractId :: ContractInfo -> ActusContractId
-actusContractId (ContractInfo { contractTerms: Actus.ContractTerms contractTerms }) =
-  ActusContractId contractTerms.contractId
-
-actusContractType :: ContractInfo -> Actus.CT
-actusContractType (ContractInfo { contractTerms: Actus.ContractTerms contractTerms }) = contractTerms.contractType
+-- actusContractId :: ContractInfo -> ActusContractId
+-- actusContractId (ContractInfo { contractTerms: Actus.ContractTerms contractTerms }) =
+--   ActusContractId contractTerms.contractId
+-- 
+-- actusContractType :: ContractInfo -> Actus.CT
+-- actusContractType (ContractInfo { contractTerms: Actus.ContractTerms contractTerms }) = contractTerms.contractType
 
 createdAt :: ContractInfo -> Maybe Runtime.BlockHeader
 createdAt (ContractInfo { _runtime: { contractHeader: Runtime.ContractHeader { block } } }) = block

@@ -5,7 +5,7 @@ import Prelude
 import Actus.Domain (CashFlow)
 import Actus.Domain.ContractTerms (ContractTerms)
 import Component.CreateContract as CreateContract
-import Component.EventList (submit)
+-- import Component.EventList (submit)
 import Component.Modal (mkModal)
 import Component.Types (ActusContractId(..), ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
 import Component.Types.ContractInfo as ContractInfo
@@ -87,7 +87,6 @@ type Props =
 
 data OrderBy
   = OrderByCreationDate
-  | OrderByActusContractId
   | OrderByLastUpdateDate
 
 derive instance Eq OrderBy
@@ -115,7 +114,6 @@ mkContractList = do
           someFutureBlockNumber = Runtime.BlockNumber 9058430
           sortedContracts = case ordering.orderBy of
             OrderByCreationDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.createdAt)) contractList
-            OrderByActusContractId -> Array.sortBy (compare `on` (ContractInfo.actusContractId)) contractList
             OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contractList
         if ordering.orderAsc then sortedContracts
         else Array.reverse sortedContracts

@@ -1,5 +1,7 @@
 module Component.EventList where
 
+{-
+
 import Prelude
 
 import Actus.Domain (ContractTerms)
@@ -411,3 +413,4 @@ continuationHash _ = Nothing
 partyToString :: Party -> String
 partyToString (V1.Address addr) = addr
 partyToString (V1.Role role) = role
+  -}
