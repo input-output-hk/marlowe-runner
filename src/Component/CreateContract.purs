@@ -2,97 +2,51 @@ module Component.CreateContract where
 
 import Prelude
 
-import Actus.Domain (ContractTerms(..))
-import Actus.Domain (ContractTerms)
-import CardanoMultiplatformLib (Bech32)
-import CardanoMultiplatformLib (Bech32)
-import CardanoMultiplatformLib (CborHex)
+import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib.Lib as Lib
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
-import Component.CreateContract.Types (FourthStepBaseRow)
 import Component.Modal (mkModal)
-import Component.Modal (mkModal)
-import Component.Modal as Modal
 import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo(..))
-import Component.Types (MkComponentM, WalletInfo)
 import Component.Widgets (link)
-import Component.Widgets (link)
+import Contrib.Fetch (FetchError)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.React.Basic.Hooks.UseForm (useForm)
 import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Bootstrap.FormBuilder (BootstrapForm)
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
-import Contrib.React.Bootstrap.Table (table)
-import Contrib.React.Bootstrap.Table as Table
-import Control.Monad.Reader.Class (asks)
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (decodeJson, parseJson)
-import Data.Argonaut (encodeJson)
-import Data.Argonaut as Argonaut
-import Data.Argonaut.Encode as Argonaut
+import Data.Argonaut.Encode (toJsonString) as Argonaut
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut as BigInt
-import Data.Bounded.Generic (genericBottom, genericTop)
-import Data.DateTime.Instant (Instant, instant, unInstant)
+import Data.DateTime.Instant (instant, unInstant)
 import Data.Either (Either(..))
-import Data.Either (Either(..))
-import Data.Enum (class BoundedEnum, class Enum)
-import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
-import Data.Generic.Rep (class Generic)
 import Data.Int as Int
-import Data.Map as Map
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype)
 import Data.Newtype (un)
-import Data.Show.Generic (genericShow)
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
-import Debug (traceM)
-import Effect (Effect)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
-import Effect.Aff (Aff, launchAff_)
-import Effect.Class (liftEffect)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Actus (CashFlows)
-import Marlowe.Actus.Metadata (Metadata(..), actusMetadataKey)
-import Marlowe.Runtime.Web (Runtime(..))
-import Marlowe.Runtime.Web.Client (ClientError(..), merkleize, post', put')
-import Marlowe.Runtime.Web.Client (ClientError)
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent(..), PostMerkleizationRequest(..), PostMerkleizationResponse(..), PutContractRequest(..), Runtime(..), ServerURL, TextEnvelope(..), toTextEnvelope)
-import Marlowe.Runtime.Web.Types (ContractsEndpoint(..), PostContractsRequest(..), PostContractsResponseContent(..), ServerURL(..), TxOutRef(..))
-import Marlowe.Runtime.Web.Types (TxOutRef)
-import Marlowe.Runtime.Web.Types as RT
-import Partial.Unsafe (unsafeCrashWith, unsafePartial)
+import Marlowe.Runtime.Web.Client (ClientError, post', put')
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), toTextEnvelope)
+import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFnEither) as Validator
-import React.Basic (JSX)
-import React.Basic (fragment) as DOOM
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (br, div_, text) as DOOM
-import React.Basic.DOM (tbody_, td_, text, tr_) as DOOM
 import React.Basic.DOM as R
-import React.Basic.DOM.Events (preventDefault)
-import React.Basic.DOM.Events (preventDefault)
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (handler)
-import React.Basic.Hooks (JSX, component, useState', (/\))
-import React.Basic.Hooks (component, useContext, useState', (/\))
+import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks as React
-import Type.Row (type (+))
-import Type.Row (type (+))
-import Wallet as Wallet
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 
@@ -105,8 +59,8 @@ type Props =
 
 type Result = V1.Contract
 
-mkJsonForm :: V1.Contract -> _ -> BootstrapForm Effect Query Result
-mkJsonForm initialContract cardanoMultiplatformLib = FormBuilder.evalBuilder' $ FormBuilder.textArea
+mkJsonForm :: V1.Contract -> BootstrapForm Effect Query Result
+mkJsonForm initialContract = FormBuilder.evalBuilder' $ FormBuilder.textArea
   { missingError: "Please provide contract terms JSON value"
   , helpText: Just $ DOOM.div_
       [ DOOM.text "We gonna perform only a basic JSON validation in here and we won't perform any ACTUS applicablity checks."
@@ -153,14 +107,15 @@ create contractData serverUrl contractsEndpoint = do
   post' serverUrl contractsEndpoint req
 
 
-submit :: CborHex TransactionWitnessSetObject -> ServerURL -> ContractEndpoint -> Aff _
+submit :: CborHex TransactionWitnessSetObject -> ServerURL -> ContractEndpoint -> Aff (Either FetchError Unit)
+
 submit witnesses serverUrl contractEndpoint = do
   let
     textEnvelope = toTextEnvelope witnesses ""
     req = PutContractRequest textEnvelope
   put' serverUrl contractEndpoint req
 
-
+-- FIXME: This is not used yet
 data SubmissionStep
   = Creating
   | Created (Either String PostContractsResponseContent)
@@ -180,7 +135,7 @@ mkComponent = do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     step /\ setStep <- useState' Creating
     let
-      form = mkJsonForm initialContract cardanoMultiplatformLib
+      form = mkJsonForm initialContract
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
@@ -194,7 +149,6 @@ mkComponent = do
 
           -- handler preventDefault \_ -> do
           do
-            traceM "ON SUBMIT CLICKED"
             launchAff_ $ do
               create contractData runtime.serverURL runtime.root >>= case _ of
                 Right res@{ resource: PostContractsResponseContent postContractsResponse, links: { contract: contractEndpoint } } -> do
@@ -267,8 +221,10 @@ mkComponent = do
         formBody
 
 
+address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
 
+mkInitialContract :: Effect V1.Contract
 mkInitialContract = do
   nowMilliseconds <- unInstant <$> now
   let

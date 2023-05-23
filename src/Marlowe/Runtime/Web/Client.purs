@@ -144,7 +144,7 @@ foldMapMContractPages
   => ServerURL
   -> endpoint
   -> Maybe Range
-  -> (Array GetContractsResponse -> Aff (Array GetContractsResponse))
+  -> (Array GetContractsResponse -> Aff { result :: Array GetContractsResponse, stopFetching :: Boolean })
   -> Aff (Either ClientError (Array GetContractsResponse))
 foldMapMContractPages serverUrl endpoint start f =
   foldMapMPages' serverUrl endpoint (f <<< _.page) start
@@ -158,7 +158,7 @@ foldMapMPages
   => Monoid b
   => ServerURL
   -> ResourceLink a
-  -> ({ page :: a, currRange :: Maybe Range } -> m b)
+  -> ({ page :: a, currRange :: Maybe Range } -> m { result :: b, stopFetching :: Boolean })
   -> Maybe Range
   -> m (GetResourceResponse b)
 foldMapMPages serverUrl path f startRange = do
@@ -166,9 +166,11 @@ foldMapMPages serverUrl path f startRange = do
     StopFetching -> pure Nothing
     FetchPage currRange -> do
       { page, nextRange } <- ExceptT $ liftAff $ getPage serverUrl path currRange
-      b <- lift $ f { page, currRange }
+      { result: b, stopFetching } <- lift $ f { page, currRange }
       pure $ Just case nextRange of
-        Just _ -> b /\ FetchPage nextRange
+        Just _ -> b /\ if stopFetching
+          then StopFetching
+          else (FetchPage nextRange)
         Nothing -> b /\ StopFetching
   pure (fold <$> bs)
 
@@ -180,7 +182,7 @@ getPages
   -> ResourceLink a
   -> Maybe Range
   -> m (GetResourceResponse (List { page :: a, currRange :: Maybe Range }))
-getPages serverUrl path = foldMapMPages serverUrl path (pure <<< List.singleton)
+getPages serverUrl path = foldMapMPages serverUrl path (List.singleton >>> \result -> pure { result, stopFetching: false })
 
 getPages'
   :: forall endpoint a m
@@ -254,7 +256,7 @@ foldMapMPages'
   => ToResourceLink t a
   => ServerURL
   -> t
-  -> ({ currRange :: Maybe Range, page :: a } -> m b)
+  -> ({ currRange :: Maybe Range, page :: a } -> m { result :: b, stopFetching :: Boolean })
   -> Maybe Range
   -> m (Either ClientError b)
 foldMapMPages' serverUrl path = foldMapMPages serverUrl (toResourceLink path)

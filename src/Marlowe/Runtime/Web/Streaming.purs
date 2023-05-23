@@ -17,6 +17,7 @@ module Marlowe.Runtime.Web.Streaming
   , ContractWithTransactionsMap
   , ContractWithTransactions
   , ContractWithTransactionsStream(..)
+  , MaxPages(..)
   , PollingInterval(..)
   , RequestInterval(..)
   ) where
@@ -29,17 +30,16 @@ import Control.Alt ((<|>))
 import Control.Alternative as Alternative
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Rec.Class (forever)
+import Data.Filterable (filter)
 import Data.Foldable (foldMap)
 import Data.Map (Map)
 import Data.Map (catMaybes, empty, filter, fromFoldable, lookup, union) as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (un)
 import Data.Newtype as Newtype
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\), (/\))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, Fiber, Milliseconds, delay, forkAff)
 import Effect.Aff.AVar as AVar
@@ -47,8 +47,8 @@ import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Halogen.Subscription (Listener)
 import Halogen.Subscription as Subscription
-import Marlowe.Runtime.Web.Client (foldMapMContractPages, getPages', getResource')
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractHeader(..), ContractId, ContractState, GetContractResponse, GetContractsResponse, ServerURL, TransactionEndpoint, TransactionsEndpoint, TxHeader, api)
+import Marlowe.Runtime.Web.Client (Range(..), foldMapMContractPages, getPages', getResource')
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractId, ContractState, GetContractResponse, GetContractsResponse, ServerURL, TransactionEndpoint, TransactionsEndpoint, TxHeader, api)
 
 -- | API CAUTION: We update the state in chunks but send the events one by one. This means that
 -- | the event handler can see some state changes (in `getLiveState`) before it receives some notifications.
@@ -75,35 +75,53 @@ newtype ContractStream = ContractStream
   , getState :: Aff ContractMap
   }
 
+newtype MaxPages = MaxPages Int
+
 -- | FIXME: take closer at error handling woudn't this component break in the case of network error?
 -- | TODO: we should return `Aff` or fiber and allow more flexible "threading" management.
 -- Use constraint at the end: `Warn (Text "pushPullContractsStreams is deprecated, use web socket based implementation instead!")`
 contracts
   :: PollingInterval
   -> RequestInterval
+  -> (GetContractsResponse -> Boolean)
+  -> Maybe MaxPages
   -> ServerURL
   -> Aff ContractStream
-contracts (PollingInterval pollingInterval) (RequestInterval requestInterval) serverUrl = do
+contracts (PollingInterval pollingInterval) (RequestInterval requestInterval) filterContracts possibleMaxPages serverUrl = do
   contractsRef <- liftEffect $ Ref.new Map.empty
+  pageNumberRef <- liftEffect $ Ref.new 0
   contractsAVar <- AVar.empty
 
-  { emitter, listener } <-
-    liftEffect Subscription.create
+  { emitter, listener } <- liftEffect Subscription.create
+
+  -- let
+  --  range = Just $ Range "contractId 11040663a4cdf37a703ce1a509d97d38f739e1556d303333729576d06189585b%231;limit 100;offset 1;order desc"
+  let
+    range = Nothing
 
   _ :: Fiber Unit <- forkAff $ forever do
+    liftEffect $ Ref.write 0 pageNumberRef
     void $ AVar.tryTake contractsAVar
     previousContracts <- liftEffect $ Ref.read contractsRef
     nextContracts :: Map ContractId GetContractsResponse <-
-      map contractsById $ Effect.liftEither =<< foldMapMContractPages serverUrl api Nothing \pageContracts -> do
+      map contractsById $ Effect.liftEither =<< foldMapMContractPages serverUrl api range \pageContracts -> do
+        let
+          pageContracts' = filter filterContracts pageContracts
         liftEffect do
           let
             cs :: Map ContractId GetContractsResponse
-            cs = contractsById pageContracts
+            cs = contractsById pageContracts'
           Ref.modify_ (Map.union cs) contractsRef
           for_ (Map.additions (Map.Old previousContracts) (Map.New cs)) $ Subscription.notify listener <<< Addition
           for_ (Map.updates (Map.Old previousContracts) (Map.New cs)) $ Subscription.notify listener <<< Update
+        pageNumber <- liftEffect $ Ref.modify (add 1) pageNumberRef
         delay requestInterval
-        pure pageContracts
+        pure
+          { result: pageContracts'
+          , stopFetching: case possibleMaxPages of
+              Nothing -> false
+              Just (MaxPages maxPages) -> pageNumber >= maxPages
+          }
     liftEffect do
       Ref.write nextContracts contractsRef
       for_ (Map.deletions (Map.Old previousContracts) (Map.New nextContracts)) $ Subscription.notify listener <<< Deletion
@@ -343,9 +361,9 @@ contractsWithTransactions (ContractStream contractStream) (ContractStateStream c
 
   ContractWithTransactionsStream { emitter, getLiveState, getState }
 
-mkContractsWithTransactions :: PollingInterval -> RequestInterval -> (GetContractsResponse -> Boolean) -> ServerURL -> Aff ContractWithTransactionsStream
-mkContractsWithTransactions pollingInterval requestInterval filterContracts serverUrl = do
-  contractStream@(ContractStream { getState }) <- contracts pollingInterval requestInterval serverUrl
+mkContractsWithTransactions :: PollingInterval -> RequestInterval -> (GetContractsResponse -> Boolean) -> Maybe MaxPages -> ServerURL -> Aff ContractWithTransactionsStream
+mkContractsWithTransactions pollingInterval requestInterval filterContracts possibleMaxPages serverUrl = do
+  contractStream@(ContractStream { getState }) <- contracts pollingInterval requestInterval filterContracts possibleMaxPages serverUrl
   let
     transactionEndpointsSource = Map.catMaybes <<< map (_.links.transactions) <<< Map.filter filterContracts <$> getState
     contractEndpointsSource = map (_.links.contract) <<< Map.filter filterContracts <$> getState

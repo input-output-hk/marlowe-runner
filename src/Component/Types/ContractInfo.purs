@@ -55,6 +55,8 @@ newtype MarloweInfo = MarloweInfo
   , currentContract :: Maybe V1.Contract
   }
 
+derive instance Eq MarloweInfo
+
 newtype ContractInfo = ContractInfo
   { -- cashFlowInfo :: Lazy (Array CashFlowInfo)
   -- , counterParty :: V1.Party

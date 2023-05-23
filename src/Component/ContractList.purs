@@ -6,6 +6,7 @@ import Actus.Domain (CashFlow)
 import Actus.Domain.ContractTerms (ContractTerms)
 import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
+import Component.ApplyInputs as ApplyInputs
 import Component.CreateContract as CreateContract
 import Component.Modal (mkModal)
 import Component.Types (ActusContractId(..), ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
@@ -14,8 +15,11 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (link, linkWithIcon)
 import Contrib.Fetch (FetchError)
-import React.Basic.DOM as R
+import Contrib.React.Basic.Hooks.UseForm (useForm)
+import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Bootstrap (overlayTrigger, tooltip)
+import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, intInput, textInput)
+import Contrib.React.Bootstrap.FormBuilder as FormBuilder
 import Contrib.React.Bootstrap.Icons as Icons
 import Contrib.React.Bootstrap.Table (striped) as Table
 import Contrib.React.Bootstrap.Table (table)
@@ -28,16 +32,21 @@ import Data.DateTime (adjust)
 import Data.Decimal (Decimal)
 import Data.Either (Either(..))
 import Data.Foldable (fold, foldMap)
+import Data.FormURLEncoded.Query (Query(..))
 import Data.Function (on)
 import Data.List (List)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
 import Data.Newtype (un, unwrap)
+import Data.Time.Duration (Seconds(..))
 import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
+import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
+import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
 import Effect.Now (nowDateTime)
 import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, Token)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputContent(..), Party)
@@ -52,13 +61,15 @@ import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_, span_, text) as DOOM
 import React.Basic.DOM (text)
+import React.Basic.DOM as R
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, handler)
 import React.Basic.Events (handler_)
-import React.Basic.Hooks (Hook, JSX, UseState, component, useState, (/\))
+import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useState, (/\))
 import React.Basic.Hooks (JSX, component, useContext, useState, (/\))
 import React.Basic.Hooks as React
+import Utils.React.Basic.Hooks (useStateRef, useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..), walletAddresses)
 
@@ -83,12 +94,7 @@ useInput initialValue = React.do
 type SubmissionError = String
 
 type ContractListState =
-  { newContract :: Boolean
-  , newInput :: 
-      Maybe 
-        { transactionsEndpoint :: TransactionsEndpoint
-        , marloweInfo :: Maybe MarloweInfo
-        }
+  { modalAction :: Maybe ModalAction
   , metadata :: Maybe Metadata
   }
 
@@ -111,6 +117,75 @@ submit witnesses serverUrl transactionEndpoint = do
     req = PutTransactionRequest textEnvelope
   put' serverUrl transactionEndpoint req
 
+onApplyInputs runtime cardanoMultiplatformLib possibleWalletContext { transactionsEndpoint, marloweInfo } { party, token, value } cw = do
+  now <- nowDateTime
+  -- FIXME: move aff flow into `useAff` on the component level
+  launchAff_ $ do
+    case possibleWalletContext of
+      Just { changeAddress: Just changeAddress } -> do
+        let WalletInfo { wallet: walletApi } = cw
+        addresses <- walletAddresses cardanoMultiplatformLib walletApi
+
+        let
+          inputs = singleton $ NormalInput (IDeposit party party token value)
+
+          invalidBefore = fromMaybe now $ adjust (Duration.Minutes (-2.0)) now
+          invalidHereafter = fromMaybe now $ adjust (Duration.Minutes 2.0) now
+          collateralUTxOs = []
+
+          req = PostTransactionsRequest
+            { inputs
+            , invalidBefore
+            , invalidHereafter
+            , metadata: mempty
+            , tags: mempty
+            , changeAddress
+            , addresses
+            , collateralUTxOs
+            }
+
+        post' runtime.serverURL transactionsEndpoint req
+          >>= case _ of
+            Right ({ resource: PostTransactionsResponse postTransactionsResponse, links: { transaction: transactionEndpoint } }) -> do
+              traceM postTransactionsResponse
+              let
+                { tx } = postTransactionsResponse
+                TextEnvelope { cborHex: txCborHex } = tx
+              Wallet.signTx walletApi txCborHex true >>= case _ of
+                Right witnessSet -> do
+                  submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
+                    Right _ -> do
+                      traceM "Successfully submitted the transaction"
+                      -- liftEffect $ msgHubProps.add $ Success $ DOOM.text $ "Successfully submitted a transaction"
+                    -- liftEffect $ onSuccess contractEndpoint
+                    Left err -> do
+                      traceM "Error while submitting the transaction"
+                      -- liftEffect $ msgHubProps.add $ Error $ DOOM.text $ "Error while submitting the transaction"
+                      traceM err
+
+                Left err -> do
+                  traceM err
+                  pure unit
+
+              pure unit
+            Left _ -> do
+              traceM token
+              -- traceM $ BigInt.toString value
+              traceM "error"
+              pure unit
+
+        pure unit
+      _ -> do
+        -- Note: this happens, when the contract is in status `Unsigned`
+        pure unit
+
+-- updateState _ { newInput = Nothing }
+
+data ModalAction = NewContract | ApplyInputs TransactionsEndpoint MarloweInfo
+
+derive instance Eq ModalAction
+
+
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   Runtime runtime <- asks _.runtime
@@ -118,15 +193,15 @@ mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
 
   createContractComponent <- CreateContract.mkComponent
+  applyInputsComponent <- ApplyInputs.mkComponent
   walletInfoCtx <- asks _.walletInfoCtx
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
   liftEffect $ component "ContractList" \{ connectedWallet, contractList } -> React.do
-    ((state :: ContractListState) /\ updateState) <- useState { newContract: false, newInput: Nothing, metadata: Nothing }
-
-    ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
-
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
+    ((state :: ContractListState) /\ updateState) <- useState { modalAction: Nothing, metadata: Nothing }
+    stateRef <- useStateRef' state
+    ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
 
     let
       contractList' = do
@@ -139,137 +214,35 @@ mkContractList = do
         if ordering.orderAsc then sortedContracts
         else Array.reverse sortedContracts
 
-    let
-      onAddContractClick = updateState _ { newContract = true }
-
-      onApplyInputs { transactionsEndpoint, marloweInfo } { party, token, value } cw = handler_ do
-        now <- nowDateTime
-        -- FIXME: move aff flow into `useAff` on the component level
-        launchAff_ $ do
-          case possibleWalletContext of
-            Just { changeAddress: Just changeAddress } -> do
-              let WalletInfo { wallet: walletApi } = cw
-              addresses <- walletAddresses cardanoMultiplatformLib walletApi
-
-              let
-                inputs = singleton $ NormalInput (IDeposit party party token value)
-
-                invalidBefore = fromMaybe now $ adjust (Duration.Minutes (-2.0)) now
-                invalidHereafter = fromMaybe now $ adjust (Duration.Minutes 2.0) now
-                collateralUTxOs = []
-
-                req = PostTransactionsRequest
-                  { inputs
-                  , invalidBefore
-                  , invalidHereafter
-                  , metadata: mempty
-                  , tags: mempty
-                  , changeAddress
-                  , addresses
-                  , collateralUTxOs
-                  }
-
-              post' runtime.serverURL transactionsEndpoint req
-                >>= case _ of
-                  Right ({ resource: PostTransactionsResponse postTransactionsResponse, links: { transaction: transactionEndpoint } }) -> do
-                    traceM postTransactionsResponse
-                    let
-                      { tx } = postTransactionsResponse
-                      TextEnvelope { cborHex: txCborHex } = tx
-                    Wallet.signTx walletApi txCborHex true >>= case _ of
-                      Right witnessSet -> do
-                        submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
-                          Right _ -> do
-                            traceM "Successfully submitted the transaction"
-                            liftEffect $ msgHubProps.add $ Success $ DOOM.text $ "Successfully submitted a transaction"
-                          -- liftEffect $ onSuccess contractEndpoint
-                          Left err -> do
-                            traceM "Error while submitting the transaction"
-                            liftEffect $ msgHubProps.add $ Error $ DOOM.text $ "Error while submitting the transaction"
-                            traceM err
-
-                      Left err -> do
-                        traceM err
-                        pure unit
-
-                    pure unit
-                  Left _ -> do
-                    traceM token
-                    -- traceM $ BigInt.toString value
-                    traceM "error"
-                    pure unit
-
-              pure unit
-            _ -> do
-              -- Note: this happens, when the contract is in status `Unsigned`
-              pure unit
-
-        updateState _ { newInput = Nothing }
-
-    pure $
+    pure $ do
       DOOM.div_
-        [ case state.newContract, state.newInput, connectedWallet of
-            true, _, Just cw -> createContractComponent
+        [ case state.modalAction, connectedWallet of
+            Just NewContract, Just cw -> createContractComponent
               { connectedWallet: cw
-              , onDismiss: updateState _ { newContract = false }
+              , onDismiss: updateState _ { modalAction = Nothing }
               , onSuccess: \_ -> do
                   msgHubProps.add $ Success $ DOOM.text $ fold
-                    [ "Successfully submitted the contract. Contract transaction awaits to be included in the blockchain."
+                    [ "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain."
                     , "Contract status should change to 'Confirmed' at that point."
                     ]
-                  updateState _ { newContract = false }
+                  updateState _ { modalAction = Nothing }
               , inModal: true
               }
-            _, Just input, Just cw -> modal $
-                { body:
-                    DOM.form {} $
-                      [ DOM.div { className: "form-group" }
-                          [ DOM.label
-                              { className: "form-control-label" }
-                              "Amount"
-                          , R.input
-                              { className: "form-control"
-                              , type: "text"
-                              , value: ""
-                              }
-                          ]
-                      , DOM.div { className: "form-group" }
-                          [ DOM.label
-                              { className: "form-control-label" }
-                              "Token"
-                          , R.input
-                              { className: "form-control"
-                              , type: "text"
-                              , value: ""
-                              }
-                          ]
-                      , DOM.div { className: "form-group" }
-                          [ DOM.label
-                              { className: "form-control-label" }
-                              "Party"
-                          , R.input
-                              { className: "form-control"
-                              , type: "text"
-                              , value: ""
-                              }
-                          ]
-                      ]
-                , onDismiss: updateState _ { newInput = Nothing }
-                , title: text "Apply inputs"
-                , footer: DOOM.fragment
-                    [ link
-                        { label: DOOM.text "Cancel"
-                        , onClick: updateState _ { newInput = Nothing }
-                        , showBorders: true
-                        }
-                    , DOM.button
-                        { className: "btn btn-primary"
-                        , onClick: onApplyInputs input { value: BigInt.fromInt 1, token: V1.Token "" "", party: V1.Address "" } cw
-                        }
-                        [ R.text "Submit" ]
-                    ]
+            Just (ApplyInputs transactionsEndpoint marloweInfo), Just cw -> do
+              let
+                onSuccess = \_ -> do
+                  msgHubProps.add $ Success $ DOOM.text $ fold
+                    [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
+                  updateState _ { modalAction = Nothing }
+              applyInputsComponent
+                { inModal: true
+                , transactionsEndpoint
+                , marloweInfo
+                , connectedWallet: cw
+                , onSuccess
+                , onDismiss: updateState _ { modalAction = Nothing }
                 }
-            _, _, _ -> mempty
+            _, _ -> mempty
         , DOM.div { className: "row justify-content-end" } $ Array.singleton $ do
             let
               disabled = isNothing connectedWallet
@@ -277,7 +250,10 @@ mkContractList = do
                 { icon: Icons.fileEarmarkPlus
                 , label: DOOM.text "Add contract"
                 , disabled
-                , onClick: onAddContractClick
+                , onClick: do
+                    readRef stateRef >>= _.modalAction >>> case _ of
+                      Nothing -> updateState _ { modalAction = Just NewContract }
+                      _ -> pure unit
                 }
             DOM.div { className: "col-3 text-end" } $ Array.singleton $
               if disabled then do
@@ -338,9 +314,15 @@ mkContractList = do
                               , placement: OverlayTrigger.placement.bottom
                               } $ DOM.span {} [ show status ]
                         , tdCentered
-                            [ case endpoints.transactions of
-                                Just transactionsEndpoint -> linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: updateState _ { newInput = Just { transactionsEndpoint, marloweInfo} } }
-                                _ -> mempty
+                            [ case endpoints.transactions, marloweInfo of
+                                Just transactionsEndpoint, Just marloweInfo' -> linkWithIcon
+                                  { icon: Icons.listOl
+                                  , label: DOOM.text "Apply"
+                                  , onClick: updateState _ { modalAction = Just (ApplyInputs transactionsEndpoint marloweInfo') }
+                                  }
+                                Just transactionEndpoint, Nothing -> DOOM.text "No Marlowe info"
+                                Nothing, _ -> DOOM.text "No transactions endpoint"
+                                _, _ -> DOOM.text "Awaiting details"
                             ]
                         ]
                 )
