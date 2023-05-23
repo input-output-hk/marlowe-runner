@@ -2,10 +2,14 @@ module Component.ContractList where
 
 import Prelude
 
+import Component.Types.ContractInfo (MarloweInfo(..))
+import Data.BigInt.Argonaut as BigInt
+import Contrib.Fetch (FetchError)
+import CardanoMultiplatformLib (CborHex)
+import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Actus.Domain (CashFlow)
 import Actus.Domain.ContractTerms (ContractTerms)
 import Component.CreateContract as CreateContract
--- import Component.EventList (submit)
 import Component.Modal (mkModal)
 import Component.Types (ActusContractId(..), ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
 import Component.Types.ContractInfo as ContractInfo
@@ -38,8 +42,10 @@ import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputConte
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Actus.Metadata as M
 import Marlowe.Runtime.Web.Client (post')
+import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, Token)
 import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxOutRef, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types (PostMerkleizationRequest(..), PostMerkleizationResponse(..), PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), Runtime(..), ServerURL, TextEnvelope(..), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
+import Marlowe.Runtime.Web.Client (put')
 import Marlowe.Runtime.Web.Types as Runtime
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (fragment) as DOOM
@@ -77,6 +83,14 @@ type SubmissionError = String
 
 type ContractListState =
   { newContract :: Boolean
+  , newInput :: 
+      Maybe 
+        { party ::V1.Party 
+        , token :: Token
+        , value :: BigInt.BigInt
+        , transactionsEndpoint :: TransactionsEndpoint
+        , marloweInfo :: Maybe MarloweInfo
+        }
   , metadata :: Maybe Metadata
   }
 
@@ -91,6 +105,14 @@ data OrderBy
 
 derive instance Eq OrderBy
 
+submit :: CborHex TransactionWitnessSetObject -> ServerURL -> TransactionEndpoint -> Aff (Either FetchError Unit)
+submit witnesses serverUrl transactionEndpoint = do
+  let
+    textEnvelope = toTextEnvelope witnesses ""
+
+    req = PutTransactionRequest textEnvelope
+  put' serverUrl transactionEndpoint req
+
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   Runtime runtime <- asks _.runtime
@@ -102,7 +124,7 @@ mkContractList = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
   liftEffect $ component "ContractList" \{ connectedWallet, contractList } -> React.do
-    ((state :: ContractListState) /\ updateState) <- useState { newContract: false, metadata: Nothing }
+    ((state :: ContractListState) /\ updateState) <- useState { newContract: false, newInput: Nothing, metadata: Nothing }
     ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
 
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -121,69 +143,71 @@ mkContractList = do
     let
       onAddContractClick = updateState _ { newContract = true }
 
-      -- onApplyInputs { party, token, value, transactionsEndpoint, marloweInfo } cw = handler_ do
-      --   now <- nowDateTime
-      --   -- FIXME: move aff flow into `useAff` on the component level
-      --   launchAff_ $ do
-      --     case possibleWalletContext of
-      --       Just { changeAddress: Just changeAddress } -> do
+      {-
+      onApplyInputs { party, token, value, transactionsEndpoint, marloweInfo } cw = handler_ do
+        now <- nowDateTime
+        -- FIXME: move aff flow into `useAff` on the component level
+        launchAff_ $ do
+          case possibleWalletContext of
+            Just { changeAddress: Just changeAddress } -> do
 
-      --         addresses <- walletAddresses cardanoMultiplatformLib cw
+              addresses <- walletAddresses cardanoMultiplatformLib cw
 
-      --         let
-      --           inputs = singleton $ NormalInput (IDeposit party party token value)
+              let
+                inputs = singleton $ NormalInput (IDeposit party party token value)
 
-      --           invalidBefore = fromMaybe now $ adjust (Duration.Minutes (-2.0)) now
-      --           invalidHereafter = fromMaybe now $ adjust (Duration.Minutes 2.0) now
-      --           collateralUTxOs = []
+                invalidBefore = fromMaybe now $ adjust (Duration.Minutes (-2.0)) now
+                invalidHereafter = fromMaybe now $ adjust (Duration.Minutes 2.0) now
+                collateralUTxOs = []
 
-      --           req = PostTransactionsRequest
-      --             { inputs
-      --             , invalidBefore
-      --             , invalidHereafter
-      --             , metadata: mempty
-      --             , tags: mempty
-      --             , changeAddress
-      --             , addresses
-      --             , collateralUTxOs
-      --             }
+                req = PostTransactionsRequest
+                  { inputs
+                  , invalidBefore
+                  , invalidHereafter
+                  , metadata: mempty
+                  , tags: mempty
+                  , changeAddress
+                  , addresses
+                  , collateralUTxOs
+                  }
 
-      --         -- post' runtime.serverURL transactionsEndpoint req
-      --         --   >>= case _ of
-      --         --     Right ({ resource: PostTransactionsResponse postTransactionsResponse, links: { transaction: transactionEndpoint } }) -> do
-      --         --       traceM postTransactionsResponse
-      --         --       let
-      --         --         { tx } = postTransactionsResponse
-      --         --         TextEnvelope { cborHex: txCborHex } = tx
-      --         --       Wallet.signTx cw txCborHex true >>= case _ of
-      --         --         Right witnessSet -> do
-      --         --           submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
-      --         --             Right _ -> do
-      --         --               traceM "Successfully submitted the transaction"
-      --         --               liftEffect $ msgHubProps.add $ Success $ DOOM.text $ "Successfully submitted a transaction"
-      --         --             -- liftEffect $ onSuccess contractEndpoint
-      --         --             Left err -> do
-      --         --               traceM "Error while submitting the transaction"
-      --         --               liftEffect $ msgHubProps.add $ Error $ DOOM.text $ "Error while submitting the transaction"
-      --         --               traceM err
+              post' runtime.serverURL transactionsEndpoint req
+                >>= case _ of
+                  Right ({ resource: PostTransactionsResponse postTransactionsResponse, links: { transaction: transactionEndpoint } }) -> do
+                    traceM postTransactionsResponse
+                    let
+                      { tx } = postTransactionsResponse
+                      TextEnvelope { cborHex: txCborHex } = tx
+                    Wallet.signTx cw txCborHex true >>= case _ of
+                      Right witnessSet -> do
+                        submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
+                          Right _ -> do
+                            traceM "Successfully submitted the transaction"
+                            liftEffect $ msgHubProps.add $ Success $ DOOM.text $ "Successfully submitted a transaction"
+                          -- liftEffect $ onSuccess contractEndpoint
+                          Left err -> do
+                            traceM "Error while submitting the transaction"
+                            liftEffect $ msgHubProps.add $ Error $ DOOM.text $ "Error while submitting the transaction"
+                            traceM err
 
-      --         --         Left err -> do
-      --         --           traceM err
-      --         --           pure unit
+                      Left err -> do
+                        traceM err
+                        pure unit
 
-      --         --       pure unit
-      --         --     Left _ -> do
-      --         --       traceM token
-      --         --       -- traceM $ BigInt.toString value
-      --         --       traceM "error"
-      --         --       pure unit
+                    pure unit
+                  Left _ -> do
+                    traceM token
+                    -- traceM $ BigInt.toString value
+                    traceM "error"
+                    pure unit
 
-      --         pure unit
-      --       _ -> do
-      --         -- Note: this happens, when the contract is in status `Unsigned`
-      --         pure unit
+              pure unit
+            _ -> do
+              -- Note: this happens, when the contract is in status `Unsigned`
+              pure unit
 
-      --   -- updateState _ { newInput = Nothing }
+        -- updateState _ { newContract = false }
+        -}
 
     pure $
       DOOM.div_
@@ -267,7 +291,11 @@ mkContractList = do
                               , placement: OverlayTrigger.placement.bottom
                               } $ DOM.span {} [ show status ]
                         , tdCentered
-                            [ linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: pure unit } ]
+                            [ case state.newInput, connectedWallet of
+                                -- Just input, Just cw -> linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: onApplyInputs input cw }
+                                Just input, Just cw -> linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: pure unit}
+                                _, _ -> mempty
+                            ]
                         ]
                 )
                 contractList'
