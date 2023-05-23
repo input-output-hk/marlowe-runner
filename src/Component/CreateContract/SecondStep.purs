@@ -559,9 +559,7 @@ mkJsonForm :: _ -> BootstrapForm Effect Query Result
 mkJsonForm cardanoMultiplatformLib = FormBuilder.evalBuilder' $ FormBuilder.textArea
   { missingError: "Please provide contract terms JSON value"
   , helpText: Just $ DOOM.div_
-      [ DOOM.text "We gonna perform only a basic JSON validation in here and we won't perform any ACTUS applicablity checks."
-      , DOOM.br {}
-      , DOOM.text "We implemented a more robust validation schemes in the case of the any other create contract flow than this one."
+      [ DOOM.text "basic JSON validation"
       ]
   , initial: initialJson
   , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
@@ -664,7 +662,7 @@ mkComponent = do
           ]
 
       if inModal then modal
-        { title: R.text "Add contract | Step 2 of 4"
+        { title: R.text "Add contract"
         , onDismiss
         , body: DOM.div { className: "row" }
             [ DOM.div { className: "col-12" } [ formBody ]
