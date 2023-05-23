@@ -1,10 +1,11 @@
-# marlowe-actus-labs
-
-Web app which deploys ACTUS contracts using Marlowe on the Cardano blockchain. WIP.
+# marlowe-run-lite
 
 ## Installation
 
-Devel env `shell.nix` doesn't cover `Js` deps so in order to build the app you have to perform `$ npm install` manually.
+* Nix:
+  ```shell
+  $ nix develop
+  ```
 
 ## CI
 
