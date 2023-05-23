@@ -2,19 +2,18 @@ module Component.ContractList where
 
 import Prelude
 
-import Component.Types.ContractInfo (MarloweInfo(..))
-import Data.BigInt.Argonaut as BigInt
-import Contrib.Fetch (FetchError)
-import CardanoMultiplatformLib (CborHex)
-import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Actus.Domain (CashFlow)
 import Actus.Domain.ContractTerms (ContractTerms)
+import CardanoMultiplatformLib (CborHex)
+import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.CreateContract as CreateContract
 import Component.Modal (mkModal)
-import Component.Types (ActusContractId(..), ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
+import Component.Types (ActusContractId(..), ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
+import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (link, linkWithIcon)
+import Contrib.Fetch (FetchError)
 import Contrib.React.Bootstrap (overlayTrigger, tooltip)
 import Contrib.React.Bootstrap.Icons as Icons
 import Contrib.React.Bootstrap.Table (striped) as Table
@@ -23,6 +22,7 @@ import Contrib.React.Bootstrap.Types as OverlayTrigger
 import Control.Monad.Reader.Class (asks)
 import Data.Array (elem, singleton, toUnfoldable)
 import Data.Array as Array
+import Data.BigInt.Argonaut as BigInt
 import Data.DateTime (adjust)
 import Data.Decimal (Decimal)
 import Data.Either (Either(..))
@@ -38,14 +38,14 @@ import Debug (traceM)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now (nowDateTime)
+import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, Token)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputContent(..), Party)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Actus.Metadata as M
 import Marlowe.Runtime.Web.Client (post')
-import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, Token)
+import Marlowe.Runtime.Web.Client (put')
 import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxOutRef, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types (PostMerkleizationRequest(..), PostMerkleizationResponse(..), PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), Runtime(..), ServerURL, TextEnvelope(..), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
-import Marlowe.Runtime.Web.Client (put')
 import Marlowe.Runtime.Web.Types as Runtime
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (fragment) as DOOM
@@ -125,6 +125,7 @@ mkContractList = do
 
   liftEffect $ component "ContractList" \{ connectedWallet, contractList } -> React.do
     ((state :: ContractListState) /\ updateState) <- useState { newContract: false, newInput: Nothing, metadata: Nothing }
+
     ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
 
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -143,15 +144,15 @@ mkContractList = do
     let
       onAddContractClick = updateState _ { newContract = true }
 
-      {-
-      onApplyInputs { party, token, value, transactionsEndpoint, marloweInfo } cw = handler_ do
+      onApplyInputs { party, token, value, transactionsEndpoint, marloweInfo } cw = do
         now <- nowDateTime
         -- FIXME: move aff flow into `useAff` on the component level
         launchAff_ $ do
           case possibleWalletContext of
             Just { changeAddress: Just changeAddress } -> do
-
-              addresses <- walletAddresses cardanoMultiplatformLib cw
+              let
+                WalletInfo { wallet: walletApi } = cw
+              addresses <- walletAddresses cardanoMultiplatformLib walletApi
 
               let
                 inputs = singleton $ NormalInput (IDeposit party party token value)
@@ -178,7 +179,7 @@ mkContractList = do
                     let
                       { tx } = postTransactionsResponse
                       TextEnvelope { cborHex: txCborHex } = tx
-                    Wallet.signTx cw txCborHex true >>= case _ of
+                    Wallet.signTx walletApi txCborHex true >>= case _ of
                       Right witnessSet -> do
                         submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
                           Right _ -> do
@@ -207,7 +208,6 @@ mkContractList = do
               pure unit
 
         -- updateState _ { newContract = false }
-        -}
 
     pure $
       DOOM.div_
@@ -292,8 +292,7 @@ mkContractList = do
                               } $ DOM.span {} [ show status ]
                         , tdCentered
                             [ case state.newInput, connectedWallet of
-                                -- Just input, Just cw -> linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: onApplyInputs input cw }
-                                Just input, Just cw -> linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: pure unit}
+                                Just input, Just cw -> linkWithIcon { icon: Icons.listOl, label: DOOM.text "Apply", onClick: onApplyInputs input cw }
                                 _, _ -> mempty
                             ]
                         ]
