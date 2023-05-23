@@ -67,6 +67,9 @@ txOutRefFromString = String.split (String.Pattern "#") >>> case _ of
 txOutRefToString :: TxOutRef -> String
 txOutRefToString (TxOutRef { txId: TxId txId, txIx }) = txId <> "#" <> show txIx
 
+txOutRefToUrlEncodedString :: TxOutRef -> String
+txOutRefToUrlEncodedString (TxOutRef { txId: TxId txId, txIx }) = txId <> "%23" <> show txIx
+
 type ContractId = TxOutRef
 
 newtype PolicyId = PolicyId String

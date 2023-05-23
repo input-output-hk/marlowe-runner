@@ -38,7 +38,7 @@ import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputConte
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Actus.Metadata as M
 import Marlowe.Runtime.Web.Client (post')
-import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxOutRef, txOutRefToString)
+import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxOutRef, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types (PostMerkleizationRequest(..), PostMerkleizationResponse(..), PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), Runtime(..), ServerURL, TextEnvelope(..), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
 import Marlowe.Runtime.Web.Types as Runtime
 import Marlowe.Runtime.Web.Types as Runtime
@@ -254,7 +254,13 @@ mkContractList = do
                     in
                       DOM.tr {}
                         [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
-                        , tdCentered [ text $ txOutRefToString contractId ]
+                        , tdCentered [ DOM.a
+                           { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover"
+                           , target: "_blank"
+                           , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
+                           }
+                           [ text $ txOutRefToString contractId ]
+                          ]
                         , DOM.td { className: "text-center" } $ do
                             let
                               tooltipJSX = tooltip {} (DOOM.text $ txOutRefToString contractId)
