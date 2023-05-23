@@ -145,7 +145,7 @@ mkApp = do
   (ContractWithTransactionsStream contractStream) <- asks _.contractStream
 
   throttledEmitter :: Subscription.Emitter (List ContractWithTransactionsEvent) <- liftEffect $
-    Subscription.foldMapThrottle (List.singleton) (MinInterval $ Milliseconds 10_000.0) contractStream.emitter
+    Subscription.foldMapThrottle (List.singleton) (MinInterval $ Milliseconds 60_000.0) contractStream.emitter
 
   initialVersion <- liftEffect now
 
