@@ -2,93 +2,99 @@ module Component.CreateContract where
 
 import Prelude
 
-import CardanoMultiplatformLib (Bech32)
-import Component.Modal (mkModal)
-import Component.Modal as Modal
-import Component.Types (MkComponentM, WalletInfo)
-import Component.Widgets (link)
-import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
-import Contrib.React.Basic.Hooks.UseForm (useForm)
-import Contrib.React.Basic.Hooks.UseForm as UseForm
-import Contrib.React.Bootstrap.FormBuilder (BootstrapForm)
-import Contrib.React.Bootstrap.FormBuilder as FormBuilder
-import Control.Monad.Reader.Class (asks)
-import Data.Argonaut (decodeJson, parseJson)
-import Data.Array as Array
-import Data.Bifunctor (lmap)
-import Data.Either (Either(..))
-import Data.FormURLEncoded.Query (FieldId(..), Query)
-import Data.Maybe (Maybe(..))
-import Data.Newtype (un)
-import Data.Time.Duration (Seconds(..))
-import Data.Tuple (snd)
-import Data.Validation.Semigroup (V(..))
-import Debug (traceM)
-import Effect (Effect)
-import Effect.Aff (Aff, launchAff_)
-import Effect.Class (liftEffect)
-import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Runtime.Web (Runtime(..))
-import Marlowe.Runtime.Web.Client (ClientError)
-import Marlowe.Runtime.Web.Types (ContractsEndpoint(..), PostContractsRequest(..), PostContractsResponseContent(..), ServerURL(..), TxOutRef(..))
-import Polyform.Validator (liftFnEither) as Validator
-import React.Basic (JSX)
-import React.Basic (fragment) as DOOM
-import React.Basic.DOM (br, div_, text) as DOOM
-import React.Basic.DOM as R
-import React.Basic.DOM.Events (preventDefault)
-import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (component, useContext, useState', (/\))
-import React.Basic.Hooks as React
-import Wallet as Wallet
-import WalletContext (WalletContext(..))
 import Actus.Domain (ContractTerms(..))
+import Actus.Domain (ContractTerms)
+import CardanoMultiplatformLib (Bech32)
+import CardanoMultiplatformLib (Bech32)
 import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Lib as Lib
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.CreateContract.Types (FourthStepBaseRow)
 import Component.Modal (mkModal)
+import Component.Modal (mkModal)
+import Component.Modal as Modal
 import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo(..))
+import Component.Types (MkComponentM, WalletInfo)
 import Component.Widgets (link)
+import Component.Widgets (link)
+import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
+import Contrib.React.Basic.Hooks.UseForm (useForm)
+import Contrib.React.Basic.Hooks.UseForm as UseForm
+import Contrib.React.Bootstrap.FormBuilder (BootstrapForm)
+import Contrib.React.Bootstrap.FormBuilder as FormBuilder
 import Contrib.React.Bootstrap.Table (table)
 import Contrib.React.Bootstrap.Table as Table
 import Control.Monad.Reader.Class (asks)
+import Control.Monad.Reader.Class (asks)
+import Data.Argonaut (decodeJson, parseJson)
 import Data.Argonaut (encodeJson)
+import Data.Argonaut as Argonaut
+import Data.Argonaut.Encode as Argonaut
+import Data.Array as Array
+import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut as BigInt
+import Data.Bounded.Generic (genericBottom, genericTop)
+import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
+import Data.Either (Either(..))
+import Data.Enum (class BoundedEnum, class Enum)
+import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
+import Data.FormURLEncoded.Query (FieldId(..), Query)
+import Data.Generic.Rep (class Generic)
+import Data.Int as Int
 import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Data.Newtype (un)
+import Data.Show.Generic (genericShow)
+import Data.Time.Duration (Milliseconds(..), Seconds(..))
+import Data.Tuple (snd)
+import Data.Validation.Semigroup (V(..))
+import Debug (traceM)
 import Debug (traceM)
 import Effect (Effect)
+import Effect (Effect)
+import Effect.Aff (Aff, launchAff_)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
+import Effect.Class (liftEffect)
+import Effect.Now (now)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Marlowe.Actus (CashFlows)
 import Marlowe.Actus.Metadata (Metadata(..), actusMetadataKey)
+import Marlowe.Runtime.Web (Runtime(..))
 import Marlowe.Runtime.Web.Client (ClientError(..), merkleize, post', put')
+import Marlowe.Runtime.Web.Client (ClientError)
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent(..), PostMerkleizationRequest(..), PostMerkleizationResponse(..), PutContractRequest(..), Runtime(..), ServerURL, TextEnvelope(..), toTextEnvelope)
+import Marlowe.Runtime.Web.Types (ContractsEndpoint(..), PostContractsRequest(..), PostContractsResponseContent(..), ServerURL(..), TxOutRef(..))
+import Marlowe.Runtime.Web.Types (TxOutRef)
 import Marlowe.Runtime.Web.Types as RT
+import Partial.Unsafe (unsafeCrashWith, unsafePartial)
+import Polyform.Validator (liftFnEither) as Validator
+import React.Basic (JSX)
 import React.Basic (fragment) as DOOM
+import React.Basic (fragment) as DOOM
+import React.Basic.DOM (br, div_, text) as DOOM
 import React.Basic.DOM (tbody_, td_, text, tr_) as DOOM
+import React.Basic.DOM as R
 import React.Basic.DOM.Events (preventDefault)
+import React.Basic.DOM.Events (preventDefault)
+import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler)
 import React.Basic.Hooks (JSX, component, useState', (/\))
+import React.Basic.Hooks (component, useContext, useState', (/\))
+import React.Basic.Hooks as React
 import React.Basic.Hooks as React
 import Type.Row (type (+))
-import Wallet as Wallet
-import Actus.Domain (ContractTerms)
-import CardanoMultiplatformLib (Bech32)
-import Data.Bounded.Generic (genericBottom, genericTop)
-import Data.Enum (class BoundedEnum, class Enum)
-import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
-import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
-import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Actus (CashFlows)
-import Marlowe.Runtime.Web.Types (TxOutRef)
 import Type.Row (type (+))
+import Wallet as Wallet
+import Wallet as Wallet
+import WalletContext (WalletContext(..))
 
 type Props =
   { inModal :: Boolean
@@ -99,16 +105,15 @@ type Props =
 
 type Result = V1.Contract
 
-mkJsonForm :: _
- -> BootstrapForm Effect Query Result
-mkJsonForm cardanoMultiplatformLib = FormBuilder.evalBuilder' $ FormBuilder.textArea
+mkJsonForm :: V1.Contract -> _ -> BootstrapForm Effect Query Result
+mkJsonForm initialContract cardanoMultiplatformLib = FormBuilder.evalBuilder' $ FormBuilder.textArea
   { missingError: "Please provide contract terms JSON value"
   , helpText: Just $ DOOM.div_
       [ DOOM.text "We gonna perform only a basic JSON validation in here and we won't perform any ACTUS applicablity checks."
       , DOOM.br {}
       , DOOM.text "We implemented a more robust validation schemes in the case of the any other create contract flow than this one."
       ]
-  , initial: initialJson
+  , initial: Argonaut.toJsonString initialContract
   , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
       json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
       lmap (Array.singleton <<< show) (decodeJson json)
@@ -169,11 +174,13 @@ mkComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
+  initialContract <- liftEffect mkInitialContract
+
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss, inModal } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     step /\ setStep <- useState' Creating
     let
-      form = mkJsonForm cardanoMultiplatformLib
+      form = mkJsonForm initialContract cardanoMultiplatformLib
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
@@ -260,7 +267,23 @@ mkComponent = do
         formBody
 
 
--- "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
+address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
 
-initialJson :: String
-initialJson = """{"when":[{"then":{"when":[{"then":{"when":[{"then":{"when":[{"then":"close","case":{"for_choice":{"choice_owner":{"role_token":"Buyer"},"choice_name":"Everything is alright"},"choose_between":[{"to":0,"from":0}]}},{"then":{"token":{"token_name":"","currency_symbol":""},"to":{"account":{"role_token":"Buyer"}},"then":{"when":[{"then":"close","case":{"for_choice":{"choice_owner":{"role_token":"Seller"},"choice_name":"Confirm problem"},"choose_between":[{"to":1,"from":1}]}},{"then":{"token":{"token_name":"","currency_symbol":""},"to":{"party":{"address":"addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"}},"then":{"token":{"token_name":"","currency_symbol":""},"to":{"party":{"address":"addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"}},"then":"close","pay":10000000,"from_account":{"role_token":"Buyer"}},"pay":10000000,"from_account":{"role_token":"Seller"}},"case":{"for_choice":{"choice_owner":{"role_token":"Seller"},"choice_name":"Dispute problem"},"choose_between":[{"to":0,"from":0}]}}],"timeout_continuation":"close","timeout":1684853188131},"pay":100000000,"from_account":{"role_token":"Seller"}},"case":{"for_choice":{"choice_owner":{"role_token":"Buyer"},"choice_name":"Report problem"},"choose_between":[{"to":1,"from":1}]}}],"timeout_continuation":"close","timeout":1684852888131},"case":{"party":{"role_token":"Buyer"},"of_token":{"token_name":"","currency_symbol":""},"into_account":{"role_token":"Seller"},"deposits":100000000}}],"timeout_continuation":"close","timeout":1684852588131},"case":{"party":{"role_token":"Buyer"},"of_token":{"token_name":"","currency_symbol":""},"into_account":{"role_token":"Buyer"},"deposits":10000000}}],"timeout_continuation":"close","timeout":1684852288131},"case":{"party":{"role_token":"Seller"},"of_token":{"token_name":"","currency_symbol":""},"into_account":{"role_token":"Seller"},"deposits":10000000}}],"timeout_continuation":"close","timeout":1684851988131}"""
+mkInitialContract = do
+  nowMilliseconds <- unInstant <$> now
+  let
+    timeout = case instant (nowMilliseconds <> Milliseconds (Int.toNumber $ 5 * 60 * 1000)) of
+      Just i -> i
+      Nothing -> unsafeCrashWith "Invalid instant"
+
+  pure $ V1.When
+      [V1.Case
+          (V1.Deposit
+              (V1.Address address)
+              (V1.Address address)
+              (V1.Token "" "")
+              (V1.Constant $ BigInt.fromInt 1000000)
+          )
+          V1.Close ]
+      timeout
+      V1.Close
