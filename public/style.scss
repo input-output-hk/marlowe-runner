@@ -1,0 +1,122 @@
+@import "bootstrap/scss/functions";
+@import "bootstrap/scss/variables";
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/utilities";
+
+$utilities: map-merge(
+  $utilities, (
+    "text-decoration": (
+      property: text-decoration,
+      state: hover,
+      values: none underline line-through,
+    ),
+    "background-color": (
+      property: background-color,
+      class: bg,
+      local-vars: (
+        "bg-opacity": 1
+      ),
+      state: hover,
+      values: map-merge(
+        $utilities-bg-colors,
+        (
+          "transparent": transparent
+        )
+      )
+    ),
+    "min-height": (
+      property: min-height,
+      class: min-h,
+      values: (
+        0: 0,
+        1rem: 1rem,
+        1_2rem: 1.2rem,
+        1_5rem: 1.5rem,
+        2rem: 2rem,
+        4rem: 4rem,
+        5rem: 5rem,
+        8rem: 8rem,
+        16rem: 16rem,
+        32rem: 32rem,
+        full: 100vh,
+        screen: 100vh,
+      )
+    ),
+    "width": (
+      property: width,
+      class: w,
+      values: (
+        1px: 1px,
+        2px: 2px,
+        4px: 4px,
+        8px: 8px,
+        16px: 16px,
+        32px: 32px,
+        64px: 64px,
+        128px: 128px,
+        1rem: 1rem,
+        1_2rem: 1.2rem,
+        1_5rem: 1.5rem,
+        2rem: 2rem,
+        4rem: 4rem,
+        8rem: 8rem,
+        16rem: 16rem,
+        32rem: 32rem,
+      )
+    ),
+    "margin-top": (
+      responsive: true,
+      property: margin-top,
+      class: mt,
+      values: map-merge(
+        $spacers,
+        ( auto: auto,
+          6: $spacer * 6,
+          7: $spacer * 7,
+          8: $spacer * 8,
+          9: $spacer * 9,
+          10: $spacer * 10,
+          11: $spacer * 11,
+          12: $spacer * 12,
+          13: $spacer * 13,
+          14: $spacer * 14
+        )
+      )
+    ),
+    "margin-bottom": (
+      responsive: true,
+      property: margin-bottom,
+      class: mb,
+      values: map-merge(
+        $spacers,
+        ( auto: auto,
+          6: $spacer * 6,
+          7: $spacer * 7,
+          8: $spacer * 8,
+          9: $spacer * 9,
+          10: $spacer * 10,
+          11: $spacer * 11,
+          12: $spacer * 12,
+          13: $spacer * 13,
+          14: $spacer * 14
+        )
+      )
+    ),
+    // "background-color": (
+    //   property: background-color,
+    //   class: bgg,
+    //   state: hover,
+    //   values: map-merge(
+    //     $utilities-bg-colors,
+    //     (
+    //       "transparent": transparent
+    //     )
+    //   )
+    // )
+  )
+);
+
+// @debug '*** Utilities: #{$utilities}';
+
+
+@import "bootstrap/scss/bootstrap";

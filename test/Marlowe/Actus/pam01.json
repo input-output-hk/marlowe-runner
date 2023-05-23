@@ -1,0 +1,18 @@
+{
+    "contractType": "PAM",
+    "contractID": "pam01",
+    "statusDate": "2012-12-30T00:00:00",
+    "contractDealDate": "2012-12-28T00:00:00",
+    "currency": "USD",
+    "notionalPrincipal": "3000",
+    "initialExchangeDate": "2013-01-01T00:00:00",
+    "maturityDate": "2014-01-01T00:00:00",
+    "nominalInterestRate": "0.1",
+    "cycleAnchorDateOfInterestPayment": "2013-01-01T00:00:00",
+    "cycleOfInterestPayment": "P1ML0",
+    "dayCountConvention": "A365",
+    "endOfMonthConvention": "SD",
+    "premiumDiscountAtIED": "   0",
+    "rateMultiplier": "1.0",
+    "contractRole": "RPA"
+}

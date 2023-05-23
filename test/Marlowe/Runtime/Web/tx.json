@@ -1,0 +1,121 @@
+{
+  "links": {
+    "previous": "contracts/3c2766b745491150d0c616a1fd4d1b2faee8d1902d0a73f997fe2c5185c77422%231/transactions/be151cd7b55c6720d8570d163cc9aa88b8bd83d8d8f2133d7bbfa5d7ebd95aba"
+  },
+  "resource": {
+    "block": {
+      "blockHeaderHash": "fea9105a22cad4ab2a0fa00016993f954aac83659c62c557be2888f34f383760",
+      "blockNo": 53164,
+      "slotNo": 1168524
+    },
+    "consumingTx": null,
+    "contractId": "3c2766b745491150d0c616a1fd4d1b2faee8d1902d0a73f997fe2c5185c77422#1",
+    "inputContract": {
+      "timeout": 1668824431633,
+      "timeout_continuation": "close",
+      "when": [
+        {
+          "case": {
+            "deposits": 500,
+            "into_account": {
+              "role_token": "bParty"
+            },
+            "of_token": {
+              "currency_symbol": "321beef8389ccc0c54f59f067212f005ebeb26443457b9f3ee5d5551",
+              "token_name": "Swan"
+            },
+            "party": {
+              "role_token": "bParty"
+            }
+          },
+          "then": {
+            "from_account": {
+              "role_token": "aParty"
+            },
+            "pay": 300,
+            "then": {
+              "from_account": {
+                "role_token": "bParty"
+              },
+              "pay": 500,
+              "then": "close",
+              "to": {
+                "party": {
+                  "role_token": "aParty"
+                }
+              },
+              "token": {
+                "currency_symbol": "321beef8389ccc0c54f59f067212f005ebeb26443457b9f3ee5d5551",
+                "token_name": "Swan"
+              }
+            },
+            "to": {
+              "party": {
+                "role_token": "bParty"
+              }
+            },
+            "token": {
+              "currency_symbol": "1e1f1e8d7e7c049288364c2d9f07d7341228269c2ae36417e3b52eea",
+              "token_name": "Globe"
+            }
+          }
+        }
+      ]
+    },
+    "inputState": {
+      "accounts": [
+        [
+          [
+            {
+              "address": "addr_test1vp7lazcjjaea0zdjkcu5v98hr3dfktpd0ff5pgl83rmtgls66f08t"
+            },
+            {
+              "currency_symbol": "",
+              "token_name": ""
+            }
+          ],
+          3000000
+        ],
+        [
+          [
+            {
+              "role_token": "aParty"
+            },
+            {
+              "currency_symbol": "1e1f1e8d7e7c049288364c2d9f07d7341228269c2ae36417e3b52eea",
+              "token_name": "Globe"
+            }
+          ],
+          300
+        ]
+      ],
+      "boundValues": [],
+      "choices": [],
+      "minTime": 1667823431000
+    },
+    "inputUtxo": "be151cd7b55c6720d8570d163cc9aa88b8bd83d8d8f2133d7bbfa5d7ebd95aba#1",
+    "inputs": [
+      {
+        "input_from_party": {
+          "role_token": "bParty"
+        },
+        "into_account": {
+          "role_token": "bParty"
+        },
+        "of_token": {
+          "currency_symbol": "321beef8389ccc0c54f59f067212f005ebeb26443457b9f3ee5d5551",
+          "token_name": "Swan"
+        },
+        "that_deposits": 500
+      }
+    ],
+    "invalidBefore": "2022-11-07T14:47:11Z",
+    "invalidHereafter": "2022-11-07T14:47:11Z",
+    "outputContract": null,
+    "outputState": null,
+    "outputUtxo": null,
+    "status": "confirmed",
+    "transactionId": "513c25548b33a0a5a27ce5d427c5b80b69404bf22d3d7ce473495590fada4dae",
+    "txBody": null
+  }
+}

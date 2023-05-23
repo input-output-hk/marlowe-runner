@@ -1,0 +1,53 @@
+{
+  "dependencies": {
+    "@babel/register": "^7.18.9",
+    "@cardano-sdk/wallet": "^0.7.0",
+    "@dcspark/cardano-multiplatform-lib-browser": "^3.1.2",
+    "@dcspark/cardano-multiplatform-lib-nodejs": "^3.1.2",
+    "@emurgo/cardano-message-signing-browser": "^1.0.1",
+    "@emurgo/cardano-message-signing-nodejs": "^1.0.1",
+    "big-integer": "^1.6.51",
+    "bip39": "^3.0.4",
+    "bootstrap": "^5.2.3",
+    "bootstrap-icons": "^1.10.2",
+    "browser-or-node": "^2.1.1",
+    "css-loader": "^6.7.3",
+    "decimal.js": "^10.4.2",
+    "domready": "^1.0.8",
+    "hex-string": "^1.0.3",
+    "html-loader": "^4.2.0",
+    "html-webpack-plugin": "^5.5.0",
+    "json-bigint": "^1.0.0",
+    "postcss-loader": "^7.0.2",
+    "react": "^18.2.0",
+    "react-bootstrap": "^2.7.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^4.7.1",
+    "react-markdown": "^8.0.5",
+    "remark-html": "^15.0.1",
+    "remark-loader": "^5.0.0",
+    "sass": "^1.57.1",
+    "sass-loader": "^13.2.0",
+    "style-loader": "^3.3.1",
+    "tiny-secp256k1": "^2.2.1",
+    "typescript": "^4.9.5",
+    "typescript-language-server": "^3.1.0",
+    "webpack": "^5.75.0",
+    "webpack-dev-server": "^4.11.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.15.18",
+    "express": "^4.18.2",
+    "webpack-cli": "^5.0.1"
+  },
+  "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
+  "scripts": {
+    "postinstall": "if ! command -v purs &> /dev/null; then npm install --no-save spago@0.20.9 purescript@0.15.6; fi",
+    "bundle": "webpack-cli --mode=production -c webpack.js",
+    "start": "webpack-cli serve --mode=development -c webpack.js",
+    "test": "node --experimental-specifier-resolution=node -e \"import('./output/Test.Main/index.js').then(function(Main) { Main.main(); })\""
+  }
+}
