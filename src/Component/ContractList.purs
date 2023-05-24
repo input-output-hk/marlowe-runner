@@ -308,7 +308,10 @@ mkContractList = do
                           ]
                         , DOM.td { className: "text-center" } $ do
                             let
-                              tooltipJSX = tooltip {} (DOOM.text $ txOutRefToString contractId)
+                              tooltipJSX = tooltip {} (DOOM.text $
+                                            case marloweInfo of
+                                                Just (MarloweInfo {currentContract: Just contract}) -> show contract
+                                                _ -> "")
                             overlayTrigger
                               { overlay: tooltipJSX
                               , placement: OverlayTrigger.placement.bottom
