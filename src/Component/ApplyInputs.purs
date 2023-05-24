@@ -435,27 +435,10 @@ mkNotifyFormComponent = do
 
   liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ notifyInputs, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
-    -- type ChoiceFieldProps validatorM a =
-    --   { validator :: Batteries.Validator validatorM String (Maybe String) a
-    --   | NotifyFieldOptionalPropsRow ()
-    --   }
     let
-      validator :: Batteries.Validator Effect _ _ _
-      validator = do
-        let
-          value2Deposit = Map.fromFoldable $ mapWithIndexFlipped notifyInputs \idx notifyInput -> show idx /\ notifyInput
-        liftFnMaybe (\v -> ["Invalid choice: " <> show v]) \possibleIdx -> do
-          idx <- possibleIdx
-          Map.lookup idx value2Deposit
-
-      form = FormBuilder.evalBuilder' $ ado
-        value <- intInput {}
-        in
-          { value }
-
-      onSubmit :: { result :: _ , payload :: _ } -> Effect Unit
-      onSubmit = _.result >>> case _, possibleWalletContext of
-        Just (V (Right { value }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
+      onSubmit :: EventHandler
+      onSubmit = handler_ $ case possibleWalletContext of
+        Just { changeAddress: Just changeAddress, usedAddresses } -> do
           let
             inputs = Array.singleton $ NormalInput INotify
             applyInputsContext = ApplyInputsContext
@@ -494,29 +477,18 @@ mkNotifyFormComponent = do
 
                 Left err ->
                   traceM $ "Error: " <> show err
-        _, _ -> do
+        _ -> do
             -- Rather improbable path because we disable submit button if the form is invalid
             pure unit
 
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
-      , onSubmit
-      , validationDebounce: Seconds 0.5
-      }
     pure $ modal do
       let
-        fields = UseForm.renderForm form formState
-        body = DOM.div { className: "form-group" } fields
+        body = DOOM.text ""
         actions = DOOM.fragment
           [ DOM.button
-              do
-                let
-                  disabled = case result of
-                    Just (V (Right _) /\ _) -> false
-                    _ -> true
                 { className: "btn btn-primary"
-                , onClick: onSubmit'
-                , disabled
+                , onClick: onSubmit
+                , disabled: false
                 }
               [ R.text "Submit" ]
           ]
