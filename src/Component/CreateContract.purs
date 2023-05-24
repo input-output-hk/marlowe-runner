@@ -17,7 +17,7 @@ import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Bootstrap.FormBuilder (BootstrapForm)
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
 import Control.Monad.Reader.Class (asks)
-import Data.Argonaut (decodeJson, parseJson)
+import Data.Argonaut (decodeJson, encodeJson, parseJson, stringifyWithIndent)
 import Data.Argonaut.Encode (toJsonString) as Argonaut
 import Data.Array as Array
 import Data.Bifunctor (lmap)
@@ -65,7 +65,8 @@ mkJsonForm initialContract = FormBuilder.evalBuilder' $ FormBuilder.textArea
   , helpText: Just $ DOOM.div_
       [ DOOM.text "Basic JSON validation"
       ]
-  , initial: Argonaut.toJsonString initialContract
+  , initial: stringifyWithIndent 2 $ encodeJson initialContract
+  , touched: true
   , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
       json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
       lmap (Array.singleton <<< show) (decodeJson json)
@@ -127,9 +128,6 @@ mkComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  let
-    address :: String
-    address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
 
   { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts address
 
@@ -137,8 +135,7 @@ mkComponent = do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     step /\ setStep <- useState' Creating
     let
-      form = mkJsonForm initialContract
-
+      form = mkJsonForm brianContract
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
@@ -229,6 +226,8 @@ one = BigInt.fromInt 1
 three = BigInt.fromInt 3
 four = BigInt.fromInt 4
 
+address :: String
+address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
 
 mkInitialContracts :: String -> Effect { multiChoiceTest :: V1.Contract }
 mkInitialContracts address = do
@@ -241,32 +240,45 @@ mkInitialContracts address = do
   pure
     { multiChoiceTest: mkMultiChoiceTest address timeout
     }
+
+brianContract = do
+  let
+    timeout = BigInt.fromString "1684937880000"
+    possibleContract = decodeJson $
+      encodeJson {"when":[{"then":{"when":[{"then":{"when":[{"then":"close","case":{"notify_if":true}}],"timeout_continuation":"close","timeout": timeout},"case":{"for_choice":{"choice_owner":{"address":address},"choice_name":"Release"},"choose_between":[{"to":1,"from":1}]}}],"timeout_continuation":"close","timeout":timeout},"case":{"party":{"address":address},"of_token":{"token_name":"","currency_symbol":""},"into_account":{"address":address},"deposits":10000000}}],"timeout_continuation":"close","timeout": timeout}
+  case possibleContract of
+    Left err -> unsafeCrashWith $ "Failed to decode contract: " <> show err
+    Right contract -> contract
+
 --    , escrow : mkEscrow address
 --    }
 --
--- mkEscrowWithCollateral :: String -> V1.Contract
--- mkEscrowWithCollateral
+-- mkEscrowWithCollateral :: String -> Int -> Int -> V1.Contract
+-- mkEscrowWithCollateral address collateralLovelace priceLovelace = do
+--   let
+--     collateral = V1.Constant $ BigInt.fromInt collateralLovelace
+--     price = V1.Constant $ BigInt.fromInt priceLovelace
 --   V1.When [
 --     (V1.Case
 --        (V1.Deposit
 --           (V1.Role "Seller")
 --           (V1.Role "Seller")
 --           (V1.Token "" "")
---           (V1.ConstantParam "Collateral amount"))
+--           collateral
 --        (V1.When [
 --           (V1.Case
 --              (V1.Deposit
 --                 (V1.Role "Buyer")
 --                 (V1.Role "Buyer")
 --                 (V1.Token "" "")
---                 (V1.ConstantParam "Collateral amount"))
+--                 collateral
 --              (V1.When [
 --                 (V1.Case
 --                    (V1.Deposit
 --                       (V1.Role "Seller")
 --                       (V1.Role "Buyer")
 --                       (V1.Token "" "")
---                       (V1.ConstantParam "Price"))
+--                       price)
 --                    (V1.When [
 --                          (V1.Case
 --                             (V1.Choice
@@ -284,7 +296,7 @@ mkInitialContracts address = do
 --                                (V1.Account
 --                                   (V1.Role "Buyer"))
 --                                (V1.Token "" "")
---                                (V1.ConstantParam "Price")
+--                                price
 --                                (V1.When [
 --                                      (V1.Case
 --                                         (V1.Choice
@@ -302,7 +314,7 @@ mkInitialContracts address = do
 --                                            (V1.Party
 --                                               (V1.PK "0000000000000000000000000000000000000000000000000000000000000000"))
 --                                            (V1.Token "" "")
---                                            (V1.ConstantParam "Collateral amount")
+--                                            collateral
 --                                            (V1.Pay
 --                                               (V1.Role "Buyer")
 --                                               (V1.Party
