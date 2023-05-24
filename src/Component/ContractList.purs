@@ -28,6 +28,7 @@ import Contrib.React.Bootstrap.Types as OverlayTrigger
 import Control.Monad.Reader.Class (asks)
 import Data.Array (elem, singleton, toUnfoldable)
 import Data.Array as Array
+import Data.Argonaut (encodeJson, stringify)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime (adjust)
 import Data.DateTime.Instant (unInstant)
@@ -69,7 +70,7 @@ import Marlowe.Runtime.Web.Types as Runtime
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Batteries as Batteries
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (div_, span_, text) as DOOM
+import React.Basic.DOM (div_, span_, text, hr) as DOOM
 import React.Basic.DOM (text)
 import React.Basic.DOM as R
 import React.Basic.DOM.Events (targetValue)
@@ -352,10 +353,11 @@ mkContractList = do
                           ]
                         , DOM.td { className: "text-center" } $ do
                             let
-                              tooltipJSX = tooltip {} (DOOM.text $
+                              tooltipJSX = tooltip {} (-- DOOM.text $
                                             case marloweInfo of
-                                                Just (MarloweInfo {currentContract: Just contract}) -> show contract
-                                                _ -> "")
+                                                Just (MarloweInfo {currentContract: Just contract, state: Just contractState}) ->
+                                                  [DOM.div {} [text $ show contract], DOOM.hr {}, DOM.div {} [text $ prettyState contractState] ]
+                                                _ -> mempty)
                             overlayTrigger
                               { overlay: tooltipJSX
                               , placement: OverlayTrigger.placement.bottom
@@ -382,3 +384,6 @@ mkContractList = do
                 contractList''
             ]
         ]
+
+prettyState :: V1.State -> String
+prettyState = stringify <<< encodeJson
