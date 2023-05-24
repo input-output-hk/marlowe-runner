@@ -128,14 +128,17 @@ mkLoadFileButtonComponent :: MkComponentM ({ onFileload :: Foreign -> Effect Uni
 mkLoadFileButtonComponent =
   liftEffect $ component "LoadFileButton" \{ onFileload } ->
     {- What I need:
-      React.Basic.DOM.Components.Ref  ref         :: (Maybe Node -> JSX) -> JSX
-      Web.HTML.HTMLInputElement       fromNode    :: Node -> Maybe HTMLInputElement
-      Web.HTML.HTMLInputElement       files       :: HTMLInputElement -> Effect (Maybe FileList)
-      Web.File.FileList               item        :: Int  -> FileList   -> Maybe File
-      Web.File.File                   toBlob      :: File -> Blob
-      Web.File.FileReader             readAsText  :: Blob -> FileReader -> Effect Unit
-      Web.File.FileReader             fileReader  :: Effect FileReader
-      Web.File.FileReader             result      :: FileReader -> Effect Foreign
+      React.Basic.DOM.Components.Ref  ref               :: (Maybe Node -> JSX) -> JSX
+      Web.HTML.HTMLInputElement       fromNode          :: Node -> Maybe HTMLInputElement
+      Web.HTML.HTMLInputElement       files             :: HTMLInputElement -> Effect (Maybe FileList)
+      Web.File.FileList               item              :: Int  -> FileList   -> Maybe File
+      Web.File.File                   toBlob            :: File -> Blob
+      Web.File.FileReader             readAsText        :: Blob -> FileReader -> Effect Unit
+      Web.File.FileReader             fileReader        :: Effect FileReader
+      Web.File.FileReader             result            :: FileReader -> Effect Foreign
+      Web.File.FileReader             toEventTarget     :: FileReader -> EventTarget
+      Web.Event.EventTarget           eventListener     :: forall a. (Event -> Effect a) -> Effect EventListener
+      Web.Event.EventTarget           addEventListener  :: EventType -> EventListener -> Boolean -> EventTarget -> Effect Unit
     -}
     {- Working example in raw HTML:
       <script>
