@@ -127,6 +127,26 @@ data SubmissionStep
 mkLoadFileButtonComponent :: MkComponentM ({ onFileload :: Foreign -> Effect Unit } -> JSX)
 mkLoadFileButtonComponent =
   liftEffect $ component "LoadFileButton" \{ onFileload } ->
+    {- What I need:
+      Web.File.FileList        item        :: Int  -> FileList   -> Maybe File
+      Web.File.File            toBlob      :: File -> Blob
+      Web.File.FileReader      readAsText  :: Blob -> FileReader -> Effect Unit
+      Web.File.FileReader      fileReader  :: Effect FileReader
+      Web.File.FileReader      result      :: FileReader -> Effect Foreign
+    -}
+    {- Working example in raw HTML:
+      <script>
+      const onfile = () => {
+        const fr = new FileReader()
+        fr.onload = e => {
+          console.log("hey ho")
+          console.log(e.target.result)
+        }
+        fr.readAsText(document.getElementById("yo").files[0])
+      }
+      </script>
+      <input id="yo" type="file" onchange="onfile()" />
+    -}
     let
       onChange :: Effect Unit
       onChange = onFileload =<< FileReader.result =<< fileReader
