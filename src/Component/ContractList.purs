@@ -42,6 +42,8 @@ import Data.List (List)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
 import Data.Newtype (un, unwrap)
+import Data.String (contains)
+import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Time.Duration as Duration
 import Data.Tuple (snd)
@@ -197,14 +199,9 @@ queryFieldId = FieldId "query"
 
 form :: BootstrapForm Effect Query _
 form = FormBuilder.evalBuilder' ado
-  -- amount <- intInput {}
-  query <- textInput { validator: identity :: Batteries.Validator Effect _ _  _, name: Just queryFieldId }
-  -- token <- textInput { validator: identity }
+  query <- textInput { validator: identity :: Batteries.Validator Effect _ _  _, name: Just queryFieldId , placeholder: "Filter contracts..."}
   in
-    { query
-    -- , party
-    -- , token
-    }
+    { query }
 
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
@@ -248,6 +245,7 @@ mkContractList = do
             OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contractList
         if ordering.orderAsc then sortedContracts
         else Array.reverse sortedContracts
+      contractList'' = Array.filter (\(ContractInfo { contractId }) -> contains (Pattern queryValue) (txOutRefToString contractId)) contractList'
 
     pure $ do
       DOOM.div_
@@ -309,21 +307,9 @@ mkContractList = do
             let
               fields = UseForm.renderForm form formState
               body = DOM.div { className: "form-group" } fields
-              actions = DOOM.fragment
-                [ DOM.button
-                    do
-                      let
-                        disabled = case result of
-                          Just (V (Right _) /\ _) -> false
-                          _ -> true
-                      { className: "btn btn-primary"
-                      , onClick: onSubmit'
-                      , disabled
-                      }
-                    [ R.text "Submit" ]
-                ]
+              -- actions = DOOM.fragment []
             [ body
-            , actions
+            -- , actions
             ]
 
         , DOM.div { className: "row" } $ Array.singleton $ case state.metadata of
@@ -389,10 +375,10 @@ mkContractList = do
                                   }
                                 Just transactionEndpoint, Nothing -> DOOM.text "No Marlowe info"
                                 Nothing, _ -> DOOM.text "No transactions endpoint"
-                                _, _ -> DOOM.text "Awaiting details"
+                                _, _ -> DOOM.text ""
                             ]
                         ]
                 )
-                contractList'
+                contractList''
             ]
         ]
