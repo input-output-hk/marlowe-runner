@@ -230,14 +230,33 @@ mkInitialContract = do
       Just i -> i
       Nothing -> unsafeCrashWith "Invalid instant"
 
+    zero = BigInt.fromInt 0
+    one = BigInt.fromInt 1
+    three = BigInt.fromInt 3
+    four = BigInt.fromInt 4
+
   pure $ V1.When
-      [V1.Case
-          (V1.Deposit
-              (V1.Address address)
-              (V1.Address address)
-              (V1.Token "" "")
-              (V1.Constant $ BigInt.fromInt 1000000)
-          )
-          V1.Close ]
-      timeout
-      V1.Close
+    [ V1.Case
+        (V1.Choice
+           (V1.ChoiceId "Everything is alright"
+              (V1.Address address)) [
+           (V1.Bound zero zero)])
+        V1.Close
+    , V1.Case
+        (V1.Choice
+           (V1.ChoiceId "Report problem" (V1.Address address))
+           [ (V1.Bound one one)])
+        V1.Close
+    , V1.Case
+        (V1.Choice
+           (V1.ChoiceId "Choice between 1-3" (V1.Address address))
+           [ (V1.Bound one three)])
+        V1.Close
+    , V1.Case
+        (V1.Choice
+           (V1.ChoiceId "Choice between 1-4" (V1.Address address))
+           [ (V1.Bound one four)])
+        V1.Close
+    ]
+    timeout
+    V1.Close

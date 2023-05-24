@@ -11,7 +11,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.CreateContract as CreateContract
-import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput(..), nextDeposit)
+import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput(..), nextChoice, nextDeposit)
 import Component.Modal (mkModal)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
@@ -31,7 +31,7 @@ import Contrib.React.Basic.Hooks.UseForm (useForm)
 import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Bootstrap (overlayTrigger, tooltip)
-import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, ChoiceFieldChoices(..), choiceField, radioFieldChoice)
+import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, ChoiceFieldChoices(..), choiceField, radioFieldChoice, selectFieldChoice)
 import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, intInput, textInput)
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
@@ -183,6 +183,7 @@ type DepositFormComponentProps =
   , transactionsEndpoint :: TransactionsEndpoint
   }
 
+
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
 mkDepositFormComponent = do
   modal <- liftEffect mkModal
@@ -296,14 +297,125 @@ mkDepositFormComponent = do
       , onDismiss
       , size: Modal.ExtraLarge
       }
-        --   { title: R.text "Select input type"
-        --   , onDismiss
-        --   , body
-        --   -- , footer: formActions
-        --   , size: Modal.ExtraLarge
-        --   }
-        -- else
-        --   body
+
+type ChoiceFormComponentProps =
+  { choiceInputs :: NonEmptyArray ChoiceInput
+  , connectedWallet :: WalletInfo Wallet.Api
+  , onDismiss :: Effect Unit
+  , onSuccess :: TransactionEndpoint -> Effect Unit
+  , timeInterval :: V1.TimeInterval
+  , transactionsEndpoint :: TransactionsEndpoint
+  }
+
+mkChoiceFormComponent :: MkComponentM (ChoiceFormComponentProps -> JSX)
+mkChoiceFormComponent = do
+  modal <- liftEffect mkModal
+  Runtime runtime <- asks _.runtime
+  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
+  walletInfoCtx <- asks _.walletInfoCtx
+
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ choiceInputs, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
+    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
+    -- type ChoiceFieldProps validatorM a =
+    --   { choices :: ChoiceFieldChoices
+    --   , validator :: Batteries.Validator validatorM String (Maybe String) a
+    --   | ChoiceFieldOptionalPropsRow ()
+    --   }
+    let
+      choices = SelectFieldChoices do
+        let
+          toChoice idx (ChoiceInput (V1.ChoiceId name _) _ _) = do
+            selectFieldChoice name (show idx)
+        ArrayAL.fromNonEmptyArray $ mapWithIndex toChoice choiceInputs
+
+      validator :: Batteries.Validator Effect _ _ _
+      validator = do
+        let
+          value2Deposit = Map.fromFoldable $ mapWithIndexFlipped choiceInputs \idx choiceInput -> show idx /\ choiceInput
+        liftFnMaybe (\v -> ["Invalid choice: " <> show v]) \possibleIdx -> do
+          idx <- possibleIdx
+          Map.lookup idx value2Deposit
+
+      form = FormBuilder.evalBuilder' $ ado
+        choice <- choiceField { choices, validator }
+        value <- intInput {}
+        in
+          { choice, value }
+
+      onSubmit :: { result :: _ , payload :: _ } -> Effect Unit
+      onSubmit = _.result >>> case _, possibleWalletContext of
+        Just (V (Right { choice, value }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
+          let
+            ChoiceInput choiceId _ _ = choice
+            inputs = Array.singleton $ NormalInput (IChoice choiceId $ BigInt.fromInt value)
+            applyInputsContext = ApplyInputsContext
+              { inputs
+              , wallet: { changeAddress, usedAddresses }
+              , timeInterval
+              }
+          do
+            -- FIXME: move aff flow into `useAff` on the component level
+            traceM "ON SUBMIT CLICKED"
+            launchAff_ $ do
+              applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
+                -- Right res -> do
+                --   traceM "APPLY SUCCESS"
+                --   traceM res
+                Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
+                  let
+                    { contractId, tx } = postContractsResponse
+                    TextEnvelope { cborHex: txCborHex } = tx
+                    lib = Lib.props cardanoMultiplatformLib
+                    txCbor = cborHexToCbor txCborHex
+                  traceM "Successfully created a transaction"
+                  let
+                    WalletInfo { wallet: walletApi } = connectedWallet
+                  Wallet.signTx walletApi txCborHex true >>= case _ of
+                    Right witnessSet -> do
+                      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
+                        Right _ -> do
+                          liftEffect $ onSuccess transactionEndpoint
+                        Left err -> do
+                          traceM "Error while submitting the transaction"
+                          traceM err
+                    Left err -> do
+                      traceM "Failed to sign transaction"
+                      traceM err
+
+                Left err ->
+                  traceM $ "Error: " <> show err
+        _, _ -> do
+            -- Rather improbable path because we disable submit button if the form is invalid
+            pure unit
+
+    { formState, onSubmit: onSubmit', result } <- useForm
+      { spec: form
+      , onSubmit
+      , validationDebounce: Seconds 0.5
+      }
+    pure $ modal do
+      let
+        fields = UseForm.renderForm form formState
+        body = DOM.div { className: "form-group" } fields
+        actions = DOOM.fragment
+          [ DOM.button
+              do
+                let
+                  disabled = case result of
+                    Just (V (Right _) /\ _) -> false
+                    _ -> true
+                { className: "btn btn-primary"
+                , onClick: onSubmit'
+                , disabled
+                }
+              [ R.text "Submit" ]
+          ]
+      { title: R.text "Perform deposit"
+      , body
+      , footer: actions
+      , onDismiss
+      , size: Modal.ExtraLarge
+      }
 
 
 
@@ -340,6 +452,7 @@ mkComponent = do
 
   initialContract <- liftEffect mkInitialContract
   depositFormComponent <- mkDepositFormComponent
+  choiceFormComponent <- mkChoiceFormComponent
 
   liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, timeInterval, transactionsEndpoint } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -347,14 +460,17 @@ mkComponent = do
     let
       environment = V1.Environment { timeInterval }
 
-      --  data TimeInterval = TimeInterval Instant Instant
-      --  newtype Environment = Environment { timeInterval :: TimeInterval }
-      -- nextDeposit :: Environment -> State -> Contract -> Array DepositInput
       possibleDeposits = do
         let
           dps = nextDeposit environment state contract
         traceM dps
         NonEmpty.fromArray $ dps
+
+      possibleChoiceInputs = do
+        let
+          cis = nextChoice environment state contract
+        traceM cis
+        NonEmpty.fromArray $ cis
 
     pure $ case step of
       Creating SelectingInputType -> do
@@ -375,6 +491,14 @@ mkComponent = do
                 , onClick: handler_ $ pure unit -- setStep (Creating $ PerformingNotify 0)
                 }
                 [ R.text "Notify" ]
+              , DOM.button
+                { className: "btn btn-primary"
+                , disabled: isNothing possibleChoiceInputs
+                , onClick: handler_ $ case possibleChoiceInputs of
+                    Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
+                    Nothing -> pure unit
+                }
+                [ R.text "Choice" ]
               ]
             ]
 
@@ -389,7 +513,10 @@ mkComponent = do
           body
       Creating (PerformingDeposit deposits) -> do
         depositFormComponent { deposits, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-        -- DOOM.text $ "DEPOSITS:" <> unsafeStringify deposits
+      Creating (PerformingNotify _) -> do
+        DOOM.text "NOTIFY"
+      Creating (PerformingChoice choiceInputs) -> do
+        choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
       _ -> DOM.div { className: "row" } [ R.text "TEST" ]
 
 address :: String
