@@ -11,7 +11,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.CreateContract as CreateContract
-import Component.InputHelper (DepositInput(..), nextDeposit)
+import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput(..), nextDeposit)
 import Component.Modal (mkModal)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
@@ -310,8 +310,8 @@ mkDepositFormComponent = do
 data CreateInputStep
   = SelectingInputType
   | PerformingDeposit (NonEmptyArray DepositInput)
-  | PerformingNotify Int
-  | PerformingChoice Int
+  | PerformingNotify (NonEmptyArray NotifyInput)
+  | PerformingChoice (NonEmptyArray ChoiceInput)
 
 data Step
   = Creating CreateInputStep
@@ -372,7 +372,7 @@ mkComponent = do
               , DOM.button
                 { className: "btn btn-primary"
                 , disabled: true
-                , onClick: handler_ $ setStep (Creating $ PerformingNotify 0)
+                , onClick: handler_ $ pure unit -- setStep (Creating $ PerformingNotify 0)
                 }
                 [ R.text "Notify" ]
               ]
