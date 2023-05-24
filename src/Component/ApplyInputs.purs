@@ -11,6 +11,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.CreateContract as CreateContract
+import Component.InputHelper (nextDeposit)
 import Component.Modal (mkModal)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
@@ -44,6 +45,7 @@ import Data.Argonaut.Encode (toJsonString) as Argonaut
 import Data.Array (elem, singleton, toUnfoldable)
 import Data.Array as Array
 import Data.Array as Array
+import Data.Array.NonEmpty as NonEmpty
 import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut as BigInt
 import Data.BigInt.Argonaut as BigInt
@@ -59,8 +61,8 @@ import Data.Function (on)
 import Data.Int as Int
 import Data.List (List)
 import Data.List.NonEmpty (NonEmptyList)
-import Data.Maybe (Maybe(..))
 import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (un)
 import Data.Newtype (un, unwrap)
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
@@ -82,6 +84,7 @@ import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Effect.Now (now)
 import Effect.Now (nowDateTime)
+import Language.Marlowe.Core.V1.Semantics as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, Token)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputContent(..), Party)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
@@ -90,7 +93,8 @@ import Marlowe.Actus.Metadata as M
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Client (post')
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), toTextEnvelope)
+import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TxHeader(..), toTextEnvelope)
 import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxOutRef, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types (PostMerkleizationRequest(..), PostMerkleizationResponse(..), PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), Runtime(..), ServerURL, TextEnvelope(..), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
 import Marlowe.Runtime.Web.Types as Runtime
@@ -118,15 +122,6 @@ import Wallet as Wallet
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 import WalletContext (WalletContext(..), walletAddresses)
-
-type Props =
-  { inModal :: Boolean
-  , onDismiss :: Effect Unit
-  , onSuccess :: ContractEndpoint -> Effect Unit
-  , connectedWallet :: WalletInfo Wallet.Api
-  , transactionsEndpoint :: TransactionsEndpoint
-  , marloweInfo :: MarloweInfo
-  }
 
 type Result = V1.Contract
 
@@ -248,6 +243,23 @@ form = FormBuilder.evalBuilder' ado
 --       , validationDebounce: Seconds 0.5
 --       }
 
+type Props =
+  { inModal :: Boolean
+  , onDismiss :: Effect Unit
+  , onSuccess :: ContractEndpoint -> Effect Unit
+  , connectedWallet :: WalletInfo Wallet.Api
+  , transactionsEndpoint :: TransactionsEndpoint
+  , contract :: V1.Contract
+  , state :: V1.State
+  , timeInterval :: V1.TimeInterval
+  }
+
+-- newtype MarloweInfo = MarloweInfo
+--   { initialContract :: V1.Contract
+--   , state :: Maybe V1.State
+--   , currentContract :: Maybe V1.Contract
+--   }
+
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   Runtime runtime <- asks _.runtime
@@ -257,10 +269,17 @@ mkComponent = do
 
   initialContract <- liftEffect mkInitialContract
 
-  liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss, inModal } -> React.do
+  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, timeInterval } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     step /\ setStep <- useState' (Creating SelectingInputType)
     let
+      environment = V1.Environment { timeInterval }
+
+      --  data TimeInterval = TimeInterval Instant Instant
+      --  newtype Environment = Environment { timeInterval :: TimeInterval }
+      -- nextDeposit :: Environment -> State -> Contract -> Array DepositInput
+      possibleDeposits = NonEmpty.fromArray $ nextDeposit environment state contract
+
       onSubmit :: _ -> Effect Unit
       onSubmit _ = pure unit
         -- _.result >>> case _, possibleWalletContext of
@@ -352,11 +371,13 @@ mkComponent = do
             [ DOM.div { className: "col-12" }
               [ DOM.button
                 { className: "btn btn-primary"
+                , disabled: isJust possibleDeposits
                 , onClick: handler_ $ setStep (Creating $ PerformingDeposit 0)
                 }
                 [ R.text "Deposit" ]
               , DOM.button
                 { className: "btn btn-primary"
+                , disabled: true
                 , onClick: handler_ $ setStep (Creating $ PerformingNotify 0)
                 }
                 [ R.text "Notify" ]

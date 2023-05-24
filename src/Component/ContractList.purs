@@ -14,6 +14,7 @@ import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (link, linkWithIcon)
+import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Fetch (FetchError)
 import Contrib.React.Basic.Hooks.UseForm (useForm)
 import Contrib.React.Basic.Hooks.UseForm as UseForm
@@ -29,15 +30,19 @@ import Data.Array (elem, singleton, toUnfoldable)
 import Data.Array as Array
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime (adjust)
+import Data.DateTime.Instant (unInstant)
 import Data.Decimal (Decimal)
 import Data.Either (Either(..))
 import Data.Foldable (fold, foldMap)
-import Data.FormURLEncoded.Query (Query(..))
+import Data.FormURLEncoded.Query (FieldId(..), Query(..))
 import Data.Function (on)
+import Data.Identity (Identity)
+import Data.Int as Int
 import Data.List (List)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
 import Data.Newtype (un, unwrap)
-import Data.Time.Duration (Seconds(..))
+import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
@@ -47,17 +52,20 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import Effect.Now (nowDateTime)
-import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, Token)
+import Effect.Now (now, nowDateTime)
+import JS.Unsafe.Stringify (unsafeStringify)
+import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, TimeInterval(..), Token)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputContent(..), Party)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Actus.Metadata as M
 import Marlowe.Runtime.Web.Client (post')
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxOutRef, txOutRefToString, txOutRefToUrlEncodedString)
+import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
+import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxHeader(..), TxOutRef, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types (PostMerkleizationRequest(..), PostMerkleizationResponse(..), PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), Runtime(..), ServerURL, TextEnvelope(..), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
 import Marlowe.Runtime.Web.Types as Runtime
 import Marlowe.Runtime.Web.Types as Runtime
+import Polyform.Batteries as Batteries
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_, span_, text) as DOOM
 import React.Basic.DOM (text)
@@ -181,10 +189,22 @@ onApplyInputs runtime cardanoMultiplatformLib possibleWalletContext { transactio
 
 -- updateState _ { newInput = Nothing }
 
-data ModalAction = NewContract | ApplyInputs TransactionsEndpoint MarloweInfo
+data ModalAction = NewContract | ApplyInputs TransactionsEndpoint V1.Contract V1.State TimeInterval
 
 derive instance Eq ModalAction
 
+queryFieldId = FieldId "query"
+
+form :: BootstrapForm Effect Query _
+form = FormBuilder.evalBuilder' ado
+  -- amount <- intInput {}
+  query <- textInput { validator: identity :: Batteries.Validator Effect _ _  _, name: Just queryFieldId }
+  -- token <- textInput { validator: identity }
+  in
+    { query
+    -- , party
+    -- , token
+    }
 
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
@@ -204,6 +224,21 @@ mkContractList = do
     ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
 
     let
+      onSubmit :: { result :: _ , payload :: _ } -> Effect Unit
+      onSubmit { result } = do
+        traceM result
+        pure unit
+
+    { formState, onSubmit: onSubmit', result } <- useForm
+      { spec: form
+      , onSubmit
+      , validationDebounce: Seconds 0.5
+      }
+
+    let
+      queryValue = case Map.lookup queryFieldId formState.fields of
+        Just { value: [ value ]} -> value
+        _ -> ""
       contractList' = do
         let
           -- Quick and dirty hack to display just submited contracts as first
@@ -228,7 +263,7 @@ mkContractList = do
                   updateState _ { modalAction = Nothing }
               , inModal: true
               }
-            Just (ApplyInputs transactionsEndpoint marloweInfo), Just cw -> do
+            Just (ApplyInputs transactionsEndpoint contract state timeInterval), Just cw -> do
               let
                 onSuccess = \_ -> do
                   msgHubProps.add $ Success $ DOOM.text $ fold
@@ -237,7 +272,9 @@ mkContractList = do
               applyInputsComponent
                 { inModal: true
                 , transactionsEndpoint
-                , marloweInfo
+                , timeInterval
+                , contract
+                , state
                 , connectedWallet: cw
                 , onSuccess
                 , onDismiss: updateState _ { modalAction = Nothing }
@@ -268,6 +305,27 @@ mkContractList = do
                   (DOOM.span_ [ addContractLink ])
               else
                 addContractLink
+        , DOM.div { className: "row" } do
+            let
+              fields = UseForm.renderForm form formState
+              body = DOM.div { className: "form-group" } fields
+              actions = DOOM.fragment
+                [ DOM.button
+                    do
+                      let
+                        disabled = case result of
+                          Just (V (Right _) /\ _) -> false
+                          _ -> true
+                      { className: "btn btn-primary"
+                      , onClick: onSubmit'
+                      , disabled
+                      }
+                    [ R.text "Submit" ]
+                ]
+            [ body
+            , actions
+            ]
+
         , DOM.div { className: "row" } $ Array.singleton $ case state.metadata of
             Just (metadata) -> modal $
               { body: text $ maybe "Empty Metadata" (show <<< _.contractTerms <<< unwrap) $ M.decodeMetadata metadata -- TODO: encode contractTerms as JSON
@@ -318,10 +376,16 @@ mkContractList = do
                               } $ DOM.span {} [ show status ]
                         , tdCentered
                             [ case endpoints.transactions, marloweInfo of
-                                Just transactionsEndpoint, Just marloweInfo' -> linkWithIcon
+                                Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
                                   { icon: Icons.listOl
                                   , label: DOOM.text "Apply"
-                                  , onClick: updateState _ { modalAction = Just (ApplyInputs transactionsEndpoint marloweInfo') }
+                                  , onClick: do
+                                      invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-5) * 60 * 1000))
+                                      invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
+                                      let
+                                        interval = TimeInterval invalidBefore invalidHereafter
+
+                                      updateState _ { modalAction = Just (ApplyInputs transactionsEndpoint currentContract currentState interval) }
                                   }
                                 Just transactionEndpoint, Nothing -> DOOM.text "No Marlowe info"
                                 Nothing, _ -> DOOM.text "No transactions endpoint"

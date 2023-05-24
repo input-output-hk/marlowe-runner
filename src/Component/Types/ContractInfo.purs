@@ -8,12 +8,12 @@ import Control.Alt ((<|>))
 import Data.Array as Array
 import Data.BigInt.Argonaut (BigInt)
 import Data.Generic.Rep (class Generic)
-import Data.Lazy (Lazy)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.Tuple.Nested (type (/\))
+import Data.Tuple.Nested (type (/\), (/\))
 import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
 import Marlowe.Runtime.Web.Types as Runtime
 
 data UserContractRole
@@ -73,7 +73,8 @@ newtype ContractInfo = ContractInfo
   -- should be precomputed and exposed as separated fields.
   , _runtime ::
       { contractHeader :: Runtime.ContractHeader
-      , transactions :: Array Runtime.TxHeader
+      , transactions :: Array TxHeaderWithEndpoint
+
       }
   }
 
@@ -99,7 +100,7 @@ createdAt (ContractInfo { _runtime: { contractHeader: Runtime.ContractHeader { b
 updatedAt :: ContractInfo -> Maybe Runtime.BlockHeader
 updatedAt ci@(ContractInfo { _runtime: { transactions } }) =
   do
-    Runtime.TxHeader tx <- Array.last transactions
+    Runtime.TxHeader tx /\ _ <- Array.last transactions
     tx.block
     <|> createdAt ci
 

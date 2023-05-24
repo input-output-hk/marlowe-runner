@@ -20,6 +20,7 @@ module Marlowe.Runtime.Web.Streaming
   , MaxPages(..)
   , PollingInterval(..)
   , RequestInterval(..)
+  , TxHeaderWithEndpoint(..)
   ) where
 
 import Prelude
@@ -38,7 +39,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype as Newtype
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
-import Data.Tuple (snd)
+import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Effect (Effect)
 import Effect.Aff (Aff, Fiber, Milliseconds, delay, forkAff)
@@ -138,9 +139,11 @@ contracts (PollingInterval pollingInterval) (RequestInterval requestInterval) fi
 type TransactionsEndpointsSource = Map ContractId TransactionsEndpoint
 
 -- | The resuling set of txs per contract.
-type ContractTransactionsMap = Map ContractId (Array TxHeader)
+type ContractTransactionsMap = Map ContractId (Array TxHeaderWithEndpoint)
 
-type ContractTransactionsEvent = ContractId /\ { new :: Array TxHeader, old :: Array TxHeader }
+type ContractTransactionsEvent
+  = ContractId
+  /\ { new :: Array TxHeaderWithEndpoint, old :: Array TxHeaderWithEndpoint }
 
 newtype ContractTransactionsStream = ContractTransactionsStream
   { emitter :: Subscription.Emitter ContractTransactionsEvent
@@ -199,9 +202,9 @@ fetchContractsTransactions endpoints prevContractTransactionMap listener (Reques
         delay requestInterval
         let
           prevTransactions = fromMaybe [] $ Map.lookup contractId prevContractTransactionMap
-          newTransactions = map _.resource txHeaders -- preservedTransactions <> addedTransactions
+          newTransactions = map (\{ resource, links: { transaction: endpoint }} -> (resource /\ endpoint)) txHeaders -- preservedTransactions <> addedTransactions
           change =
-            if newTransactions == prevTransactions then
+            if map fst newTransactions == map fst prevTransactions then
               Nothing
             else
               Just { old: prevTransactions, new: newTransactions }
@@ -308,13 +311,15 @@ fetchContractsStates endpoints prevContractStateMap listener (RequestInterval re
     , notify: doNotify
     }
 
+type TxHeaderWithEndpoint = TxHeader /\ TransactionEndpoint
+
 type ContractWithTransactions =
   { contract :: GetContractsResponse
   -- | This fetch is done for every contract
   -- | but we don't want to wait with the updates
   -- | until all the states are fetched.
   , contractState :: Maybe GetContractResponse
-  , transactions :: Array TxHeader
+  , transactions :: Array TxHeaderWithEndpoint
   }
 
 type ContractWithTransactionsMap = Map ContractId ContractWithTransactions
