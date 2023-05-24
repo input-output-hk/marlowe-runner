@@ -300,7 +300,7 @@ mkApp = do
           $ modal
           $
             { onDismiss: setDisplayOption Default
-            , title: DOOM.text "About"
+            , title: DOOM.text "Marlowe Run Light"
             , body: DOOM.div { dangerouslySetInnerHTML: { __html: about } }
             , size: Large
             }

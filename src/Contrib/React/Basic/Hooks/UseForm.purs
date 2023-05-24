@@ -278,5 +278,9 @@ useForm ({ spec: Form { fields, validator }, onSubmit, validationDebounce }) = R
           V (Right _) /\ _ -> Nothing
       , query: currQuery
       }
-  pure { formState: formState, onSubmit: onSubmit', result: validationResult }
+  pure
+    { formState: formState
+    , onSubmit: onSubmit'
+    , result: validationResult
+    }
 

@@ -6,7 +6,7 @@ import Data.Array as Array
 import Data.BigInt.Argonaut as BigInt
 import Data.Maybe (Maybe(..))
 import Language.Marlowe.Core.V1.Semantics (evalObservation, evalValue)
-import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId, Contract(..), Environment, Party, State, Token)
+import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId, Contract(..), Environment(..), Party, State, TimeInterval(..), Token)
 
 data DepositInput = DepositInput AccountId Party Token BigInt.BigInt (Maybe Contract)
 data ChoiceInput  = ChoiceInput ChoiceId (Array Bound) (Maybe Contract)
@@ -42,3 +42,12 @@ nextNotify env state contract = nextInputs' contract
   nextInputsCase (Case (Notify obs) cont) | evalObservation env state obs = [NotifyInput (Just cont)]
   nextInputsCase (MerkleizedCase (Notify obs) _) | evalObservation env state obs = [NotifyInput Nothing]
   nextInputsCase _ = []
+
+nextTimeoutAdvance :: Environment -> Contract -> Maybe Contract
+nextTimeoutAdvance (Environment { timeInterval: TimeInterval startTime _ }) contract = nextTimeoutAdvance' contract
+  where
+  nextTimeoutAdvance' (When _ t _) = if startTime >= t
+    then Just contract
+    else Nothing
+  nextTimeoutAdvance' _ = Nothing
+

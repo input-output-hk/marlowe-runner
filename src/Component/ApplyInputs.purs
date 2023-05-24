@@ -11,7 +11,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.CreateContract as CreateContract
-import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput(..), nextNotify, nextChoice, nextDeposit)
+import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput(..), nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Modal (mkModal)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
@@ -39,8 +39,10 @@ import Contrib.React.Bootstrap.Icons as Icons
 import Contrib.React.Bootstrap.Table (striped) as Table
 import Contrib.React.Bootstrap.Table (table)
 import Contrib.React.Bootstrap.Types as OverlayTrigger
+import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Monad.Reader.Class (asks)
+import Control.Monad.Trans.Class (lift)
 import Data.Argonaut (decodeJson, parseJson)
 import Data.Argonaut.Encode (toJsonString) as Argonaut
 import Data.Array (elem, singleton, toUnfoldable)
@@ -110,12 +112,10 @@ import Marlowe.Runtime.Web.Types as Runtime
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Batteries as Batteries
 import Polyform.Validator (liftFnEither) as Validator
-import Polyform.Validator (liftFnMaybe)
-import React.Basic (fragment) as DOOM
-import React.Basic (fragment) as DOOM
-import React.Basic.DOM (br, div_, text) as DOOM
-import React.Basic.DOM (div_, span_, text) as DOOM
+import Polyform.Validator (liftFnMMaybe, liftFnMaybe)
+import React.Basic (fragment)
 import React.Basic.DOM (text)
+import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM as R
 import React.Basic.DOM.Events (targetValue)
@@ -123,7 +123,7 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, handler)
 import React.Basic.Events (handler_)
-import React.Basic.Hooks (Hook, JSX, UseState, component, useState, (/\))
+import React.Basic.Hooks (Hook, JSX, UseState, component, useRef, useState, (/\))
 import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks (JSX, component, useContext, useState, (/\))
 import React.Basic.Hooks as React
@@ -278,7 +278,7 @@ mkDepositFormComponent = do
       let
         fields = UseForm.renderForm form formState
         body = DOM.div { className: "form-group" } fields
-        actions = DOOM.fragment
+        actions = fragment
           [ DOM.button
               do
                 let
@@ -321,6 +321,7 @@ mkChoiceFormComponent = do
     --   , validator :: Batteries.Validator validatorM String (Maybe String) a
     --   | ChoiceFieldOptionalPropsRow ()
     --   }
+    partialFormResult /\ setPartialFormResult <- useState' Nothing
     let
       choices = SelectFieldChoices do
         let
@@ -332,9 +333,12 @@ mkChoiceFormComponent = do
       validator = do
         let
           value2Deposit = Map.fromFoldable $ mapWithIndexFlipped choiceInputs \idx choiceInput -> show idx /\ choiceInput
-        liftFnMaybe (\v -> ["Invalid choice: " <> show v]) \possibleIdx -> do
-          idx <- possibleIdx
-          Map.lookup idx value2Deposit
+        liftFnMMaybe (\v -> pure ["Invalid choice: " <> show v]) \possibleIdx -> runMaybeT do
+          deposit <- MaybeT $ pure do
+            idx <- possibleIdx
+            Map.lookup idx value2Deposit
+          liftEffect $ setPartialFormResult $ Just deposit
+          pure deposit
 
       form = FormBuilder.evalBuilder' $ ado
         choice <- choiceField { choices, validator }
@@ -354,8 +358,6 @@ mkChoiceFormComponent = do
               , timeInterval
               }
           do
-            -- FIXME: move aff flow into `useAff` on the component level
-            traceM "ON SUBMIT CLICKED"
             launchAff_ $ do
               applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
                 -- Right res -> do
@@ -363,10 +365,8 @@ mkChoiceFormComponent = do
                 --   traceM res
                 Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
                   let
-                    { contractId, tx } = postContractsResponse
+                    { tx } = postContractsResponse
                     TextEnvelope { cborHex: txCborHex } = tx
-                    lib = Lib.props cardanoMultiplatformLib
-                    txCbor = cborHexToCbor txCborHex
                   traceM "Successfully created a transaction"
                   let
                     WalletInfo { wallet: walletApi } = connectedWallet
@@ -396,8 +396,16 @@ mkChoiceFormComponent = do
     pure $ modal do
       let
         fields = UseForm.renderForm form formState
-        body = DOM.div { className: "form-group" } fields
-        actions = DOOM.fragment
+        body = DOOM.div_ $
+          [ DOM.div { className: "form-group" } fields ]
+          <> case partialFormResult of
+            Just (ChoiceInput _ _ (Just cont)) ->
+              [ DOOM.hr {}
+              , DOOM.text $ show cont
+              ]
+            _ -> mempty
+
+        actions = fragment
           [ DOM.button
               do
                 let
@@ -484,7 +492,7 @@ mkNotifyFormComponent = do
     pure $ modal do
       let
         body = DOOM.text ""
-        actions = DOOM.fragment
+        actions = fragment
           [ DOM.button
                 { className: "btn btn-primary"
                 , onClick: onSubmit
@@ -501,6 +509,7 @@ mkNotifyFormComponent = do
 
 type AdvanceFormComponentProps =
   { connectedWallet :: WalletInfo Wallet.Api
+  , contract :: V1.Contract
   , onDismiss :: Effect Unit
   , onSuccess :: TransactionEndpoint -> Effect Unit
   , timeInterval :: V1.TimeInterval
@@ -514,7 +523,7 @@ mkAdvanceFormComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
+  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ contract, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     let
       onSubmit :: EventHandler
@@ -529,7 +538,6 @@ mkAdvanceFormComponent = do
               }
           do
             -- FIXME: move aff flow into `useAff` on the component level
-            traceM "ON SUBMIT CLICKED"
             launchAff_ $ do
               applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
                 -- Right res -> do
@@ -565,7 +573,7 @@ mkAdvanceFormComponent = do
     pure $ modal do
       let
         body = DOOM.text ""
-        actions = DOOM.fragment
+        actions = fragment
           [ DOM.button
                 { className: "btn btn-primary"
                 , onClick: onSubmit
@@ -585,7 +593,7 @@ data CreateInputStep
   | PerformingDeposit (NonEmptyArray DepositInput)
   | PerformingNotify (NonEmptyArray NotifyInput)
   | PerformingChoice (NonEmptyArray ChoiceInput)
-  | PerformingAdvance
+  | PerformingAdvance V1.Contract
 
 data Step
   = Creating CreateInputStep
@@ -609,10 +617,8 @@ mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   Runtime runtime <- asks _.runtime
   modal <- liftEffect mkModal
-  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  initialContract <- liftEffect mkInitialContract
   depositFormComponent <- mkDepositFormComponent
   choiceFormComponent <- mkChoiceFormComponent
   notifyFormComponent <- mkNotifyFormComponent
@@ -627,57 +633,60 @@ mkComponent = do
       possibleDeposits = do
         let
           dps = nextDeposit environment state contract
-        traceM dps
         NonEmpty.fromArray $ dps
 
       possibleChoiceInputs = do
         let
           cis = nextChoice environment state contract
-        traceM cis
         NonEmpty.fromArray $ cis
 
       possibleNotifyInputs = do
         let
           cis = nextNotify environment state contract
-        traceM cis
         NonEmpty.fromArray $ cis
+
+      possibleNextTimeoutAdvance = nextTimeoutAdvance environment contract
 
     pure $ case step of
       Creating SelectingInputType -> do
         let
           body = DOM.div { className: "row" }
-            [ DOM.div { className: "col-12" }
-              [ DOM.button
+            [ DOM.div { className: "col-3 text-center" } $
+                DOM.button
+                  { className: "btn btn-primary"
+                  , disabled: isNothing possibleDeposits || isJust possibleNextTimeoutAdvance
+                  , onClick: handler_ $ case possibleDeposits of
+                      Just deposits -> setStep (Creating $ PerformingDeposit deposits)
+                      Nothing -> pure unit
+                  }
+                  [ R.text "Deposit" ]
+            , DOM.div { className: "col-3 text-center" } $
+                DOM.button
                 { className: "btn btn-primary"
-                , disabled: isNothing possibleDeposits
-                , onClick: handler_ $ case possibleDeposits of
-                    Just deposits -> setStep (Creating $ PerformingDeposit deposits)
-                    Nothing -> pure unit
-                }
-                [ R.text "Deposit" ]
-              , DOM.button
-                { className: "btn btn-primary"
-                , disabled: isNothing possibleChoiceInputs
+                , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
                 , onClick: handler_ $ case possibleChoiceInputs of
                     Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
                     Nothing -> pure unit
                 }
                 [ R.text "Choice" ]
-              , DOM.button
+            , DOM.div { className: "col-3 text-center" } $
+                DOM.button
                 { className: "btn btn-primary"
-                , disabled: isNothing possibleNotifyInputs
+                , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
                 , onClick: handler_ $ case possibleNotifyInputs of
                     Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
                     Nothing -> pure unit
                 }
                 [ R.text "Notify" ]
-              , DOM.button
+            , DOM.div { className: "col-3 text-center" } $
+                DOM.button
                 { className: "btn btn-primary"
-                , disabled: false
-                , onClick: handler_ $ setStep (Creating $ PerformingAdvance)
+                , disabled: isNothing possibleNextTimeoutAdvance
+                , onClick: handler_ $ case possibleNextTimeoutAdvance of
+                    Just cont -> setStep (Creating $ PerformingAdvance cont)
+                    Nothing -> pure unit
                 }
-                [ R.text "Adance Contract" ]
-              ]
+                [ R.text "Advance Contract" ]
             ]
 
         if inModal then modal
@@ -695,8 +704,8 @@ mkComponent = do
         notifyFormComponent { notifyInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
       Creating (PerformingChoice choiceInputs) -> do
         choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-      Creating PerformingAdvance -> do
-        advanceFormComponent { connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+      Creating (PerformingAdvance cont) -> do
+        advanceFormComponent { contract: cont, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
       _ -> DOM.div { className: "row" } [ R.text "TEST" ]
 
 address :: String
