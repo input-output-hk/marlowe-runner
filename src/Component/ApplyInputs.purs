@@ -499,11 +499,93 @@ mkNotifyFormComponent = do
       , size: Modal.ExtraLarge
       }
 
+type AdvanceFormComponentProps =
+  { connectedWallet :: WalletInfo Wallet.Api
+  , onDismiss :: Effect Unit
+  , onSuccess :: TransactionEndpoint -> Effect Unit
+  , timeInterval :: V1.TimeInterval
+  , transactionsEndpoint :: TransactionsEndpoint
+  }
+
+mkAdvanceFormComponent :: MkComponentM (AdvanceFormComponentProps -> JSX)
+mkAdvanceFormComponent = do
+  modal <- liftEffect mkModal
+  Runtime runtime <- asks _.runtime
+  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
+  walletInfoCtx <- asks _.walletInfoCtx
+
+  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
+    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
+    let
+      onSubmit :: EventHandler
+      onSubmit = handler_ $ case possibleWalletContext of
+        Just { changeAddress: Just changeAddress, usedAddresses } -> do
+          let
+            inputs = []
+            applyInputsContext = ApplyInputsContext
+              { inputs
+              , wallet: { changeAddress, usedAddresses }
+              , timeInterval
+              }
+          do
+            -- FIXME: move aff flow into `useAff` on the component level
+            traceM "ON SUBMIT CLICKED"
+            launchAff_ $ do
+              applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
+                -- Right res -> do
+                --   traceM "APPLY SUCCESS"
+                --   traceM res
+                Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
+                  let
+                    { contractId, tx } = postContractsResponse
+                    TextEnvelope { cborHex: txCborHex } = tx
+                    lib = Lib.props cardanoMultiplatformLib
+                    txCbor = cborHexToCbor txCborHex
+                  traceM "Successfully created a transaction"
+                  let
+                    WalletInfo { wallet: walletApi } = connectedWallet
+                  Wallet.signTx walletApi txCborHex true >>= case _ of
+                    Right witnessSet -> do
+                      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
+                        Right _ -> do
+                          liftEffect $ onSuccess transactionEndpoint
+                        Left err -> do
+                          traceM "Error while submitting the transaction"
+                          traceM err
+                    Left err -> do
+                      traceM "Failed to sign transaction"
+                      traceM err
+
+                Left err ->
+                  traceM $ "Error: " <> show err
+        _ -> do
+            -- Rather improbable path because we disable submit button if the form is invalid
+            pure unit
+
+    pure $ modal do
+      let
+        body = DOOM.text ""
+        actions = DOOM.fragment
+          [ DOM.button
+                { className: "btn btn-primary"
+                , onClick: onSubmit
+                , disabled: false
+                }
+              [ R.text "Submit" ]
+          ]
+      { title: R.text "Advance Contract"
+      , body
+      , footer: actions
+      , onDismiss
+      , size: Modal.ExtraLarge
+      }
+
 data CreateInputStep
   = SelectingInputType
   | PerformingDeposit (NonEmptyArray DepositInput)
   | PerformingNotify (NonEmptyArray NotifyInput)
   | PerformingChoice (NonEmptyArray ChoiceInput)
+  | PerformingAdvance
 
 data Step
   = Creating CreateInputStep
@@ -534,6 +616,7 @@ mkComponent = do
   depositFormComponent <- mkDepositFormComponent
   choiceFormComponent <- mkChoiceFormComponent
   notifyFormComponent <- mkNotifyFormComponent
+  advanceFormComponent <- mkAdvanceFormComponent
 
   liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, timeInterval, transactionsEndpoint } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -588,6 +671,12 @@ mkComponent = do
                     Nothing -> pure unit
                 }
                 [ R.text "Notify" ]
+              , DOM.button
+                { className: "btn btn-primary"
+                , disabled: false
+                , onClick: handler_ $ setStep (Creating $ PerformingAdvance)
+                }
+                [ R.text "Adance Contract" ]
               ]
             ]
 
@@ -606,6 +695,8 @@ mkComponent = do
         notifyFormComponent { notifyInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
       Creating (PerformingChoice choiceInputs) -> do
         choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+      Creating PerformingAdvance -> do
+        advanceFormComponent { connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
       _ -> DOM.div { className: "row" } [ R.text "TEST" ]
 
 address :: String
