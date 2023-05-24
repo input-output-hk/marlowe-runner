@@ -217,7 +217,7 @@ mkContractList = do
                 , onDismiss: updateState _ { modalAction = Nothing }
                 }
             _, _ -> mempty
-        , DOM.div { className: "row justify-content-end" } $ Array.singleton $ do
+        , DOM.div { className: "row justify-content-end" } do
             let
               disabled = isNothing connectedWallet
               addContractLink = linkWithIcon
@@ -229,28 +229,28 @@ mkContractList = do
                       Nothing -> updateState _ { modalAction = Just NewContract }
                       _ -> pure unit
                 }
-            DOM.div { className: "col-3 text-end" } $ Array.singleton $
-              if disabled then do
-                let
-                  tooltipJSX = tooltip {} (DOOM.text "Connect to a wallet to add a contract")
-                overlayTrigger
-                  { overlay: tooltipJSX
-                  , placement: OverlayTrigger.placement.bottom
-                  }
-                  -- Disabled button doesn't trigger the hook,
-                  -- so we wrap it in a `span`
-                  (DOOM.span_ [ addContractLink ])
-              else
-                addContractLink
-        , DOM.div { className: "row" } do
-            let
               fields = UseForm.renderForm form formState
               body = DOM.div { className: "form-group" } fields
-              -- actions = DOOM.fragment []
-            [ body
-            -- , actions
+                -- actions = DOOM.fragment []
+            [ DOM.div { className: "col-9 text-end" } $
+              [ body
+              -- , actions
+              ]
+            , DOM.div { className: "col-3 text-end" } $ Array.singleton $
+                if disabled then do
+                  let
+                    tooltipJSX = tooltip {} (DOOM.text "Connect to a wallet to add a contract")
+                  overlayTrigger
+                    { overlay: tooltipJSX
+                    , placement: OverlayTrigger.placement.bottom
+                    }
+                    -- Disabled button doesn't trigger the hook,
+                    -- so we wrap it in a `span`
+                    (DOOM.span_ [ addContractLink ])
+                else
+                  addContractLink
             ]
-
+        , DOOM.hr {}
         , DOM.div { className: "row" } $ Array.singleton $ case state.metadata of
             Just (metadata) -> modal $
               { body: text $ maybe "Empty Metadata" (show <<< _.contractTerms <<< unwrap) $ M.decodeMetadata metadata -- TODO: encode contractTerms as JSON
