@@ -11,7 +11,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.CreateContract as CreateContract
-import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput(..), nextChoice, nextDeposit)
+import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput(..), nextNotify, nextChoice, nextDeposit)
 import Component.Modal (mkModal)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
@@ -410,14 +410,122 @@ mkChoiceFormComponent = do
                 }
               [ R.text "Submit" ]
           ]
-      { title: R.text "Perform deposit"
+      { title: R.text "Perform choice"
       , body
       , footer: actions
       , onDismiss
       , size: Modal.ExtraLarge
       }
 
+type NotifyFormComponentProps =
+  { notifyInputs :: NonEmptyArray NotifyInput
+  , connectedWallet :: WalletInfo Wallet.Api
+  , onDismiss :: Effect Unit
+  , onSuccess :: TransactionEndpoint -> Effect Unit
+  , timeInterval :: V1.TimeInterval
+  , transactionsEndpoint :: TransactionsEndpoint
+  }
 
+mkNotifyFormComponent :: MkComponentM (NotifyFormComponentProps -> JSX)
+mkNotifyFormComponent = do
+  modal <- liftEffect mkModal
+  Runtime runtime <- asks _.runtime
+  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
+  walletInfoCtx <- asks _.walletInfoCtx
+
+  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ notifyInputs, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
+    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
+    -- type ChoiceFieldProps validatorM a =
+    --   { validator :: Batteries.Validator validatorM String (Maybe String) a
+    --   | NotifyFieldOptionalPropsRow ()
+    --   }
+    let
+      validator :: Batteries.Validator Effect _ _ _
+      validator = do
+        let
+          value2Deposit = Map.fromFoldable $ mapWithIndexFlipped notifyInputs \idx notifyInput -> show idx /\ notifyInput
+        liftFnMaybe (\v -> ["Invalid choice: " <> show v]) \possibleIdx -> do
+          idx <- possibleIdx
+          Map.lookup idx value2Deposit
+
+      form = FormBuilder.evalBuilder' $ ado
+        value <- intInput {}
+        in
+          { value }
+
+      onSubmit :: { result :: _ , payload :: _ } -> Effect Unit
+      onSubmit = _.result >>> case _, possibleWalletContext of
+        Just (V (Right { value }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
+          let
+            inputs = Array.singleton $ NormalInput INotify
+            applyInputsContext = ApplyInputsContext
+              { inputs
+              , wallet: { changeAddress, usedAddresses }
+              , timeInterval
+              }
+          do
+            -- FIXME: move aff flow into `useAff` on the component level
+            traceM "ON SUBMIT CLICKED"
+            launchAff_ $ do
+              applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
+                -- Right res -> do
+                --   traceM "APPLY SUCCESS"
+                --   traceM res
+                Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
+                  let
+                    { contractId, tx } = postContractsResponse
+                    TextEnvelope { cborHex: txCborHex } = tx
+                    lib = Lib.props cardanoMultiplatformLib
+                    txCbor = cborHexToCbor txCborHex
+                  traceM "Successfully created a transaction"
+                  let
+                    WalletInfo { wallet: walletApi } = connectedWallet
+                  Wallet.signTx walletApi txCborHex true >>= case _ of
+                    Right witnessSet -> do
+                      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
+                        Right _ -> do
+                          liftEffect $ onSuccess transactionEndpoint
+                        Left err -> do
+                          traceM "Error while submitting the transaction"
+                          traceM err
+                    Left err -> do
+                      traceM "Failed to sign transaction"
+                      traceM err
+
+                Left err ->
+                  traceM $ "Error: " <> show err
+        _, _ -> do
+            -- Rather improbable path because we disable submit button if the form is invalid
+            pure unit
+
+    { formState, onSubmit: onSubmit', result } <- useForm
+      { spec: form
+      , onSubmit
+      , validationDebounce: Seconds 0.5
+      }
+    pure $ modal do
+      let
+        fields = UseForm.renderForm form formState
+        body = DOM.div { className: "form-group" } fields
+        actions = DOOM.fragment
+          [ DOM.button
+              do
+                let
+                  disabled = case result of
+                    Just (V (Right _) /\ _) -> false
+                    _ -> true
+                { className: "btn btn-primary"
+                , onClick: onSubmit'
+                , disabled
+                }
+              [ R.text "Submit" ]
+          ]
+      { title: R.text "Perform notify"
+      , body
+      , footer: actions
+      , onDismiss
+      , size: Modal.ExtraLarge
+      }
 
 data CreateInputStep
   = SelectingInputType
@@ -453,6 +561,7 @@ mkComponent = do
   initialContract <- liftEffect mkInitialContract
   depositFormComponent <- mkDepositFormComponent
   choiceFormComponent <- mkChoiceFormComponent
+  notifyFormComponent <- mkNotifyFormComponent
 
   liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, timeInterval, transactionsEndpoint } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -472,6 +581,12 @@ mkComponent = do
         traceM cis
         NonEmpty.fromArray $ cis
 
+      possibleNotifyInputs = do
+        let
+          cis = nextNotify environment state contract
+        traceM cis
+        NonEmpty.fromArray $ cis
+
     pure $ case step of
       Creating SelectingInputType -> do
         let
@@ -487,18 +602,20 @@ mkComponent = do
                 [ R.text "Deposit" ]
               , DOM.button
                 { className: "btn btn-primary"
-                , disabled: true
-                , onClick: handler_ $ pure unit -- setStep (Creating $ PerformingNotify 0)
-                }
-                [ R.text "Notify" ]
-              , DOM.button
-                { className: "btn btn-primary"
                 , disabled: isNothing possibleChoiceInputs
                 , onClick: handler_ $ case possibleChoiceInputs of
                     Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
                     Nothing -> pure unit
                 }
                 [ R.text "Choice" ]
+              , DOM.button
+                { className: "btn btn-primary"
+                , disabled: isNothing possibleNotifyInputs
+                , onClick: handler_ $ case possibleNotifyInputs of
+                    Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
+                    Nothing -> pure unit
+                }
+                [ R.text "Notify" ]
               ]
             ]
 
@@ -513,8 +630,8 @@ mkComponent = do
           body
       Creating (PerformingDeposit deposits) -> do
         depositFormComponent { deposits, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-      Creating (PerformingNotify _) -> do
-        DOOM.text "NOTIFY"
+      Creating (PerformingNotify notifyInputs ) -> do
+        notifyFormComponent { notifyInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
       Creating (PerformingChoice choiceInputs) -> do
         choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
       _ -> DOM.div { className: "row" } [ R.text "TEST" ]
