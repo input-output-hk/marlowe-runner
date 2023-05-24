@@ -226,7 +226,7 @@ mkInitialContract :: Effect V1.Contract
 mkInitialContract = do
   nowMilliseconds <- unInstant <$> now
   let
-    timeout = case instant (nowMilliseconds <> Milliseconds (Int.toNumber $ 5 * 60 * 1000)) of
+    timeout = case instant (nowMilliseconds <> Milliseconds (Int.toNumber $ 20 * 60 * 1000)) of
       Just i -> i
       Nothing -> unsafeCrashWith "Invalid instant"
 

@@ -11,7 +11,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.CreateContract as CreateContract
-import Component.InputHelper (nextDeposit)
+import Component.InputHelper (DepositInput(..), nextDeposit)
 import Component.Modal (mkModal)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
@@ -22,6 +22,7 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (link)
 import Component.Widgets (link, linkWithIcon)
+import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
@@ -30,7 +31,7 @@ import Contrib.React.Basic.Hooks.UseForm (useForm)
 import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Bootstrap (overlayTrigger, tooltip)
-import Contrib.React.Bootstrap.FormBuilder (BootstrapForm)
+import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, ChoiceFieldChoices(..), choiceField, radioFieldChoice)
 import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, intInput, textInput)
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
@@ -45,12 +46,14 @@ import Data.Argonaut.Encode (toJsonString) as Argonaut
 import Data.Array (elem, singleton, toUnfoldable)
 import Data.Array as Array
 import Data.Array as Array
+import Data.Array.ArrayAL as ArrayAL
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmpty
 import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut as BigInt
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime (adjust)
-import Data.DateTime.Instant (instant, unInstant)
+import Data.DateTime.Instant (instant, toDateTime, unInstant)
 import Data.Decimal (Decimal)
 import Data.Either (Either(..))
 import Data.Either (Either(..))
@@ -58,9 +61,12 @@ import Data.Foldable (fold, foldMap)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.FormURLEncoded.Query (Query(..))
 import Data.Function (on)
+import Data.FunctorWithIndex (mapWithIndex)
+import Data.Identity (Identity)
 import Data.Int as Int
 import Data.List (List)
 import Data.List.NonEmpty (NonEmptyList)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (un)
@@ -71,6 +77,7 @@ import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
+import Data.Unfoldable (unfoldr1)
 import Data.Validation.Semigroup (V(..))
 import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
@@ -84,6 +91,7 @@ import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Effect.Now (now)
 import Effect.Now (nowDateTime)
+import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, Token)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputContent(..), Party)
@@ -100,7 +108,9 @@ import Marlowe.Runtime.Web.Types (PostMerkleizationRequest(..), PostMerkleizatio
 import Marlowe.Runtime.Web.Types as Runtime
 import Marlowe.Runtime.Web.Types as Runtime
 import Partial.Unsafe (unsafeCrashWith)
+import Polyform.Batteries as Batteries
 import Polyform.Validator (liftFnEither) as Validator
+import Polyform.Validator (liftFnMaybe)
 import React.Basic (fragment) as DOOM
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (br, div_, text) as DOOM
@@ -157,18 +167,149 @@ create contractData serverUrl contractsEndpoint = do
   post' serverUrl contractsEndpoint req
 
 
-submit :: CborHex TransactionWitnessSetObject -> ServerURL -> ContractEndpoint -> Aff (Either FetchError Unit)
-
+submit :: CborHex TransactionWitnessSetObject -> ServerURL -> TransactionEndpoint -> Aff (Either FetchError Unit)
 submit witnesses serverUrl contractEndpoint = do
   let
     textEnvelope = toTextEnvelope witnesses ""
-    req = PutContractRequest textEnvelope
+    req = PutTransactionRequest textEnvelope
   put' serverUrl contractEndpoint req
+
+type DepositFormComponentProps =
+  { deposits :: NonEmptyArray DepositInput
+  , connectedWallet :: WalletInfo Wallet.Api
+  , onDismiss :: Effect Unit
+  , onSuccess :: TransactionEndpoint -> Effect Unit
+  , timeInterval :: V1.TimeInterval
+  , transactionsEndpoint :: TransactionsEndpoint
+  }
+
+mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
+mkDepositFormComponent = do
+  modal <- liftEffect mkModal
+  Runtime runtime <- asks _.runtime
+  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
+  walletInfoCtx <- asks _.walletInfoCtx
+
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ deposits, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
+    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
+    -- type ChoiceFieldProps validatorM a =
+    --   { choices :: ChoiceFieldChoices
+    --   , validator :: Batteries.Validator validatorM String (Maybe String) a
+    --   | ChoiceFieldOptionalPropsRow ()
+    --   }
+    let
+      choices = RadioButtonFieldChoices do
+        let
+          toChoice idx (DepositInput account party token value cont) = do
+            let
+              label = show value
+            radioFieldChoice (show idx) (DOOM.text label)
+        { switch: true
+        , choices: ArrayAL.fromNonEmptyArray $ mapWithIndex toChoice deposits
+        }
+
+      validator :: Batteries.Validator Effect _ _ _
+      validator = do
+        let
+          value2Deposit = Map.fromFoldable $ mapWithIndexFlipped deposits \idx deposit -> show idx /\ deposit
+        liftFnMaybe (\v -> ["Invalid choice: " <> show v]) \possibleIdx -> do
+          idx <- possibleIdx
+          Map.lookup idx value2Deposit
+
+      form = FormBuilder.evalBuilder' $
+        choiceField { choices, validator }
+
+      onSubmit :: { result :: _ , payload :: _ } -> Effect Unit
+      onSubmit = _.result >>> case _, possibleWalletContext of
+        Just (V (Right deposit) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
+          let
+            DepositInput account party token value cont = deposit
+            inputs = Array.singleton $ NormalInput (IDeposit party party token value)
+
+            applyInputsContext = ApplyInputsContext
+              { inputs
+              , wallet: { changeAddress, usedAddresses }
+              , timeInterval
+              }
+
+           -- handler preventDefault \_ -> do
+          do
+            -- FIXME: move aff flow into `useAff` on the component level
+            traceM "ON SUBMIT CLICKED"
+            launchAff_ $ do
+              applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
+                -- Right res -> do
+                --   traceM "APPLY SUCCESS"
+                --   traceM res
+                Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
+                  let
+                    { contractId, tx } = postContractsResponse
+                    TextEnvelope { cborHex: txCborHex } = tx
+                    lib = Lib.props cardanoMultiplatformLib
+                    txCbor = cborHexToCbor txCborHex
+                  traceM "Successfully created a transaction"
+                  let
+                    WalletInfo { wallet: walletApi } = connectedWallet
+                  Wallet.signTx walletApi txCborHex true >>= case _ of
+                    Right witnessSet -> do
+                      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
+                        Right _ -> do
+                          liftEffect $ onSuccess transactionEndpoint
+                        Left err -> do
+                          traceM "Error while submitting the transaction"
+                          traceM err
+                    Left err -> do
+                      traceM "Failed to sign transaction"
+                      traceM err
+
+                Left err ->
+                  traceM $ "Error: " <> show err
+        _, _ -> do
+            -- Rather improbable path because we disable submit button if the form is invalid
+            pure unit
+
+    { formState, onSubmit: onSubmit', result } <- useForm
+      { spec: form
+      , onSubmit
+      , validationDebounce: Seconds 0.5
+      }
+    pure $ modal do
+      let
+        fields = UseForm.renderForm form formState
+        body = DOM.div { className: "form-group" } fields
+        actions = DOOM.fragment
+          [ DOM.button
+              do
+                let
+                  disabled = case result of
+                    Just (V (Right _) /\ _) -> false
+                    _ -> true
+                { className: "btn btn-primary"
+                , onClick: onSubmit'
+                , disabled
+                }
+              [ R.text "Submit" ]
+          ]
+      { title: R.text "Perform deposit"
+      , body
+      , footer: actions
+      , onDismiss
+      , size: Modal.ExtraLarge
+      }
+        --   { title: R.text "Select input type"
+        --   , onDismiss
+        --   , body
+        --   -- , footer: formActions
+        --   , size: Modal.ExtraLarge
+        --   }
+        -- else
+        --   body
+
 
 
 data CreateInputStep
   = SelectingInputType
-  | PerformingDeposit Int
+  | PerformingDeposit (NonEmptyArray DepositInput)
   | PerformingNotify Int
   | PerformingChoice Int
 
@@ -178,87 +319,17 @@ data Step
   | Signing (Either String PostContractsResponseContent)
   | Signed (Either ClientError PostContractsResponseContent)
 
-form :: BootstrapForm Effect Query _
-form = FormBuilder.evalBuilder' ado
-  amount <- intInput {}
-  -- party <- textInput { validator: identity }
-  -- token <- textInput { validator: identity }
-  in
-    { amount
-    -- , party
-    -- , token
-    }
-
---              modal $ do
---                let
---                  fields = UseForm.renderForm form formState
---                  formBody = DOM.div { className: "form-group" } fields
---                  formActions = DOOM.fragment
---                    [
---                    -- link
---                    --     { label: DOOM.text "Cancel"
---                    --     , onClick: onDismiss
---                    --     , showBorders: true
---                    --     }
---                      DOM.button
---                        do
---                          let
---                            disabled = case result of
---                              Just (V (Right _) /\ _) -> false
---                              _ -> true
---                          { className: "btn btn-primary"
---                          , onClick: onSubmit'
---                          , disabled
---                          }
---                        [ R.text "Submit" ]
---                    ]
---
---                { body: DOM.div { className: "row" } [ DOM.div { className: "col-12" } [ formBody ]]
---                , onDismiss: updateState _ { newInput = Nothing }
---                , title: text "Apply inputs"
---                , footer: formActions
---                -- , footer: DOOM.fragment
---                --     [ link
---                --         { label: DOOM.text "Cancel"
---                --         , onClick: updateState _ { newInput = Nothing }
---                --         , showBorders: true
---                --         }
---                --     , DOM.button
---                --         { className: "btn btn-primary"
---                --         , onClick: onApplyInputs input { value: BigInt.fromInt 1, token: V1.Token "" "", party: V1.Address "" } cw
---                --         }
---                --         [ R.text "Submit" ]
---                --     ]
---                }
-
-
---     { formState, onSubmit: onSubmit', result } <- useForm
---       { spec: form
---       , onSubmit: \{ result } -> do
---           case result, state.newInput, connectedWallet of
---             Just (V (Right { amount }) /\ _), Just input, Just cw -> do
---               onApplyInputs runtime cardanoMultiplatformLib possibleWalletContext input { value: BigInt.fromInt 1, token: V1.Token "" "", party: V1.Address "" } cw
---               updateState _ { newInput = Nothing }
---             _, _, _ -> pure unit
---       , validationDebounce: Seconds 0.5
---       }
 
 type Props =
   { inModal :: Boolean
   , onDismiss :: Effect Unit
-  , onSuccess :: ContractEndpoint -> Effect Unit
+  , onSuccess :: TransactionEndpoint -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , transactionsEndpoint :: TransactionsEndpoint
   , contract :: V1.Contract
   , state :: V1.State
   , timeInterval :: V1.TimeInterval
   }
-
--- newtype MarloweInfo = MarloweInfo
---   { initialContract :: V1.Contract
---   , state :: Maybe V1.State
---   , currentContract :: Maybe V1.Contract
---   }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
@@ -268,8 +339,9 @@ mkComponent = do
   walletInfoCtx <- asks _.walletInfoCtx
 
   initialContract <- liftEffect mkInitialContract
+  depositFormComponent <- mkDepositFormComponent
 
-  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, timeInterval } -> React.do
+  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, timeInterval, transactionsEndpoint } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     step /\ setStep <- useState' (Creating SelectingInputType)
     let
@@ -278,92 +350,12 @@ mkComponent = do
       --  data TimeInterval = TimeInterval Instant Instant
       --  newtype Environment = Environment { timeInterval :: TimeInterval }
       -- nextDeposit :: Environment -> State -> Contract -> Array DepositInput
-      possibleDeposits = NonEmpty.fromArray $ nextDeposit environment state contract
+      possibleDeposits = do
+        let
+          dps = nextDeposit environment state contract
+        traceM dps
+        NonEmpty.fromArray $ dps
 
-      onSubmit :: _ -> Effect Unit
-      onSubmit _ = pure unit
-        -- _.result >>> case _, possibleWalletContext of
-        --   Just (V (Right contract) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
-        --     let
-        --       contractData = ContractData
-        --         { contract
-        --         , changeAddress
-        --         , usedAddresses
-        --         }
-
-        --     -- handler preventDefault \_ -> do
-        --     do
-        --       traceM "ON SUBMIT CLICKED"
-        --       launchAff_ $ do
-        --         create contractData runtime.serverURL runtime.root >>= case _ of
-        --           Right res@{ resource: PostContractsResponseContent postContractsResponse, links: { contract: contractEndpoint } } -> do
-        --             let
-        --               { contractId, tx } = postContractsResponse
-        --               TextEnvelope { cborHex: txCborHex } = tx
-        --               lib = Lib.props cardanoMultiplatformLib
-        --               txCbor = cborHexToCbor txCborHex
-        --             traceM "Successfully created a transaction"
-        --             let
-        --               WalletInfo { wallet: walletApi } = connectedWallet
-        --             Wallet.signTx walletApi txCborHex false >>= case _ of
-        --               Right witnessSet -> do
-        --                 submit witnessSet runtime.serverURL contractEndpoint >>= case _ of
-        --                   Right _ -> do
-        --                     liftEffect $ onSuccess contractEndpoint
-        --                   Left err -> do
-        --                     traceM "Error while submitting the transaction"
-        --                     traceM err
-        --               Left err -> do
-        --                 traceM "Failed to sign transaction"
-        --                 traceM err
-
-        --           Left err ->
-        --             traceM $ "Error: " <> show err
-        --   _, _ -> do
-        --     -- Rather improbable path because we disable submit button if the form is invalid
-        --     pure unit
-
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
-      , onSubmit
-      , validationDebounce: Seconds 0.5
-      }
-
-    -- pure $ do
-    --   let
-    --     fields = UseForm.renderForm form formState
-    --     formBody = DOM.div { className: "form-group" } fields
-    --     formActions = DOOM.fragment
-    --       [ link
-    --           { label: DOOM.text "Cancel"
-    --           , onClick: onDismiss
-    --           , showBorders: true
-    --           }
-    --       , DOM.button
-    --           do
-    --             let
-    --               disabled = case result of
-    --                 Just (V (Right _) /\ _) -> false
-    --                 _ -> true
-    --             { className: "btn btn-primary"
-    --             , onClick: onSubmit'
-    --             , disabled
-    --             }
-    --           [ R.text "Submit" ]
-    --       ]
-
-    --   if inModal then modal
-    --     { title: R.text "Add contract | Step 2 of 4"
-    --     , onDismiss
-    --     , body: DOM.div { className: "row" }
-    --         [ DOM.div { className: "col-12" } [ formBody ]
-    --         -- , DOM.div { className: "col-3" } [ DOOM.text "TEST" ]
-    --         ]
-    --     , footer: formActions
-    --     , size: Modal.ExtraLarge
-    --     }
-    --   else
-    --     formBody
     pure $ case step of
       Creating SelectingInputType -> do
         let
@@ -371,8 +363,10 @@ mkComponent = do
             [ DOM.div { className: "col-12" }
               [ DOM.button
                 { className: "btn btn-primary"
-                , disabled: isJust possibleDeposits
-                , onClick: handler_ $ setStep (Creating $ PerformingDeposit 0)
+                , disabled: isNothing possibleDeposits
+                , onClick: handler_ $ case possibleDeposits of
+                    Just deposits -> setStep (Creating $ PerformingDeposit deposits)
+                    Nothing -> pure unit
                 }
                 [ R.text "Deposit" ]
               , DOM.button
@@ -393,9 +387,10 @@ mkComponent = do
           }
         else
           body
+      Creating (PerformingDeposit deposits) -> do
+        depositFormComponent { deposits, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+        -- DOOM.text $ "DEPOSITS:" <> unsafeStringify deposits
       _ -> DOM.div { className: "row" } [ R.text "TEST" ]
-
-
 
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
@@ -419,3 +414,62 @@ mkInitialContract = do
           V1.Close ]
       timeout
       V1.Close
+
+newtype ApplyInputsContext = ApplyInputsContext
+  { wallet :: { changeAddress :: Bech32, usedAddresses :: Array Bech32 }
+  , inputs :: Array V1.Input
+  , timeInterval :: V1.TimeInterval
+  }
+
+applyInputs :: ApplyInputsContext -> ServerURL -> TransactionsEndpoint -> _
+applyInputs (ApplyInputsContext ctx) serverURL transactionsEndpoint = do
+  let
+    V1.TimeInterval ib iha = ctx.timeInterval
+    invalidBefore = toDateTime ib
+    invalidHereafter = toDateTime iha
+    req = PostTransactionsRequest
+      { inputs: ctx.inputs
+      , invalidBefore
+      , invalidHereafter
+      , metadata: mempty
+      , tags: mempty
+      , changeAddress: ctx.wallet.changeAddress
+      , addresses: ctx.wallet.usedAddresses
+      , collateralUTxOs: []
+      }
+  post' serverURL transactionsEndpoint req
+
+-- submit
+--       >>= case _ of
+--         Right ({ resource: PostTransactionsResponse postTransactionsResponse, links: { transaction: transactionEndpoint } }) -> do
+--           traceM postTransactionsResponse
+--           let
+--             { tx } = postTransactionsResponse
+--             TextEnvelope { cborHex: txCborHex } = tx
+--           Wallet.signTx walletApi txCborHex true >>= case _ of
+--             Right witnessSet -> do
+--               submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
+--                 Right _ -> do
+--                   traceM "Successfully submitted the transaction"
+--                   -- liftEffect $ msgHubProps.add $ Success $ DOOM.text $ "Successfully submitted a transaction"
+--                 -- liftEffect $ onSuccess contractEndpoint
+--                 Left err -> do
+--                   traceM "Error while submitting the transaction"
+--                   -- liftEffect $ msgHubProps.add $ Error $ DOOM.text $ "Error while submitting the transaction"
+--                   traceM err
+-- 
+--             Left err -> do
+--               traceM err
+--               pure unit
+-- 
+--           pure unit
+--         Left _ -> do
+--           traceM token
+--           -- traceM $ BigInt.toString value
+--           traceM "error"
+--           pure unit
+-- 
+--     pure unit
+--   _ -> do
+--     -- Note: this happens, when the contract is in status `Unsigned`
+--     pure unit
