@@ -36,19 +36,23 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
+import Foreign (Foreign)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), toTextEnvelope)
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFnEither) as Validator
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (br, div_, text) as DOOM
+import React.Basic.DOM (br, div_, text, input) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
+import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks as React
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
+import Web.File.FileReader (fileReader)
+import Web.File.FileReader as FileReader
 
 type Props =
   { inModal :: Boolean
@@ -81,7 +85,7 @@ data ContractData = ContractData
   -- , collateralUTxOs :: Array TxOutRef
   }
 
-create :: ContractData -> ServerURL -> ContractsEndpoint -> Aff (Either ClientError { resource :: PostContractsResponseContent, links :: {contract :: ContractEndpoint} })
+create :: ContractData -> ServerURL -> ContractsEndpoint -> Aff (Either ClientError { resource :: PostContractsResponseContent, links :: { contract :: ContractEndpoint } })
 create contractData serverUrl contractsEndpoint = do
   let
     ContractData { contract, changeAddress, usedAddresses } = contractData
@@ -105,7 +109,6 @@ create contractData serverUrl contractsEndpoint = do
 
   post' serverUrl contractsEndpoint req
 
-
 submit :: CborHex TransactionWitnessSetObject -> ServerURL -> ContractEndpoint -> Aff (Either FetchError Unit)
 
 submit witnesses serverUrl contractEndpoint = do
@@ -121,13 +124,21 @@ data SubmissionStep
   | Signing (Either String PostContractsResponseContent)
   | Signed (Either ClientError PostContractsResponseContent)
 
+mkLoadFileButtonComponent :: MkComponentM ({ onFileload :: Foreign -> Effect Unit } -> JSX)
+mkLoadFileButtonComponent =
+  liftEffect $ component "LoadFileButton" \{ onFileload } ->
+    let
+      onChange :: Effect Unit
+      onChange = onFileload =<< FileReader.result =<< fileReader
+    in
+      pure $ DOOM.input { type: "file", onChange: handler_ onChange }
+
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   Runtime runtime <- asks _.runtime
   modal <- liftEffect mkModal
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
-
 
   { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts address
 
@@ -220,7 +231,6 @@ mkComponent = do
       else
         formBody
 
-
 zero = BigInt.fromInt 0
 one = BigInt.fromInt 1
 three = BigInt.fromInt 3
@@ -245,7 +255,7 @@ brianContract = do
   let
     timeout = BigInt.fromString "1684937880000"
     possibleContract = decodeJson $
-      encodeJson {"when":[{"then":{"when":[{"then":{"when":[{"then":"close","case":{"notify_if":true}}],"timeout_continuation":"close","timeout": timeout},"case":{"for_choice":{"choice_owner":{"address":address},"choice_name":"Release"},"choose_between":[{"to":1,"from":1}]}}],"timeout_continuation":"close","timeout":timeout},"case":{"party":{"address":address},"of_token":{"token_name":"","currency_symbol":""},"into_account":{"address":address},"deposits":10000000}}],"timeout_continuation":"close","timeout": timeout}
+      encodeJson { "when": [ { "then": { "when": [ { "then": { "when": [ { "then": "close", "case": { "notify_if": true } } ], "timeout_continuation": "close", "timeout": timeout }, "case": { "for_choice": { "choice_owner": { "address": address }, "choice_name": "Release" }, "choose_between": [ { "to": 1, "from": 1 } ] } } ], "timeout_continuation": "close", "timeout": timeout }, "case": { "party": { "address": address }, "of_token": { "token_name": "", "currency_symbol": "" }, "into_account": { "address": address }, "deposits": 10000000 } } ], "timeout_continuation": "close", "timeout": timeout }
   case possibleContract of
     Left err -> unsafeCrashWith $ "Failed to decode contract: " <> show err
     Right contract -> contract
@@ -322,30 +332,35 @@ brianContract = do
 --                                               (V1.Token "" "")
 --                                               (V1.ConstantParam "Collateral amount") Close)))] (TimeParam "Complaint deadline") Close)))] (TimeParam "Dispute by buyer timeout") Close))] (TimeParam "Deposit of price by buyer timeout") Close))] (TimeParam "Deposit of collateral by buyer timeout") Close))] (TimeParam "Collateral deposit by seller timeout") Close
 
-
 mkMultiChoiceTest :: String -> _ -> V1.Contract
 mkMultiChoiceTest address timeout =
   V1.When
     [ V1.Case
-        (V1.Choice
-           (V1.ChoiceId "Everything is alright"
-              (V1.Address address)) [
-           (V1.Bound zero zero)])
+        ( V1.Choice
+            ( V1.ChoiceId "Everything is alright"
+                (V1.Address address)
+            )
+            [ (V1.Bound zero zero)
+            ]
+        )
         V1.Close
     , V1.Case
-        (V1.Choice
-           (V1.ChoiceId "Report problem" (V1.Address address))
-           [ (V1.Bound one one)])
+        ( V1.Choice
+            (V1.ChoiceId "Report problem" (V1.Address address))
+            [ (V1.Bound one one) ]
+        )
         V1.Close
     , V1.Case
-        (V1.Choice
-           (V1.ChoiceId "Choice between 1-3" (V1.Address address))
-           [ (V1.Bound one three)])
+        ( V1.Choice
+            (V1.ChoiceId "Choice between 1-3" (V1.Address address))
+            [ (V1.Bound one three) ]
+        )
         V1.Close
     , V1.Case
-        (V1.Choice
-           (V1.ChoiceId "Choice between 1-4" (V1.Address address))
-           [ (V1.Bound one four)])
+        ( V1.Choice
+            (V1.ChoiceId "Choice between 1-4" (V1.Address address))
+            [ (V1.Bound one four) ]
+        )
         V1.Close
     ]
     timeout

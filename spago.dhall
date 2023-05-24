@@ -94,6 +94,7 @@
   , "web-encoding"
   , "web-html"
   , "web-streams"
+  , "web-file"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
