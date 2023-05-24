@@ -39,11 +39,12 @@ import Contrib.React.Bootstrap.Icons as Icons
 import Contrib.React.Bootstrap.Table (striped) as Table
 import Contrib.React.Bootstrap.Table (table)
 import Contrib.React.Bootstrap.Types as OverlayTrigger
+import Contrib.ReactSyntaxHighlighter (jsonSyntaxHighlighter, yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Monad.Reader.Class (asks)
 import Control.Monad.Trans.Class (lift)
-import Data.Argonaut (decodeJson, parseJson)
+import Data.Argonaut (decodeJson, encodeJson, parseJson)
 import Data.Argonaut.Encode (toJsonString) as Argonaut
 import Data.Array (elem, singleton, toUnfoldable)
 import Data.Array as Array
@@ -232,11 +233,7 @@ mkDepositFormComponent = do
               , wallet: { changeAddress, usedAddresses }
               , timeInterval
               }
-
-           -- handler preventDefault \_ -> do
           do
-            -- FIXME: move aff flow into `useAff` on the component level
-            traceM "ON SUBMIT CLICKED"
             launchAff_ $ do
               applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
                 -- Right res -> do
@@ -341,7 +338,7 @@ mkChoiceFormComponent = do
           pure deposit
 
       form = FormBuilder.evalBuilder' $ ado
-        choice <- choiceField { choices, validator }
+        choice <- choiceField { choices, validator, touched: true, initial: "0" }
         value <- intInput {}
         in
           { choice, value }
@@ -651,6 +648,11 @@ mkComponent = do
       Creating SelectingInputType -> do
         let
           body = DOM.div { className: "row" }
+            [ DOM.div { className: "col-12" } $
+                yamlSyntaxHighlighter contract
+            ]
+
+          footer = DOM.div { className: "row" }
             [ DOM.div { className: "col-3 text-center" } $
                 DOM.button
                   { className: "btn btn-primary"
@@ -686,14 +688,14 @@ mkComponent = do
                     Just cont -> setStep (Creating $ PerformingAdvance cont)
                     Nothing -> pure unit
                 }
-                [ R.text "Advance Contract" ]
+                [ R.text "Advance" ]
             ]
 
         if inModal then modal
           { title: R.text "Select input type"
           , onDismiss
           , body
-          -- , footer: formActions
+          , footer
           , size: Modal.ExtraLarge
           }
         else
@@ -755,37 +757,3 @@ applyInputs (ApplyInputsContext ctx) serverURL transactionsEndpoint = do
       }
   post' serverURL transactionsEndpoint req
 
--- submit
---       >>= case _ of
---         Right ({ resource: PostTransactionsResponse postTransactionsResponse, links: { transaction: transactionEndpoint } }) -> do
---           traceM postTransactionsResponse
---           let
---             { tx } = postTransactionsResponse
---             TextEnvelope { cborHex: txCborHex } = tx
---           Wallet.signTx walletApi txCborHex true >>= case _ of
---             Right witnessSet -> do
---               submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
---                 Right _ -> do
---                   traceM "Successfully submitted the transaction"
---                   -- liftEffect $ msgHubProps.add $ Success $ DOOM.text $ "Successfully submitted a transaction"
---                 -- liftEffect $ onSuccess contractEndpoint
---                 Left err -> do
---                   traceM "Error while submitting the transaction"
---                   -- liftEffect $ msgHubProps.add $ Error $ DOOM.text $ "Error while submitting the transaction"
---                   traceM err
--- 
---             Left err -> do
---               traceM err
---               pure unit
--- 
---           pure unit
---         Left _ -> do
---           traceM token
---           -- traceM $ BigInt.toString value
---           traceM "error"
---           pure unit
--- 
---     pure unit
---   _ -> do
---     -- Note: this happens, when the contract is in status `Unsigned`
---     pure unit

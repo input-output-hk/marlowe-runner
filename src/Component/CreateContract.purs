@@ -127,13 +127,18 @@ mkComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  initialContract <- liftEffect mkInitialContract
+  let
+    address :: String
+    address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
+
+  { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts address
 
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss, inModal } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     step /\ setStep <- useState' Creating
     let
       form = mkJsonForm initialContract
+
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
@@ -219,23 +224,96 @@ mkComponent = do
         formBody
 
 
-address :: String
-address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
+zero = BigInt.fromInt 0
+one = BigInt.fromInt 1
+three = BigInt.fromInt 3
+four = BigInt.fromInt 4
 
-mkInitialContract :: Effect V1.Contract
-mkInitialContract = do
+
+mkInitialContracts :: String -> Effect { multiChoiceTest :: V1.Contract }
+mkInitialContracts address = do
   nowMilliseconds <- unInstant <$> now
   let
     timeout = case instant (nowMilliseconds <> Milliseconds (Int.toNumber $ 20 * 60 * 1000)) of
       Just i -> i
       Nothing -> unsafeCrashWith "Invalid instant"
 
-    zero = BigInt.fromInt 0
-    one = BigInt.fromInt 1
-    three = BigInt.fromInt 3
-    four = BigInt.fromInt 4
+  pure
+    { multiChoiceTest: mkMultiChoiceTest address timeout
+    }
+--    , escrow : mkEscrow address
+--    }
+--
+-- mkEscrowWithCollateral :: String -> V1.Contract
+-- mkEscrowWithCollateral
+--   V1.When [
+--     (V1.Case
+--        (V1.Deposit
+--           (V1.Role "Seller")
+--           (V1.Role "Seller")
+--           (V1.Token "" "")
+--           (V1.ConstantParam "Collateral amount"))
+--        (V1.When [
+--           (V1.Case
+--              (V1.Deposit
+--                 (V1.Role "Buyer")
+--                 (V1.Role "Buyer")
+--                 (V1.Token "" "")
+--                 (V1.ConstantParam "Collateral amount"))
+--              (V1.When [
+--                 (V1.Case
+--                    (V1.Deposit
+--                       (V1.Role "Seller")
+--                       (V1.Role "Buyer")
+--                       (V1.Token "" "")
+--                       (V1.ConstantParam "Price"))
+--                    (V1.When [
+--                          (V1.Case
+--                             (V1.Choice
+--                                (V1.ChoiceId "Everything is alright"
+--                                   (V1.Role "Buyer")) [
+--                                (V1.Bound 0 0)]) Close)
+--                          ,
+--                          (V1.Case
+--                             (V1.Choice
+--                                (V1.ChoiceId "Report problem"
+--                                   (V1.Role "Buyer")) [
+--                                (V1.Bound 1 1)])
+--                             (V1.Pay
+--                                (V1.Role "Seller")
+--                                (V1.Account
+--                                   (V1.Role "Buyer"))
+--                                (V1.Token "" "")
+--                                (V1.ConstantParam "Price")
+--                                (V1.When [
+--                                      (V1.Case
+--                                         (V1.Choice
+--                                            (V1.ChoiceId "Confirm problem"
+--                                               (V1.Role "Seller")) [
+--                                            (V1.Bound 1 1)]) Close)
+--                                      ,
+--                                      (V1.Case
+--                                         (V1.Choice
+--                                            (V1.ChoiceId "Dispute problem"
+--                                               (V1.Role "Seller")) [
+--                                            (V1.Bound 0 0)])
+--                                         (V1.Pay
+--                                            (V1.Role "Seller")
+--                                            (V1.Party
+--                                               (V1.PK "0000000000000000000000000000000000000000000000000000000000000000"))
+--                                            (V1.Token "" "")
+--                                            (V1.ConstantParam "Collateral amount")
+--                                            (V1.Pay
+--                                               (V1.Role "Buyer")
+--                                               (V1.Party
+--                                                  (V1.PK "0000000000000000000000000000000000000000000000000000000000000000"))
+--                                               (V1.Token "" "")
+--                                               (V1.ConstantParam "Collateral amount") Close)))] (TimeParam "Complaint deadline") Close)))] (TimeParam "Dispute by buyer timeout") Close))] (TimeParam "Deposit of price by buyer timeout") Close))] (TimeParam "Deposit of collateral by buyer timeout") Close))] (TimeParam "Collateral deposit by seller timeout") Close
 
-  pure $ V1.When
+
+mkMultiChoiceTest :: String -> _ -> V1.Contract
+mkMultiChoiceTest address timeout =
+  V1.When
     [ V1.Case
         (V1.Choice
            (V1.ChoiceId "Everything is alright"
