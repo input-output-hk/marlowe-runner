@@ -5,7 +5,6 @@ import Prelude
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.App (mkApp)
 import Component.MessageHub (mkMessageHub)
-import Component.Types (ActusDictionaries)
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
 import Control.Monad.Reader (runReaderT)
@@ -22,7 +21,6 @@ import Effect.Class.Console as Console
 import Effect.Exception (throw)
 import Foreign.Object (Object)
 import JS.Unsafe.Stringify (unsafeStringify)
-import Marlowe.Actus.Metadata (actusMetadataKey)
 import Marlowe.Runtime.Web as Marlowe.Runtime.Web
 import Marlowe.Runtime.Web.Streaming (MaxPages(..), PollingInterval(..), RequestInterval(..))
 import Marlowe.Runtime.Web.Streaming as Streaming
@@ -61,7 +59,6 @@ type Config =
   { marloweWebServerUrl :: ServerURL
   , develMode :: Boolean
   , aboutMarkdown :: String
-  , actusDictionaries :: ActusDictionaries
   }
 
 decodeConfig :: JsonParser Config
@@ -70,10 +67,8 @@ decodeConfig json = do
   marloweWebServerUrl <- obj .: "marloweWebServerUrl"
   develMode <- obj .: "develMode"
   aboutMarkdown <- obj .: "aboutMarkdown"
-  actusDictionaries <- obj .: "actusDictionaries"
   pure
-    { actusDictionaries
-    , marloweWebServerUrl: ServerURL marloweWebServerUrl
+    { marloweWebServerUrl: ServerURL marloweWebServerUrl
     , develMode
     , aboutMarkdown
     }
@@ -118,7 +113,6 @@ main configJson = do
             , msgHub
             , runtime
             , aboutMarkdown: config.aboutMarkdown
-            , actusDictionaries: config.actusDictionaries
             }
 
         app <- liftEffect $ runReaderT mkApp mkAppCtx

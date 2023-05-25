@@ -9,7 +9,7 @@ import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
-import Component.Types (MkComponentM, WalletInfo(..))
+import Component.Types (MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Language.Marlowe.Core.V1 (compareMarloweJsonKeys)

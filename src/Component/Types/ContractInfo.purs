@@ -25,29 +25,23 @@ derive instance Generic UserContractRole _
 instance Show UserContractRole where
   show = genericShow
 
-data ActusContractRole = ActusParty | ActusCounterParty
-
-derive instance Generic ActusContractRole _
-instance Show ActusContractRole where
-  show = genericShow
-
 -- Cash flow direction in the context of the wallet.
 data UserCashFlowDirection
   = IncomingFlow
   | OutgoingFlow
   | InternalFlow
 
-newtype CashFlowInfo = CashFlowInfo
-  { -- Author of the transaction - either party or counter party.
-    cashFlow :: Actus.CashFlow V1.Value V1.Party
-  , sender :: ActusContractRole
-  -- From the current wallet perspective (if relatd to the user).
-  , userCashFlowDirection :: Maybe (UserCashFlowDirection /\ PositiveBigInt)
-  , token :: V1.Token
-  , transaction :: Maybe Runtime.TxHeader
-  -- Value from ACTUS perspective.
-  , value :: BigInt
-  }
+-- newtype CashFlowInfo = CashFlowInfo
+--   { -- Author of the transaction - either party or counter party.
+--     cashFlow :: Actus.CashFlow V1.Value V1.Party
+--   , sender :: ActusContractRole
+--   -- From the current wallet perspective (if relatd to the user).
+--   , userCashFlowDirection :: Maybe (UserCashFlowDirection /\ PositiveBigInt)
+--   , token :: V1.Token
+--   , transaction :: Maybe Runtime.TxHeader
+--   -- Value from ACTUS perspective.
+--   , value :: BigInt
+--   }
 
 newtype MarloweInfo = MarloweInfo
   { initialContract :: V1.Contract
@@ -80,11 +74,11 @@ newtype ContractInfo = ContractInfo
 
 derive instance Newtype ContractInfo _
 
-newtype ActusContractId = ActusContractId String
-
-derive instance Newtype ActusContractId _
-derive newtype instance Eq ActusContractId
-derive newtype instance Ord ActusContractId
+-- newtype ActusContractId = ActusContractId String
+-- 
+-- derive instance Newtype ActusContractId _
+-- derive newtype instance Eq ActusContractId
+-- derive newtype instance Ord ActusContractId
 
 -- actusContractId :: ContractInfo -> ActusContractId
 -- actusContractId (ContractInfo { contractTerms: Actus.ContractTerms contractTerms }) =

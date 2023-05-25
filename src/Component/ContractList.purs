@@ -2,98 +2,78 @@ module Component.ContractList where
 
 import Prelude
 
-import Actus.Domain (CashFlow)
 import Actus.Domain.ContractTerms (ContractTerms)
 import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
 import Component.CreateContract as CreateContract
 import Component.Modal (mkModal)
-import Component.Types (ActusContractId(..), ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
+import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (link, linkWithIcon)
+import Component.Widgets (linkWithIcon)
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Fetch (FetchError)
 import Contrib.React.Basic.Hooks.UseForm (useForm)
 import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Bootstrap (overlayTrigger, tooltip)
-import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, intInput, textInput)
+import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, textInput)
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
 import Contrib.React.Bootstrap.Icons as Icons
 import Contrib.React.Bootstrap.Table (striped) as Table
 import Contrib.React.Bootstrap.Table (table)
 import Contrib.React.Bootstrap.Types as OverlayTrigger
 import Control.Monad.Reader.Class (asks)
-import Data.Array (elem, singleton, toUnfoldable)
 import Data.Array as Array
 import Data.Argonaut (encodeJson, stringify)
-import Data.BigInt.Argonaut as BigInt
-import Data.DateTime (adjust)
-import Data.DateTime.Instant (unInstant)
-import Data.Decimal (Decimal)
-import Data.Either (Either(..))
+import Data.Either (Either)
 import Data.Foldable (fold, foldMap)
-import Data.FormURLEncoded.Query (FieldId(..), Query(..))
+import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
-import Data.Identity (Identity)
 import Data.Int as Int
-import Data.List (List)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
 import Data.Newtype (un, unwrap)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
-import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
-import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
 import Effect (Effect)
-import Effect.Aff (Aff, launchAff_)
+import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
-import Effect.Now (now, nowDateTime)
-import JS.Unsafe.Stringify (unsafeStringify)
-import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, TimeInterval(..), Token)
-import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputContent(..), Party)
+import Language.Marlowe.Core.V1.Semantics.Types (Contract, TimeInterval(..))
+import Language.Marlowe.Core.V1.Semantics.Types (Contract, TimeInterval(TimeInterval))
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Actus.Metadata as M
-import Marlowe.Runtime.Web.Client (post')
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
-import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxHeader(..), TxOutRef, txOutRefToString, txOutRefToUrlEncodedString)
-import Marlowe.Runtime.Web.Types (PostMerkleizationRequest(..), PostMerkleizationResponse(..), PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), Runtime(..), ServerURL, TextEnvelope(..), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
-import Marlowe.Runtime.Web.Types as Runtime
+import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString, txOutRefToUrlEncodedString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata, PutTransactionRequest(..), Runtime(..), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Batteries as Batteries
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_, span_, text, hr) as DOOM
 import React.Basic.DOM (text)
-import React.Basic.DOM as R
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, handler)
-import React.Basic.Events (handler_)
 import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useState, (/\))
 import React.Basic.Hooks (JSX, component, useContext, useState, (/\))
 import React.Basic.Hooks as React
-import Utils.React.Basic.Hooks (useStateRef, useStateRef')
+import Utils.React.Basic.Hooks (useStateRef')
 import Wallet as Wallet
-import WalletContext (WalletContext(..), walletAddresses)
+import WalletContext (WalletContext(..))
 
 type ContractId = TxOutRef
-
-type ProjectedCashFlows = List (CashFlow Decimal Party)
 
 type ValidationError = String
 
 data FormState
   = NotValidated
   | Failure ValidationError
-  | Validated (ContractTerms /\ Contract)
+  | Validated (Contract)
 
 -- An example of a simple "custom hook"
 useInput :: String -> Hook (UseState String) (String /\ EventHandler)
@@ -134,9 +114,10 @@ data ModalAction = NewContract | ApplyInputs TransactionsEndpoint V1.Contract V1
 
 derive instance Eq ModalAction
 
+queryFieldId :: FieldId
 queryFieldId = FieldId "query"
 
-form :: BootstrapForm Effect Query _
+form :: BootstrapForm Effect Query { query :: Maybe String }
 form = FormBuilder.evalBuilder' ado
   query <- textInput { validator: identity :: Batteries.Validator Effect _ _  _, name: Just queryFieldId , placeholder: "Filter contracts..."}
   in
