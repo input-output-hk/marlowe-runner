@@ -2,7 +2,6 @@ module Component.CreateContract.Types where
 
 import Prelude
 
-import Actus.Domain (ContractTerms)
 import CardanoMultiplatformLib (Bech32)
 import Data.Bounded.Generic (genericBottom, genericTop)
 import Data.Enum (class BoundedEnum, class Enum)
@@ -10,7 +9,6 @@ import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, gene
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Actus (CashFlows)
 import Marlowe.Runtime.Web.Types (TxOutRef)
 import Type.Row (type (+))
 
@@ -72,16 +70,12 @@ type ContractFormTypeChoiceRow r =
   )
 
 type ThirdStepBaseRow r =
-  ( contractTerms :: ContractTerms
+  ( 
   | r
   )
 
 type FourthStepBaseRow r =
-  ( cashFlows :: CashFlows
-  , contract :: V1.Contract
-  , counterParty :: V1.Party
-  , party :: V1.Party
-
+  ( contract :: V1.Contract
   , changeAddress :: Bech32
   , usedAddresses :: Array Bech32
   , collateralUTxOs :: Array TxOutRef

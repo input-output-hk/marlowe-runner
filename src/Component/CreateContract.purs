@@ -93,12 +93,6 @@ create :: ContractData -> ServerURL -> ContractsEndpoint -> Aff (Either ClientEr
 create contractData serverUrl contractsEndpoint = do
   let
     ContractData { contract, changeAddress, usedAddresses } = contractData
-    -- metadata = RT.Metadata $ Map.singleton actusMetadataKey $ encodeJson $ Metadata
-    --   { contractTerms: contractTerms
-    --   , party
-    --   , counterParty
-    --   }
-
     req = PostContractsRequest
       { metadata: mempty
       -- , version :: MarloweVersion

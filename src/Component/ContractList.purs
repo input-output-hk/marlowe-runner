@@ -2,7 +2,6 @@ module Component.ContractList where
 
 import Prelude
 
-import Actus.Domain.ContractTerms (ContractTerms)
 import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
@@ -47,7 +46,6 @@ import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract, TimeInterval(..))
 import Language.Marlowe.Core.V1.Semantics.Types (Contract, TimeInterval(TimeInterval))
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Actus.Metadata as M
 import Marlowe.Runtime.Web.Client (put')
 import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata, PutTransactionRequest(..), Runtime(..), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString, txOutRefToUrlEncodedString)
@@ -234,7 +232,7 @@ mkContractList = do
         , DOOM.hr {}
         , DOM.div { className: "row" } $ Array.singleton $ case state.metadata of
             Just (metadata) -> modal $
-              { body: text $ maybe "Empty Metadata" (show <<< _.contractTerms <<< unwrap) $ M.decodeMetadata metadata -- TODO: encode contractTerms as JSON
+              { body: text "Empty Metadata" 
               , onDismiss: updateState _ { metadata = Nothing }
               , title: text "Contract Terms"
               , footer: text ""

@@ -2,45 +2,13 @@ module Test.Marlowe.Web.Client where
 
 import Prelude
 
-import Actus.Core (genProjectedCashflows)
-import Actus.Domain (ContractTerms(..))
-import CardanoMultiplatformLib.Types (unsafeBech32)
-import Contrib.Bip39 (generateMnemonic, strength)
 import Contrib.Bip39 as Bip39
-import Contrib.Effect as Effect
-import Contrib.Fetch (FetchError(InvalidStatusCode))
-import Control.Monad.Error.Class (catchError, throwError)
-import Data.Argonaut (Json, JsonDecodeError, decodeJson, encodeJson, jsonParser)
-import Data.Array (head)
 import Data.Array as Array
-import Data.BigInt.Argonaut as BigInt
-import Data.Either (Either(..), either, hush)
-import Data.List as List
-import Data.Map as Map
-import Data.Maybe (Maybe(..))
-import Data.Newtype (un)
 import Data.String as String
-import Data.Time.Duration (Milliseconds(..))
-import Data.Traversable (for)
-import Data.Tuple.Nested ((/\))
 import Debug (traceM)
-import Effect.Aff (delay)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (log)
-import Effect.Exception (error, throw)
-import Foreign.Object (Object)
-import JS.Unsafe.Stringify (unsafeStringify)
-import Language.Marlowe.Core.V1.Semantics.Types (Ada(..))
-import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Actus (defaultRiskFactors, genContract)
-import Marlowe.Actus.Metadata (Metadata(..), actusMetadataKey)
-import Marlowe.Runtime.Web.Client (ClientError(..), foldMapMPages, foldMapMPages', getItems', getPages', getResource, post, post')
-import Marlowe.Runtime.Web.Types (ContractsEndpoint(..), GetContractsResponse, Metadata, PostContractsRequest(..), PostContractsResponseContent(..), ServerURL(..), Tx(..), api)
-import Marlowe.Runtime.Web.Types as RT
-import Node.Encoding (Encoding(..))
-import Node.FS.Aff (readTextFile)
+import Marlowe.Runtime.Web.Types (ServerURL(..))
 import Test.Spec (Spec, describe, it)
-import Test.Spec.Assertions (fail)
 
 spec :: ServerURL -> Spec Unit
 spec serverUrl@(ServerURL serverUrlStr) = do

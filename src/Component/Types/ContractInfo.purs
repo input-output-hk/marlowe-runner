@@ -2,16 +2,13 @@ module Component.Types.ContractInfo where
 
 import Prelude
 
-import Actus.Domain as Actus
-import Contrib.Data.BigInt.PositiveBigInt (PositiveBigInt)
 import Control.Alt ((<|>))
 import Data.Array as Array
-import Data.BigInt.Argonaut (BigInt)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.Tuple.Nested (type (/\), (/\))
+import Data.Tuple.Nested ((/\))
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
 import Marlowe.Runtime.Web.Types as Runtime
@@ -31,18 +28,6 @@ data UserCashFlowDirection
   | OutgoingFlow
   | InternalFlow
 
--- newtype CashFlowInfo = CashFlowInfo
---   { -- Author of the transaction - either party or counter party.
---     cashFlow :: Actus.CashFlow V1.Value V1.Party
---   , sender :: ActusContractRole
---   -- From the current wallet perspective (if relatd to the user).
---   , userCashFlowDirection :: Maybe (UserCashFlowDirection /\ PositiveBigInt)
---   , token :: V1.Token
---   , transaction :: Maybe Runtime.TxHeader
---   -- Value from ACTUS perspective.
---   , value :: BigInt
---   }
-
 newtype MarloweInfo = MarloweInfo
   { initialContract :: V1.Contract
   , state :: Maybe V1.State
@@ -52,17 +37,12 @@ newtype MarloweInfo = MarloweInfo
 derive instance Eq MarloweInfo
 
 newtype ContractInfo = ContractInfo
-  { -- cashFlowInfo :: Lazy (Array CashFlowInfo)
-  -- , counterParty :: V1.Party
-  contractId :: Runtime.ContractId
-  -- , contractTerms :: Actus.ContractTerms
+  { contractId :: Runtime.ContractId
   , marloweInfo :: Maybe MarloweInfo
   , endpoints ::
       { contract :: Runtime.ContractEndpoint
       , transactions :: Maybe Runtime.TransactionsEndpoint
       }
-  -- , party :: V1.Party
-  -- , userContractRole :: Maybe UserContractRole
   -- Use this only for debugging - all domain specific data
   -- should be precomputed and exposed as separated fields.
   , _runtime ::
@@ -74,19 +54,6 @@ newtype ContractInfo = ContractInfo
 
 derive instance Newtype ContractInfo _
 
--- newtype ActusContractId = ActusContractId String
--- 
--- derive instance Newtype ActusContractId _
--- derive newtype instance Eq ActusContractId
--- derive newtype instance Ord ActusContractId
-
--- actusContractId :: ContractInfo -> ActusContractId
--- actusContractId (ContractInfo { contractTerms: Actus.ContractTerms contractTerms }) =
---   ActusContractId contractTerms.contractId
--- 
--- actusContractType :: ContractInfo -> Actus.CT
--- actusContractType (ContractInfo { contractTerms: Actus.ContractTerms contractTerms }) = contractTerms.contractType
-
 createdAt :: ContractInfo -> Maybe Runtime.BlockHeader
 createdAt (ContractInfo { _runtime: { contractHeader: Runtime.ContractHeader { block } } }) = block
 
@@ -97,4 +64,3 @@ updatedAt ci@(ContractInfo { _runtime: { transactions } }) =
     Runtime.TxHeader tx /\ _ <- Array.last transactions
     tx.block
     <|> createdAt ci
-
