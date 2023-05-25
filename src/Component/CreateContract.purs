@@ -16,6 +16,7 @@ import Contrib.React.Basic.Hooks.UseForm (useForm)
 import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Bootstrap.FormBuilder (BootstrapForm)
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
+import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise, toAff)
 import Control.Promise as Promise
@@ -28,12 +29,13 @@ import Data.DateTime.Instant (instant, unInstant)
 import Data.Either (Either(..))
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Int as Int
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (un)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Tuple (snd)
+import Data.Typelevel.Undefined (undefined)
 import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
 import Effect (Effect)
@@ -46,17 +48,23 @@ import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), toTextEnvelope)
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFnEither) as Validator
+import React.Basic (Ref)
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (br, div_, text, input) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
-import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
+import React.Basic.Hooks (JSX, component, readRef, useContext, useRef, useState', (/\))
 import React.Basic.Hooks as React
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
+import Web.DOM.Node (Node)
 import Web.File.File (File)
+import Web.File.FileList (FileList)
+import Web.File.FileList as FileList
 import Web.File.FileReader as FileReader
+import Web.HTML.HTMLInputElement (HTMLInputElement)
+import Web.HTML.HTMLInputElement as HTMLInputElement
 
 type Props =
   { inModal :: Boolean
@@ -127,15 +135,12 @@ foreign import _loadFile :: File -> Promise (Nullable String)
 loadFile :: File -> Aff (Maybe String)
 loadFile = map Nullable.toMaybe <<< Promise.toAff <<< _loadFile
 
+hoistMaybe :: forall m a. Applicative m => Maybe a -> MaybeT m a
+hoistMaybe = MaybeT <<< pure
+
 mkLoadFileButtonComponent :: MkComponentM ({ onFileload :: Maybe String -> Effect Unit } -> JSX)
 mkLoadFileButtonComponent =
-  liftEffect $ component "LoadFileButton" \{ onFileload } ->
-    {- What I need:
-      React.Basic.DOM.Components.Ref  ref               :: (Maybe Node -> JSX) -> JSX
-      Web.HTML.HTMLInputElement       fromNode          :: Node -> Maybe HTMLInputElement
-      Web.HTML.HTMLInputElement       files             :: HTMLInputElement -> Effect (Maybe FileList)
-      Web.File.FileList               item              :: Int  -> FileList   -> Maybe File
-    -}
+  liftEffect $ component "LoadFileButton" \{ onFileload } -> React.do
     {- Working example in raw HTML:
       <script>
       const onfile = () => {
@@ -149,11 +154,18 @@ mkLoadFileButtonComponent =
       </script>
       <input id="yo" type="file" onchange="onfile()" />
     -}
+    ref :: Ref (Nullable Node) <- useRef Nullable.null
+
     let
       onChange :: Effect Unit
-      onChange = pure unit
-    in
-      pure $ DOOM.input { type: "file", onChange: handler_ onChange }
+      onChange = map (fromMaybe unit) $ runMaybeT do
+        node :: Node <- MaybeT $ Nullable.toMaybe <$> readRef ref
+        inputElement :: HTMLInputElement <- hoistMaybe $ HTMLInputElement.fromNode node
+        files :: FileList <- MaybeT $ HTMLInputElement.files inputElement
+        file :: File <- hoistMaybe $ FileList.item 0 files
+        liftEffect $ launchAff_ $ (liftEffect <<< onFileload) =<< loadFile file
+
+    pure $ DOOM.input { type: "file", onChange: handler_ onChange, ref }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
