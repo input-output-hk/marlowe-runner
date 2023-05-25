@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "checkJs": true,
+    "noUncheckedIndexedAccess": true,
+    "target": "ES2022",
+    "lib": ["DOM", "ES2022"]
+  }
+}

@@ -17,6 +17,8 @@ import Contrib.React.Basic.Hooks.UseForm as UseForm
 import Contrib.React.Bootstrap.FormBuilder (BootstrapForm)
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
 import Control.Monad.Reader.Class (asks)
+import Control.Promise (Promise, toAff)
+import Control.Promise as Promise
 import Data.Argonaut (decodeJson, encodeJson, parseJson, stringifyWithIndent)
 import Data.Argonaut.Encode (toJsonString) as Argonaut
 import Data.Array as Array
@@ -28,6 +30,8 @@ import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
+import Data.Nullable (Nullable)
+import Data.Nullable as Nullable
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
@@ -51,7 +55,7 @@ import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks as React
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
-import Web.File.FileReader (fileReader)
+import Web.File.File (File)
 import Web.File.FileReader as FileReader
 
 type Props =
@@ -124,7 +128,12 @@ data SubmissionStep
   | Signing (Either String PostContractsResponseContent)
   | Signed (Either ClientError PostContractsResponseContent)
 
-mkLoadFileButtonComponent :: MkComponentM ({ onFileload :: Foreign -> Effect Unit } -> JSX)
+foreign import _loadFile :: File -> Promise (Nullable String)
+
+loadFile :: File -> Aff (Maybe String)
+loadFile = map Nullable.toMaybe <<< Promise.toAff <<< _loadFile
+
+mkLoadFileButtonComponent :: MkComponentM ({ onFileload :: Maybe String -> Effect Unit } -> JSX)
 mkLoadFileButtonComponent =
   liftEffect $ component "LoadFileButton" \{ onFileload } ->
     {- What I need:
@@ -132,13 +141,6 @@ mkLoadFileButtonComponent =
       Web.HTML.HTMLInputElement       fromNode          :: Node -> Maybe HTMLInputElement
       Web.HTML.HTMLInputElement       files             :: HTMLInputElement -> Effect (Maybe FileList)
       Web.File.FileList               item              :: Int  -> FileList   -> Maybe File
-      Web.File.File                   toBlob            :: File -> Blob
-      Web.File.FileReader             readAsText        :: Blob -> FileReader -> Effect Unit
-      Web.File.FileReader             fileReader        :: Effect FileReader
-      Web.File.FileReader             result            :: FileReader -> Effect Foreign
-      Web.File.FileReader             toEventTarget     :: FileReader -> EventTarget
-      Web.Event.EventTarget           eventListener     :: forall a. (Event -> Effect a) -> Effect EventListener
-      Web.Event.EventTarget           addEventListener  :: EventType -> EventListener -> Boolean -> EventTarget -> Effect Unit
     -}
     {- Working example in raw HTML:
       <script>
@@ -155,7 +157,7 @@ mkLoadFileButtonComponent =
     -}
     let
       onChange :: Effect Unit
-      onChange = onFileload =<< FileReader.result =<< fileReader
+      onChange = pure unit
     in
       pure $ DOOM.input { type: "file", onChange: handler_ onChange }
 
