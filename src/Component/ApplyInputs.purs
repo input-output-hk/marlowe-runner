@@ -2,137 +2,62 @@ module Component.ApplyInputs where
 
 import Prelude
 
-import Actus.Domain (CashFlow)
-import Actus.Domain.ContractTerms (ContractTerms)
 import CardanoMultiplatformLib (Bech32, CborHex)
-import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Lib as Lib
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
-import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
-import Component.CreateContract as CreateContract
-import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput(..), nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
-import Component.Modal (mkModal)
+import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
-import Component.Types (ActusContractId(..), ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
 import Component.Types (MkComponentM, WalletInfo(..))
-import Component.Types.ContractInfo (MarloweInfo(..))
-import Component.Types.ContractInfo as ContractInfo
-import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (link)
-import Component.Widgets (link, linkWithIcon)
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
-import Contrib.Fetch (FetchError)
-import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
-import Contrib.React.Basic.Hooks.UseForm (useForm)
+import Contrib.Language.Marlowe.Core.V1 (compareMarloweJsonKeys)
 import Contrib.React.Basic.Hooks.UseForm (useForm)
 import Contrib.React.Basic.Hooks.UseForm as UseForm
-import Contrib.React.Basic.Hooks.UseForm as UseForm
-import Contrib.React.Bootstrap (overlayTrigger, tooltip)
-import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, ChoiceFieldChoices(..), choiceField, radioFieldChoice, selectFieldChoice)
-import Contrib.React.Bootstrap.FormBuilder (BootstrapForm, intInput, textInput)
+import Contrib.React.Bootstrap.FormBuilder (ChoiceFieldChoices(SelectFieldChoices, RadioButtonFieldChoices), choiceField, intInput, radioFieldChoice, selectFieldChoice)
 import Contrib.React.Bootstrap.FormBuilder as FormBuilder
-import Contrib.React.Bootstrap.FormBuilder as FormBuilder
-import Contrib.React.Bootstrap.Icons as Icons
-import Contrib.React.Bootstrap.Table (striped) as Table
-import Contrib.React.Bootstrap.Table (table)
-import Contrib.React.Bootstrap.Types as OverlayTrigger
-import Contrib.ReactSyntaxHighlighter (jsonSyntaxHighlighter, yamlSyntaxHighlighter)
+import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
-import Control.Monad.Reader.Class (asks)
-import Control.Monad.Trans.Class (lift)
-import Data.Argonaut (decodeJson, encodeJson, parseJson)
-import Data.Argonaut.Encode (toJsonString) as Argonaut
-import Data.Array (elem, singleton, toUnfoldable)
-import Data.Array as Array
 import Data.Array as Array
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmpty
-import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut as BigInt
-import Data.BigInt.Argonaut as BigInt
-import Data.DateTime (adjust)
 import Data.DateTime.Instant (instant, toDateTime, unInstant)
-import Data.Decimal (Decimal)
 import Data.Either (Either(..))
-import Data.Either (Either(..))
-import Data.Foldable (fold, foldMap)
-import Data.FormURLEncoded.Query (FieldId(..), Query)
-import Data.FormURLEncoded.Query (Query(..))
-import Data.Function (on)
+import Data.Function.Uncurried (mkFn2)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Identity (Identity)
 import Data.Int as Int
-import Data.List (List)
-import Data.List.NonEmpty (NonEmptyList)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, isNothing, maybe)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Newtype (un)
-import Data.Newtype (un, unwrap)
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
-import Data.Time.Duration (Seconds(..))
-import Data.Time.Duration as Duration
 import Data.Tuple (snd)
-import Data.Tuple (snd)
-import Data.Tuple.Nested (type (/\))
-import Data.Unfoldable (unfoldr1)
-import Data.Validation.Semigroup (V(..))
 import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
-import Debug (traceM)
-import Effect (Effect)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
-import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
-import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Effect.Now (now)
-import Effect.Now (nowDateTime)
-import JS.Unsafe.Stringify (unsafeStringify)
-import Language.Marlowe.Core.V1.Semantics as V1
-import Language.Marlowe.Core.V1.Semantics.Types (Case(..), Contract(..), Input(..), InputContent(..), Party, Token)
-import Language.Marlowe.Core.V1.Semantics.Types (Contract, Input(..), InputContent(..), Party)
-import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Actus.Metadata as M
+import JsYaml as JsYaml
+import Language.Marlowe.Core.V1.Semantics.Types (Input(..), InputContent(..))
+import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input, Party(..), State, TimeInterval(..), Token(..), Value(..)) as V1
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
-import Marlowe.Runtime.Web.Client (post')
-import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TxHeader(..), toTextEnvelope)
-import Marlowe.Runtime.Web.Types (ContractHeader(..), Metadata, PostTransactionsRequest(..), TxOutRef, txOutRefToString, txOutRefToUrlEncodedString)
-import Marlowe.Runtime.Web.Types (PostMerkleizationRequest(..), PostMerkleizationResponse(..), PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), Runtime(..), ServerURL, TextEnvelope(..), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
-import Marlowe.Runtime.Web.Types as Runtime
-import Marlowe.Runtime.Web.Types as Runtime
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse(PostTransactionsResponse), PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Batteries as Batteries
-import Polyform.Validator (liftFnEither) as Validator
 import Polyform.Validator (liftFnMMaybe, liftFnMaybe)
 import React.Basic (fragment)
-import React.Basic.DOM (text)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
-import React.Basic.DOM as R
-import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (EventHandler, handler)
-import React.Basic.Events (handler_)
-import React.Basic.Hooks (Hook, JSX, UseState, component, useRef, useState, (/\))
+import React.Basic.Events (EventHandler, handler_)
 import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
-import React.Basic.Hooks (JSX, component, useContext, useState, (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks as React
-import Wallet as Wallet
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
-import WalletContext (WalletContext(..), walletAddresses)
 
 type Result = V1.Contract
 
@@ -236,16 +161,10 @@ mkDepositFormComponent = do
           do
             launchAff_ $ do
               applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
-                -- Right res -> do
-                --   traceM "APPLY SUCCESS"
-                --   traceM res
-                Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
+                Right { resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
                   let
-                    { contractId, tx } = postContractsResponse
+                    { tx } = postContractsResponse
                     TextEnvelope { cborHex: txCborHex } = tx
-                    lib = Lib.props cardanoMultiplatformLib
-                    txCbor = cborHexToCbor txCborHex
-                  traceM "Successfully created a transaction"
                   let
                     WalletInfo { wallet: walletApi } = connectedWallet
                   Wallet.signTx walletApi txCborHex true >>= case _ of
@@ -610,6 +529,9 @@ type Props =
   , timeInterval :: V1.TimeInterval
   }
 
+sortMarloweKeys :: String -> String -> JsYaml.JsOrdering
+sortMarloweKeys a b = JsYaml.toJsOrdering $ compareMarloweJsonKeys a b
+
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   Runtime runtime <- asks _.runtime
@@ -648,8 +570,7 @@ mkComponent = do
       Creating SelectingInputType -> do
         let
           body = DOM.div { className: "row" }
-            [ DOM.div { className: "col-12" } $
-                yamlSyntaxHighlighter contract
+            [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
             ]
 
           footer = DOM.div { className: "row" }
@@ -739,7 +660,14 @@ newtype ApplyInputsContext = ApplyInputsContext
   , timeInterval :: V1.TimeInterval
   }
 
-applyInputs :: ApplyInputsContext -> ServerURL -> TransactionsEndpoint -> _
+applyInputs :: ApplyInputsContext -> ServerURL -> TransactionsEndpoint -> Aff
+  (Either ClientError
+     { links :: { transaction :: TransactionEndpoint
+                }
+     , resource :: PostTransactionsResponse
+     }
+  )
+
 applyInputs (ApplyInputsContext ctx) serverURL transactionsEndpoint = do
   let
     V1.TimeInterval ib iha = ctx.timeInterval

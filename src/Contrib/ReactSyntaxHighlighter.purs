@@ -26,5 +26,16 @@ syntaxHighlighter props = element _SyntaxHighlighter (NoProblem.coerce props)
 jsonSyntaxHighlighter :: forall a. EncodeJson a => a -> JSX
 jsonSyntaxHighlighter a = syntaxHighlighter { language: "json", children: stringifyWithIndent 2 $ encodeJson a, wrapLongLines: true }
 
-yamlSyntaxHighlighter :: forall a. EncodeJson a => a -> JSX
-yamlSyntaxHighlighter a = syntaxHighlighter { language: "yaml", children: JsYaml.dump (encodeJson a) { indent: 2 }, wrapLongLines: true}
+yamlSyntaxHighlighter
+  :: forall a opts
+   . EncodeJson a
+  => NoProblem.Coerce { | opts } JsYaml.Options
+  => a
+  -> { | opts }
+  -> JSX
+yamlSyntaxHighlighter a opts = do
+  syntaxHighlighter
+    { language: "yaml"
+    , children: JsYaml.dump opts (encodeJson a)
+    , wrapLongLines: true
+    }
