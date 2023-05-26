@@ -75,7 +75,7 @@ create contractData serverUrl contractsEndpoint = do
     req = PostContractsRequest
       { metadata: mempty
       -- , version :: MarloweVersion
-      -- , roles :: Maybe RolesConfig
+      , roles: Nothing
       , tags: mempty -- TODO: use instead of metadata
       , contract
       , minUTxODeposit: V1.Lovelace (BigInt.fromInt 2_000_000)

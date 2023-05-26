@@ -8,8 +8,9 @@ import CardanoMultiplatformLib.Types (unsafeBech32)
 import Contrib.Data.Argonaut (JsonParser, JsonParserResult, decodeFromString)
 import Contrib.Data.Argonaut.Generic.Record (class DecodeRecord, DecodeJsonFieldFn, decodeRecord, decodeNewtypedRecord)
 import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), decodeJson, encodeJson)
+import Data.Argonaut.Core (isString)
 import Data.Argonaut.Decode.Combinators ((.:))
-import Data.Argonaut.Decode.Decoders (decodeMaybe)
+import Data.Argonaut.Decode.Decoders (decodeJObject, decodeMaybe)
 import Data.DateTime (DateTime)
 import Data.DateTime.ISO (ISO(..))
 import Data.Either (Either(..), note)
@@ -104,9 +105,21 @@ data RolesConfig
   = UsePolicy PolicyId
   | Mint (Map String RoleTokenConfig)
 
+instance DecodeJson RolesConfig where
+  decodeJson json | isString json = UsePolicy <$> decodeJson json
+  decodeJson json = Mint <$> decodeJson json
+
 data RoleTokenConfig
   = RoleTokenSimple V1.Address
   | RoleTokenAdvanced V1.Address TokenMetadata
+
+instance DecodeJson RoleTokenConfig where
+  decodeJson json | isString json = RoleTokenSimple <$> decodeJson json
+  decodeJson json = do
+    obj <- decodeJObject json
+    address <- obj .: "address"
+    metadata <- obj .: "metadata"
+    pure $ RoleTokenAdvanced address metadata
 
 newtype TokenMetadata = TokenMetadata
   { name :: String
@@ -499,7 +512,7 @@ derive newtype instance DecodeJson PostMerkleizationResponse
 newtype PostContractsRequest = PostContractsRequest
   { metadata :: Metadata
   -- , version :: MarloweVersion
-  -- , roles :: Maybe RolesConfig
+  , roles :: Maybe RolesConfig
   , tags :: Tags
   , contract :: V1.Contract
   , minUTxODeposit :: V1.Ada

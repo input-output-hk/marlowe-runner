@@ -4,6 +4,7 @@
   , "aff-promise"
   , "argonaut"
   , "argonaut-codecs"
+  , "argonaut-core"
   , "argonaut-generic"
   , "array-builder"
   , "arraybuffer-types"
@@ -92,9 +93,9 @@
   , "variant"
   , "web-dom"
   , "web-encoding"
+  , "web-file"
   , "web-html"
   , "web-streams"
-  , "web-file"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
