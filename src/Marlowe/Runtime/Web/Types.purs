@@ -18,9 +18,10 @@ import Data.Int as Int
 import Data.JSDate as JSDate
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, un, unwrap)
 import Data.Profunctor.Strong ((***))
+import Data.Show.Generic (genericShow)
 import Data.String as String
 import Data.Traversable (for)
 import Data.Tuple.Nested (type (/\), (/\))
@@ -78,6 +79,10 @@ derive instance Generic PolicyId _
 derive instance Newtype PolicyId _
 derive instance Eq PolicyId
 derive instance Ord PolicyId
+
+instance Show PolicyId where
+  show = genericShow
+
 instance DecodeJson PolicyId where
   decodeJson = map PolicyId <$> decodeJson
 
@@ -94,6 +99,40 @@ instance DecodeJson MarloweVersion where
   decodeJson = decodeFromString case _ of
     "v1" -> Just V1
     _ -> Nothing
+
+data RolesConfig
+  = UsePolicy PolicyId
+  | Mint (Map String RoleTokenConfig)
+
+data RoleTokenConfig
+  = RoleTokenSimple V1.Address
+  | RoleTokenAdvanced V1.Address TokenMetadata
+
+newtype TokenMetadata = TokenMetadata
+  { name :: String
+  , image :: String -- URI
+  , mediaType :: Maybe String
+  , description :: Maybe String
+  , files :: Maybe (Array TokenMetadataFile)
+  }
+
+derive instance Generic TokenMetadata _
+derive instance Newtype TokenMetadata _
+derive instance Eq TokenMetadata
+derive instance Ord TokenMetadata
+derive newtype instance DecodeJson TokenMetadata
+
+newtype TokenMetadataFile = TokenMetadataFile
+  { name :: String
+  , src :: String -- URI
+  , mediaType :: String
+  }
+
+derive instance Generic TokenMetadataFile _
+derive instance Newtype TokenMetadataFile _
+derive instance Eq TokenMetadataFile
+derive instance Ord TokenMetadataFile
+derive newtype instance DecodeJson TokenMetadataFile
 
 data TxStatus
   = Unsigned
@@ -180,6 +219,7 @@ metadataFieldDecoder :: { metadata :: DecodeJsonFieldFn Metadata }
 metadataFieldDecoder = { metadata: map decodeJson :: Maybe Json -> Maybe (JsonParserResult Metadata) }
 
 newtype Tags = Tags (Map String Metadata)
+
 derive instance Generic Tags _
 derive instance Newtype Tags _
 derive instance Eq Tags
@@ -198,19 +238,20 @@ instance EncodeJson Tags where
 
 instance DecodeJson Tags where
   decodeJson _ = Right mempty
-  -- FIXME: properly decode Tags
-  {-
-  decodeJson json = do
-    (obj :: Object Metadata) <- decodeJson json
 
-    (arr :: Array (String /\ Metadata)) <- for (Object.toUnfoldable obj) \(idx /\ value) -> do
-      idx' <- do
-        let
-          err = TypeMismatch $ "Expecting an integer metadata label but got: " <> show idx
-        note err (Just idx)
-      pure (idx' /\ value)
-    pure <<< Tags <<< Map.fromFoldable $ arr
-    -}
+-- FIXME: properly decode Tags
+{-
+decodeJson json = do
+  (obj :: Object Metadata) <- decodeJson json
+
+  (arr :: Array (String /\ Metadata)) <- for (Object.toUnfoldable obj) \(idx /\ value) -> do
+    idx' <- do
+      let
+        err = TypeMismatch $ "Expecting an integer metadata label but got: " <> show idx
+      note err (Just idx)
+    pure (idx' /\ value)
+  pure <<< Tags <<< Map.fromFoldable $ arr
+  -}
 
 type ContractHeadersRowBase r =
   ( contractId :: TxOutRef
