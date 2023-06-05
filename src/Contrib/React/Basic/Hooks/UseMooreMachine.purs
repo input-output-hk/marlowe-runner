@@ -1,4 +1,4 @@
-module Contrib.React.Basic.Hooks.UseMoorMachine where
+module Contrib.React.Basic.Hooks.UseMooreMachine where
 
 import Prelude
 
@@ -7,31 +7,31 @@ import Data.Newtype (class Newtype)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
-import Effect.Aff (Aff, delay)
+import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import React.Basic.Hooks (Hook, bind, coerceHook, discard, readRef) as React
 import React.Basic.Hooks.Aff (UseAff, useAff)
 import Type.Function (type (#))
 import Utils.React.Basic.Hooks (UseStateRef, UseVersionedState, useStateRef, useVersionedState')
 
-type MoorMachineStep state action = state -> action -> state
+type MooreMachineStep state action = state -> action -> state
 
-type MoorMachineDriver state action = state -> Maybe (Aff action)
+type MooreMachineDriver state action = state -> Maybe (Aff action)
 
-type MoorMachineSpec state action output =
+type MooreMachineSpec state action output =
   { initialState :: state
   -- | Driver can trigger automatic actions.
-  , driver :: MoorMachineDriver state action
+  , driver :: MooreMachineDriver state action
   -- , onStateTransition :: state -> state -> Effect Unit
   , output :: state -> output
-  , step :: MoorMachineStep state action
+  , step :: MooreMachineStep state action
   }
 
-newtype UseMoorMachine :: Type -> Type -> Type -> Type -> Type
-newtype UseMoorMachine state action output hooks = UseMoorMachine
+newtype UseMooreMachine :: Type -> Type -> Type -> Type -> Type
+newtype UseMooreMachine state action output hooks = UseMooreMachine
   ( hooks
-      # UseVersionedState (MoorMachineSpec state action output)
-      # UseStateRef Int (MoorMachineSpec state action output)
+      # UseVersionedState (MooreMachineSpec state action output)
+      # UseStateRef Int (MooreMachineSpec state action output)
       # UseVersionedState state
       # UseStateRef Int state
       # UseVersionedState (Maybe (Aff action))
@@ -39,20 +39,20 @@ newtype UseMoorMachine state action output hooks = UseMoorMachine
       # UseAff Int Unit
   )
 
-derive instance Newtype (UseMoorMachine state action output hooks) _
+derive instance Newtype (UseMooreMachine state action output hooks) _
 
 -- Much more simpler API than `useHalo` which should be probably preferable.
-useMoorMachine
+useMooreMachine
   :: forall output state action
-   . MoorMachineSpec state action output
+   . MooreMachineSpec state action output
   -> React.Hook
-      (UseMoorMachine state action output)
+      (UseMooreMachine state action output)
       { state :: state
       , output :: output
       , applyAction :: action -> Effect Unit
-      , reset :: Maybe (MoorMachineSpec state action output) -> Effect Unit
+      , reset :: Maybe (MooreMachineSpec state action output) -> Effect Unit
       }
-useMoorMachine initialSpec = React.coerceHook React.do
+useMooreMachine initialSpec = React.coerceHook React.do
   { state: spec@{ driver, output, step }, version: specVersion } /\ setSpec <- useVersionedState' initialSpec
   specRef <- useStateRef specVersion spec
 
@@ -76,7 +76,6 @@ useMoorMachine initialSpec = React.coerceHook React.do
     case currPossibleRequest of
       Nothing -> pure unit
       Just request -> do
-        delay (Milliseconds 2000.0)
         action <- request
         liftEffect $ applyAction action
   pure

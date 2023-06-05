@@ -8,7 +8,7 @@ import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo)
 import Component.Widgets (link)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
-import Contrib.React.Basic.Hooks.UseMoorMachine (useMoorMachine)
+import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
@@ -136,7 +136,7 @@ mkComponent = do
   { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts address
 
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss, inModal } -> React.do
-    { state: submissionState, applyAction, reset } <- useMoorMachine do
+    { state: submissionState, applyAction, reset } <- useMooreMachine do
       let
         env = { connectedWallet, cardanoMultiplatformLib, runtime }
       { initialState: Machine.initialState
