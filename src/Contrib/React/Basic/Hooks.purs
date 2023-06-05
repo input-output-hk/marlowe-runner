@@ -2,6 +2,8 @@ module Utils.React.Basic.Hooks where
 
 import Prelude
 
+import Contrib.Effect.SequenceRef (SequenceRef)
+import Contrib.Effect.SequenceRef as SequenceRef
 import Control.Monad.Rec.Class (forever)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -12,8 +14,9 @@ import Effect (Effect)
 import Effect.Aff (Aff, delay)
 import Effect.Ref as Ref
 import Effect.Timer (clearInterval, clearTimeout, setInterval, setTimeout)
+import Effect.Unsafe (unsafePerformEffect)
 import Halogen.Subscription (Emitter, subscribe, unsubscribe) as HS
-import React.Basic.Hooks (Hook, Ref, UseEffect, UseRef, UseState, useEffect, useRef, useState, writeRef)
+import React.Basic.Hooks (Hook, Ref, UseEffect, UseMemo, UseRef, UseState, useEffect, useRef, useState, useState', writeRef)
 import React.Basic.Hooks (Render) as RB.Hooks
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (UseAff, useAff)
@@ -139,3 +142,48 @@ useLoopAff deps interval action = React.do
     action
     delay interval
 
+useMaybeValue :: forall a. Maybe a -> Hook (UseState (Maybe a)) (Maybe a /\ (a -> Effect Unit) /\ Effect Unit)
+useMaybeValue value = React.do
+  possibleModalAction /\ setPossibleModalAction <- useState' value
+  let
+    setModalAction = setPossibleModalAction <<< Just
+    resetModalAction = setPossibleModalAction Nothing
+  pure (possibleModalAction /\ setModalAction /\ resetModalAction)
+
+useMaybeValue' :: forall a. Hook (UseState (Maybe a)) (Maybe a /\ (a -> Effect Unit) /\ Effect Unit)
+useMaybeValue' = useMaybeValue Nothing
+
+newtype UseSequence a hooks = UseSequence (UseState a hooks)
+
+derive instance Newtype (UseSequence a hooks) _
+
+useSequence :: forall a. Semiring a => a -> Hook (UseSequence a) { curr :: a, next :: Effect Unit }
+useSequence a = React.coerceHook React.do
+  seq /\ updateSeq <- useState a
+  pure $ { curr: seq, next: updateSeq (_ + one) }
+
+newtype UseVersionedState a hooks = UseVersionedState (UseState { state :: a, version :: Int } (UseMemo Unit (SequenceRef Int) hooks))
+
+derive instance Newtype (UseVersionedState a hooks) _
+
+-- | Sometimes when we don't have ability to specify `Eq` instance for a type
+-- | we can use this hook to track changes in the state.
+useVersionedState :: forall a. a -> Hook (UseVersionedState a) ({ state :: a, version :: Int } /\ ((a -> a) -> Effect Unit))
+useVersionedState a = React.coerceHook React.do
+  versionRef <- React.useMemo unit \_ -> unsafePerformEffect $ SequenceRef.new 0
+  currState /\ updateState <- useState { version: 0, state: a }
+  let
+    updateState' f = do
+      version' <- SequenceRef.next versionRef
+      updateState \{ state } -> do
+        let
+          state' = f state
+        { version: version', state: state' }
+  pure $ currState /\ updateState'
+
+useVersionedState' :: forall a. a -> Hook (UseVersionedState a) ({ state :: a, version :: Int } /\ (a -> Effect Unit))
+useVersionedState' a = React.do
+  currState /\ updateState <- useVersionedState a
+  let
+    setState = updateState <<< const
+  pure $ currState /\ setState

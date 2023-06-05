@@ -2,12 +2,13 @@ module WalletContext where
 
 import Prelude
 
-import CardanoMultiplatformLib (Bech32, addressObject, allocate, asksLib, runGarbageCollector)
+import CardanoMultiplatformLib (Bech32, CborHex, addressObject, allocate, asksLib, runGarbageCollector)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
-import CardanoMultiplatformLib.Transaction (transactionOutputObject, transactionUnspentOutput, transactionUnspentOutputObject)
+import CardanoMultiplatformLib.Transaction (TransactionUnspentOutputObject, transactionOutputObject, transactionUnspentOutput, transactionUnspentOutputObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either(..), fromRight)
+import Data.Foldable (fold)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Traversable (for)
@@ -41,24 +42,21 @@ walletAddresses cardanoMultiplatformLib wallet = do
   possibleUsedAddresses <- Wallet.getUsedAddresses wallet
   possibleUTxOs <- Wallet.getUtxos wallet
 
-  case possibleUsedAddresses, possibleUTxOs of
-    Right addresses, Right (Just utxos) -> do
-      utxoAddresses' <- liftEffect $ runGarbageCollector cardanoMultiplatformLib do
-        _TransactionUnspentOutput <- asksLib _."TransactionUnspentOutput"
-        for utxos \utxo -> do
-          let
-            utxo' = cborHexToCbor utxo
-          unspentTxOutObj <- allocate $ transactionUnspentOutput.from_bytes _TransactionUnspentOutput utxo'
-          txOutObj <- allocate $ transactionUnspentOutputObject.output unspentTxOutObj
-          addressObj <- allocate $ transactionOutputObject.address txOutObj
-          liftEffect $ addressObject.to_bech32 addressObj NoProblem.undefined
-
-      addresses' <- liftEffect $ Array.catMaybes <$> for addresses \someAddress -> do
-        fromSomeAddress cardanoMultiplatformLib someAddress
-
-      pure $ Array.nub $ utxoAddresses' <> addresses'
-    _, _ -> do
-      pure []
+  let
+    addresses = fromRight [] possibleUsedAddresses
+    utxos = fromRight [] (map fold possibleUTxOs)
+  utxoAddresses' <- liftEffect $ runGarbageCollector cardanoMultiplatformLib do
+    _TransactionUnspentOutput <- asksLib _."TransactionUnspentOutput"
+    for utxos \(utxo :: CborHex TransactionUnspentOutputObject) -> do
+      let
+        utxo' = cborHexToCbor utxo
+      unspentTxOutObj <- allocate $ transactionUnspentOutput.from_bytes _TransactionUnspentOutput utxo'
+      txOutObj <- allocate $ transactionUnspentOutputObject.output unspentTxOutObj
+      addressObj <- allocate $ transactionOutputObject.address txOutObj
+      liftEffect $ addressObject.to_bech32 addressObj NoProblem.undefined
+  addresses' <- liftEffect $ Array.catMaybes <$> for addresses \someAddress -> do
+    fromSomeAddress cardanoMultiplatformLib someAddress
+  pure $ Array.nub $ utxoAddresses' <> addresses'
 
 walletContext :: CardanoMultiplatformLib.Lib -> Wallet.Api -> Aff WalletContext
 walletContext cardanoMultiplatformLib wallet = do

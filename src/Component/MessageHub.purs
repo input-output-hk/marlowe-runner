@@ -3,10 +3,10 @@ module Component.MessageHub where
 import Prelude
 
 import Component.Types (Message, MessageContent(..), MessageHub(..), MessageId)
-import Contrib.React.Bootstrap (alert)
-import Contrib.React.Bootstrap.Collapse (collapse, dimension)
-import Contrib.React.Bootstrap.Icons as Icons
-import Contrib.React.Bootstrap.Types (variant)
+import ReactBootstrap (alert)
+import ReactBootstrap.Collapse (collapse, dimension)
+import ReactBootstrap.Icons as Icons
+import ReactBootstrap.Types (variant)
 import Data.Array as Array
 import Data.List as List
 import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)

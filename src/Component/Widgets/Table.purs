@@ -2,7 +2,7 @@ module Component.Widget.Table where
 
 import Prelude
 
-import Contrib.React.Bootstrap.Icons as Icons
+import ReactBootstrap.Icons as Icons
 import React.Basic (JSX)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)

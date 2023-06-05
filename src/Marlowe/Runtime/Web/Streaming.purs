@@ -48,7 +48,7 @@ import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Halogen.Subscription (Listener)
 import Halogen.Subscription as Subscription
-import Marlowe.Runtime.Web.Client (Range(..), foldMapMContractPages, getPages', getResource')
+import Marlowe.Runtime.Web.Client (foldMapMContractPages, getPages', getResource')
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractId, ContractState, GetContractResponse, GetContractsResponse, ServerURL, TransactionEndpoint, TransactionsEndpoint, TxHeader, api)
 
 -- | API CAUTION: We update the state in chunks but send the events one by one. This means that
@@ -95,8 +95,6 @@ contracts (PollingInterval pollingInterval) (RequestInterval requestInterval) fi
 
   { emitter, listener } <- liftEffect Subscription.create
 
-  -- let
-  --  range = Just $ Range "contractId 11040663a4cdf37a703ce1a509d97d38f739e1556d303333729576d06189585b%231;limit 100;offset 1;order desc"
   let
     range = Nothing
 
@@ -105,7 +103,7 @@ contracts (PollingInterval pollingInterval) (RequestInterval requestInterval) fi
     void $ AVar.tryTake contractsAVar
     previousContracts <- liftEffect $ Ref.read contractsRef
     nextContracts :: Map ContractId GetContractsResponse <-
-      map contractsById $ Effect.liftEither =<< foldMapMContractPages serverUrl api range \pageContracts -> do
+      map contractsById $ Effect.liftEither =<< foldMapMContractPages @String serverUrl api range \pageContracts -> do
         let
           pageContracts' = filter filterContracts pageContracts
         liftEffect do
@@ -193,16 +191,17 @@ fetchContractsTransactions
        , notify :: Effect Unit
        }
 fetchContractsTransactions endpoints prevContractTransactionMap listener (RequestInterval requestInterval) serverUrl = do
-  items <- map Map.catMaybes $ forWithIndex endpoints \contractId endpoint -> do
+  items <- map Map.catMaybes $ forWithIndex endpoints \contractId transactionEndpoint -> do
     let
       action = do
         let
-          getTransactions = getPages' serverUrl endpoint Nothing >>= Effect.liftEither <#> foldMap _.page
+          getTransactions = getPages' @String serverUrl transactionEndpoint Nothing >>= Effect.liftEither <#> foldMap _.page
         (txHeaders :: Array { resource :: TxHeader, links :: { transaction :: TransactionEndpoint } }) <- getTransactions
         delay requestInterval
         let
           prevTransactions = fromMaybe [] $ Map.lookup contractId prevContractTransactionMap
-          newTransactions = map (\{ resource, links: { transaction: endpoint }} -> (resource /\ endpoint)) txHeaders -- preservedTransactions <> addedTransactions
+          newTransactions = txHeaders <#> \{ resource, links: { transaction: transactionEndpoint' }} ->
+            resource /\ transactionEndpoint'
           change =
             if map fst newTransactions == map fst prevTransactions then
               Nothing
@@ -285,7 +284,7 @@ fetchContractsStates endpoints prevContractStateMap listener (RequestInterval re
     let
       action = do
         let
-          getContractState = (getResource' serverUrl endpoint {} >>= Effect.liftEither) <#> _.payload.resource -- <#> foldMap _.page
+          getContractState = (getResource' @String serverUrl endpoint {} >>= Effect.liftEither) <#> _.payload.resource -- <#> foldMap _.page
         (newContractState :: ContractState) <- getContractState
         delay requestInterval
         let

@@ -43,11 +43,15 @@ nextNotify env state contract = nextInputs' contract
   nextInputsCase (MerkleizedCase (Notify obs) _) | evalObservation env state obs = [NotifyInput Nothing]
   nextInputsCase _ = []
 
+-- | There is a corner case in here:
+-- | * we return continuation if we are in `When` (so we for example return `Close`).
+-- | * we return `Close` when the input contract is `Close` :-)
 nextTimeoutAdvance :: Environment -> Contract -> Maybe Contract
 nextTimeoutAdvance (Environment { timeInterval: TimeInterval startTime _ }) contract = nextTimeoutAdvance' contract
   where
-  nextTimeoutAdvance' (When _ t _) = if startTime >= t
-    then Just contract
+  nextTimeoutAdvance' (When _ t contract') = if startTime >= t
+    then Just contract'
     else Nothing
+  nextTimeoutAdvance' Close = Just Close
   nextTimeoutAdvance' _ = Nothing
 

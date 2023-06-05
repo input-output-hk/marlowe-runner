@@ -72,6 +72,8 @@
   , "react-basic"
   , "react-basic-dom"
   , "react-basic-hooks"
+  , "react-bootstrap"
+  , "react-halo"
   , "record"
   , "refined"
   , "refs"

@@ -7,7 +7,7 @@ import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnes
 import CardanoMultiplatformLib.Types (unsafeBech32)
 import Contrib.Data.Argonaut (JsonParser, JsonParserResult, decodeFromString)
 import Contrib.Data.Argonaut.Generic.Record (class DecodeRecord, DecodeJsonFieldFn, decodeRecord, decodeNewtypedRecord)
-import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), decodeJson, encodeJson)
+import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), decodeJson, encodeJson, stringify)
 import Data.Argonaut.Core (isString)
 import Data.Argonaut.Decode.Combinators ((.:))
 import Data.Argonaut.Decode.Decoders (decodeJObject, decodeMaybe)
@@ -33,6 +33,37 @@ import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Record as Record
 import Type.Row (type (+))
 import Type.Row.Homogeneous as Row
+
+-- Lower level error representation which we get from the API.
+-- We turn this into a well typed error on a case by case basis.
+-- Currently API returns back this encoding for errors:
+-- ```
+--    { message :: String
+--    , errorCode :: String
+--    , details :: Json
+--    }
+-- ```
+newtype ApiError error = ApiError
+  { message :: String
+  , error :: error
+  }
+derive instance Generic (ApiError err) _
+derive instance Newtype (ApiError err) _
+
+decodeApiError :: forall err. (String -> Json -> err) -> Json -> JsonParserResult (ApiError err)
+decodeApiError decodeError json = do
+  obj <- decodeJson json
+  message <- obj .: "message"
+  errorCode <- obj .: "errorCode"
+  details <- obj .: "details"
+  pure $ ApiError { message, error: decodeError errorCode details }
+
+instance DecodeJson (ApiError String) where
+  decodeJson = decodeApiError $ \errorCode details -> errorCode <> ": " <> stringify details
+
+instance Show err => Show (ApiError err) where
+  show (ApiError { message, error }) =
+    "ApiError { message: " <> show message <> ", error: " <> show error <> " }"
 
 newtype TxId = TxId String
 
@@ -567,6 +598,80 @@ type ContractEndpointRow r = ("contract" :: ContractEndpoint | r)
 type TransactionsEndpointRow r = ("transactions" :: Maybe TransactionsEndpoint | r)
 
 type PostContractsResponse = ResourceWithLinks PostContractsResponseContent (ContractEndpointRow + ())
+
+data PostContractsError
+  = MintingUtxoNotFound
+  | RoleTokenNotFound
+  | ToCardanoError
+  | MissingMarloweInput
+  | PayoutInputNotFound
+  | CalculateMinUtxoFailed
+  | CoinSelectionFailed
+  | BalancingError
+  | MarloweContractNotFound
+  | MarloweContractVersionMismatch
+  | LoadMarloweContextToCardanoError
+  | MarloweScriptNotPublished
+  | PayoutScriptNotPublished
+  | ExtractCreationError
+  | ExtractMarloweTransactionError
+  | MintingUtxoSelectionFailed
+  | AddressDecodingFailed
+  | MintingScriptDecodingFailed
+  | CreateToCardanoError
+  | InternalError
+  | UnknownError String
+
+postContractsFromString :: String -> PostContractsError
+postContractsFromString = case _ of
+  "MintingUtxoNotFound" -> MintingUtxoNotFound
+  "RoleTokenNotFound" -> RoleTokenNotFound
+  "ToCardanoError" -> ToCardanoError
+  "MissingMarloweInput" -> MissingMarloweInput
+  "PayoutInputNotFound" -> PayoutInputNotFound
+  "CalculateMinUtxoFailed" -> CalculateMinUtxoFailed
+  "CoinSelectionFailed" -> CoinSelectionFailed
+  "BalancingError" -> BalancingError
+  "MarloweContractNotFound" -> MarloweContractNotFound
+  "MarloweContractVersionMismatch" -> MarloweContractVersionMismatch
+  "LoadMarloweContextToCardanoError" -> LoadMarloweContextToCardanoError
+  "MarloweScriptNotPublished" -> MarloweScriptNotPublished
+  "PayoutScriptNotPublished" -> PayoutScriptNotPublished
+  "ExtractCreationError" -> ExtractCreationError
+  "ExtractMarloweTransactionError" -> ExtractMarloweTransactionError
+  "MintingUtxoSelectionFailed" -> MintingUtxoSelectionFailed
+  "AddressDecodingFailed" -> AddressDecodingFailed
+  "MintingScriptDecodingFailed" -> MintingScriptDecodingFailed
+  "CreateToCardanoError" -> CreateToCardanoError
+  "InternalError" -> InternalError
+  msg -> UnknownError msg
+
+instance Show PostContractsError where
+  show = case _ of
+    MintingUtxoNotFound -> "MintingUtxoNotFound"
+    RoleTokenNotFound -> "RoleTokenNotFound"
+    ToCardanoError -> "ToCardanoError"
+    MissingMarloweInput -> "MissingMarloweInput"
+    PayoutInputNotFound -> "PayoutInputNotFound"
+    CalculateMinUtxoFailed -> "CalculateMinUtxoFailed"
+    CoinSelectionFailed -> "CoinSelectionFailed"
+    BalancingError -> "BalancingError"
+    MarloweContractNotFound -> "MarloweContractNotFound"
+    MarloweContractVersionMismatch -> "MarloweContractVersionMismatch"
+    LoadMarloweContextToCardanoError -> "LoadMarloweContextToCardanoError"
+    MarloweScriptNotPublished -> "MarloweScriptNotPublished"
+    PayoutScriptNotPublished -> "PayoutScriptNotPublished"
+    ExtractCreationError -> "ExtractCreationError"
+    ExtractMarloweTransactionError -> "ExtractMarloweTransactionError"
+    MintingUtxoSelectionFailed -> "MintingUtxoSelectionFailed"
+    AddressDecodingFailed -> "AddressDecodingFailed"
+    MintingScriptDecodingFailed -> "MintingScriptDecodingFailed"
+    CreateToCardanoError -> "CreateToCardanoError"
+    InternalError -> "InternalError"
+    UnknownError msg -> "(UnknownError " <> msg <> ")"
+
+instance DecodeJson (ApiError PostContractsError) where
+  decodeJson = decodeApiError \code _ -> postContractsFromString code
 
 type GetContractsResponseContent = ContractHeader
 

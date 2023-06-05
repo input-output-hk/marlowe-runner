@@ -9,7 +9,7 @@ import Data.Either (Either(..), either)
 import Data.Foldable (for_)
 import Effect.Exception (error)
 import Foreign.Object as Object
-import Marlowe.Runtime.Web.Types (ContractHeader, ContractState, ResourceLink, ResourceWithLinks, Tx, TxHeader, GetContractsResponse, decodeResourceWithLink)
+import Marlowe.Runtime.Web.Types (ContractState, GetContractsResponse, ResourceLink, ResourceWithLinks, Tx, TxHeader, decodeResourceWithLink)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Test.Spec (Spec, describe, it)

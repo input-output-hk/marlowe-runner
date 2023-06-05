@@ -9,14 +9,14 @@ import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
-import Component.Types (MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
+import Component.Types (MkComponentM, WalletInfo(..))
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Language.Marlowe.Core.V1 (compareMarloweJsonKeys)
-import Contrib.React.Basic.Hooks.UseForm (useForm)
-import Contrib.React.Basic.Hooks.UseForm as UseForm
-import Contrib.React.Bootstrap.FormBuilder (ChoiceFieldChoices(SelectFieldChoices, RadioButtonFieldChoices), choiceField, intInput, radioFieldChoice, selectFieldChoice)
-import Contrib.React.Bootstrap.FormBuilder as FormBuilder
+import React.Basic.Hooks.UseForm (useForm)
+import React.Basic.Hooks.UseForm as UseForm
+import ReactBootstrap.FormBuilder (ChoiceFieldChoices(SelectFieldChoices, RadioButtonFieldChoices), choiceField, intInput, radioFieldChoice, selectFieldChoice)
+import ReactBootstrap.FormBuilder as FormBuilder
 import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
@@ -68,7 +68,10 @@ data ContractData = ContractData
   -- , collateralUTxOs :: Array TxOutRef
   }
 
-create :: ContractData -> ServerURL -> ContractsEndpoint -> Aff (Either ClientError { resource :: PostContractsResponseContent, links :: {contract :: ContractEndpoint} })
+-- TODO: Introduce proper error type to the Marlowe.Runtime.Web.Types for this post response
+type ClientError' = ClientError String
+
+create :: ContractData -> ServerURL -> ContractsEndpoint -> Aff (Either ClientError' { resource :: PostContractsResponseContent, links :: { contract :: ContractEndpoint } })
 create contractData serverUrl contractsEndpoint = do
   let
     ContractData { contract, changeAddress, usedAddresses } = contractData
@@ -86,7 +89,6 @@ create contractData serverUrl contractsEndpoint = do
 
   post' serverUrl contractsEndpoint req
 
-
 submit :: CborHex TransactionWitnessSetObject -> ServerURL -> TransactionEndpoint -> Aff (Either FetchError Unit)
 submit witnesses serverUrl contractEndpoint = do
   let
@@ -102,7 +104,6 @@ type DepositFormComponentProps =
   , timeInterval :: V1.TimeInterval
   , transactionsEndpoint :: TransactionsEndpoint
   }
-
 
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
 mkDepositFormComponent = do
@@ -133,14 +134,14 @@ mkDepositFormComponent = do
       validator = do
         let
           value2Deposit = Map.fromFoldable $ mapWithIndexFlipped deposits \idx deposit -> show idx /\ deposit
-        liftFnMaybe (\v -> ["Invalid choice: " <> show v]) \possibleIdx -> do
+        liftFnMaybe (\v -> [ "Invalid choice: " <> show v ]) \possibleIdx -> do
           idx <- possibleIdx
           Map.lookup idx value2Deposit
 
       form = FormBuilder.evalBuilder' $
         choiceField { choices, validator }
 
-      onSubmit :: { result :: _ , payload :: _ } -> Effect Unit
+      onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
         Just (V (Right deposit) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
           let
@@ -176,8 +177,8 @@ mkDepositFormComponent = do
                 Left err ->
                   traceM $ "Error: " <> show err
         _, _ -> do
-            -- Rather improbable path because we disable submit button if the form is invalid
-            pure unit
+          -- Rather improbable path because we disable submit button if the form is invalid
+          pure unit
 
     { formState, onSubmit: onSubmit', result } <- useForm
       { spec: form
@@ -243,7 +244,7 @@ mkChoiceFormComponent = do
       validator = do
         let
           value2Deposit = Map.fromFoldable $ mapWithIndexFlipped choiceInputs \idx choiceInput -> show idx /\ choiceInput
-        liftFnMMaybe (\v -> pure ["Invalid choice: " <> show v]) \possibleIdx -> runMaybeT do
+        liftFnMMaybe (\v -> pure [ "Invalid choice: " <> show v ]) \possibleIdx -> runMaybeT do
           deposit <- MaybeT $ pure do
             idx <- possibleIdx
             Map.lookup idx value2Deposit
@@ -256,7 +257,7 @@ mkChoiceFormComponent = do
         in
           { choice, value }
 
-      onSubmit :: { result :: _ , payload :: _ } -> Effect Unit
+      onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
         Just (V (Right { choice, value }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
           let
@@ -295,8 +296,8 @@ mkChoiceFormComponent = do
                 Left err ->
                   traceM $ "Error: " <> show err
         _, _ -> do
-            -- Rather improbable path because we disable submit button if the form is invalid
-            pure unit
+          -- Rather improbable path because we disable submit button if the form is invalid
+          pure unit
 
     { formState, onSubmit: onSubmit', result } <- useForm
       { spec: form
@@ -308,12 +309,12 @@ mkChoiceFormComponent = do
         fields = UseForm.renderForm form formState
         body = DOOM.div_ $
           [ DOM.div { className: "form-group" } fields ]
-          <> case partialFormResult of
-            Just (ChoiceInput _ _ (Just cont)) ->
-              [ DOOM.hr {}
-              , DOOM.text $ show cont
-              ]
-            _ -> mempty
+            <> case partialFormResult of
+              Just (ChoiceInput _ _ (Just cont)) ->
+                [ DOOM.hr {}
+                , DOOM.text $ show cont
+                ]
+              _ -> mempty
 
         actions = fragment
           [ DOM.button
@@ -396,18 +397,18 @@ mkNotifyFormComponent = do
                 Left err ->
                   traceM $ "Error: " <> show err
         _ -> do
-            -- Rather improbable path because we disable submit button if the form is invalid
-            pure unit
+          -- Rather improbable path because we disable submit button if the form is invalid
+          pure unit
 
     pure $ modal do
       let
         body = DOOM.text ""
         actions = fragment
           [ DOM.button
-                { className: "btn btn-primary"
-                , onClick: onSubmit
-                , disabled: false
-                }
+              { className: "btn btn-primary"
+              , onClick: onSubmit
+              , disabled: false
+              }
               [ R.text "Submit" ]
           ]
       { title: R.text "Perform notify"
@@ -477,18 +478,18 @@ mkAdvanceFormComponent = do
                 Left err ->
                   traceM $ "Error: " <> show err
         _ -> do
-            -- Rather improbable path because we disable submit button if the form is invalid
-            pure unit
+          -- Rather improbable path because we disable submit button if the form is invalid
+          pure unit
 
     pure $ modal do
       let
         body = DOOM.text ""
         actions = fragment
           [ DOM.button
-                { className: "btn btn-primary"
-                , onClick: onSubmit
-                , disabled: false
-                }
+              { className: "btn btn-primary"
+              , onClick: onSubmit
+              , disabled: false
+              }
               [ R.text "Submit" ]
           ]
       { title: R.text "Advance Contract"
@@ -505,12 +506,11 @@ data CreateInputStep
   | PerformingChoice (NonEmptyArray ChoiceInput)
   | PerformingAdvance V1.Contract
 
-data Step
-  = Creating CreateInputStep
-  | Created (Either String PostContractsResponseContent)
-  | Signing (Either String PostContractsResponseContent)
-  | Signed (Either ClientError PostContractsResponseContent)
+data Step = Creating CreateInputStep
 
+-- | Created (Either String PostContractsResponseContent)
+-- | Signing (Either String PostContractsResponseContent)
+-- | Signed (Either ClientError PostContractsResponseContent)
 
 type Props =
   { inModal :: Boolean
@@ -579,31 +579,31 @@ mkComponent = do
                   [ R.text "Deposit" ]
             , DOM.div { className: "col-3 text-center" } $
                 DOM.button
-                { className: "btn btn-primary"
-                , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
-                , onClick: handler_ $ case possibleChoiceInputs of
-                    Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
-                    Nothing -> pure unit
-                }
-                [ R.text "Choice" ]
+                  { className: "btn btn-primary"
+                  , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
+                  , onClick: handler_ $ case possibleChoiceInputs of
+                      Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
+                      Nothing -> pure unit
+                  }
+                  [ R.text "Choice" ]
             , DOM.div { className: "col-3 text-center" } $
                 DOM.button
-                { className: "btn btn-primary"
-                , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
-                , onClick: handler_ $ case possibleNotifyInputs of
-                    Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
-                    Nothing -> pure unit
-                }
-                [ R.text "Notify" ]
+                  { className: "btn btn-primary"
+                  , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
+                  , onClick: handler_ $ case possibleNotifyInputs of
+                      Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
+                      Nothing -> pure unit
+                  }
+                  [ R.text "Notify" ]
             , DOM.div { className: "col-3 text-center" } $
                 DOM.button
-                { className: "btn btn-primary"
-                , disabled: isNothing possibleNextTimeoutAdvance
-                , onClick: handler_ $ case possibleNextTimeoutAdvance of
-                    Just cont -> setStep (Creating $ PerformingAdvance cont)
-                    Nothing -> pure unit
-                }
-                [ R.text "Advance" ]
+                  { className: "btn btn-primary"
+                  , disabled: isNothing possibleNextTimeoutAdvance
+                  , onClick: handler_ $ case possibleNextTimeoutAdvance of
+                      Just cont -> setStep (Creating $ PerformingAdvance cont)
+                      Nothing -> pure unit
+                  }
+                  [ R.text "Advance" ]
             ]
 
         if inModal then modal
@@ -617,7 +617,7 @@ mkComponent = do
           body
       Creating (PerformingDeposit deposits) -> do
         depositFormComponent { deposits, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-      Creating (PerformingNotify notifyInputs ) -> do
+      Creating (PerformingNotify notifyInputs) -> do
         notifyFormComponent { notifyInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
       Creating (PerformingChoice choiceInputs) -> do
         choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
@@ -637,16 +637,17 @@ mkInitialContract = do
       Nothing -> unsafeCrashWith "Invalid instant"
 
   pure $ V1.When
-      [V1.Case
-          (V1.Deposit
-              (V1.Address address)
-              (V1.Address address)
-              (V1.Token "" "")
-              (V1.Constant $ BigInt.fromInt 1000000)
-          )
-          V1.Close ]
-      timeout
-      V1.Close
+    [ V1.Case
+        ( V1.Deposit
+            (V1.Address address)
+            (V1.Address address)
+            (V1.Token "" "")
+            (V1.Constant $ BigInt.fromInt 1000000)
+        )
+        V1.Close
+    ]
+    timeout
+    V1.Close
 
 newtype ApplyInputsContext = ApplyInputsContext
   { wallet :: { changeAddress :: Bech32, usedAddresses :: Array Bech32 }
@@ -654,13 +655,18 @@ newtype ApplyInputsContext = ApplyInputsContext
   , timeInterval :: V1.TimeInterval
   }
 
-applyInputs :: ApplyInputsContext -> ServerURL -> TransactionsEndpoint -> Aff
-  (Either ClientError
-     { links :: { transaction :: TransactionEndpoint
-                }
-     , resource :: PostTransactionsResponse
-     }
-  )
+applyInputs
+  :: ApplyInputsContext
+  -> ServerURL
+  -> TransactionsEndpoint
+  -> Aff
+       ( Either ClientError'
+           { links ::
+               { transaction :: TransactionEndpoint
+               }
+           , resource :: PostTransactionsResponse
+           }
+       )
 
 applyInputs (ApplyInputsContext ctx) serverURL transactionsEndpoint = do
   let
@@ -678,4 +684,3 @@ applyInputs (ApplyInputsContext ctx) serverURL transactionsEndpoint = do
       , collateralUTxOs: []
       }
   post' serverURL transactionsEndpoint req
-

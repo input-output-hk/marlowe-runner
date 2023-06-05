@@ -1,12 +1,18 @@
 module Wallet
   ( Api
+  , ApiError
+  , ApiForeignErrors
   , Bytes(..)
   , Cbor(..)
   , Coin
+  , DataSignError
   , HashObject32(..)
   , SomeAddress(..)
+  , SignTxError
   , Transaction(..)
+  , TxSignError
   , TransactionUnspentOutput
+  , UnknownError
   , Value(..)
   , Wallet
   , apiVersion
@@ -440,12 +446,14 @@ toAffEither customCoerce p = makeAff \cb ->
 toAffEitherE :: forall a err. (Promise.Rejection -> err) -> Effect (Promise a) -> Aff (Either err a)
 toAffEitherE coerce f = liftEffect f >>= toAffEither coerce
 
+type SignTxError r = ApiError + TxSignError + ApiForeignErrors + UnknownError + r
+
 signTx
   :: forall r
    . Api
   -> CborHex TransactionObject
   -> Boolean
-  -> Aff (Either (Variant (| ApiError + TxSignError + ApiForeignErrors + UnknownError r)) (CborHex TransactionWitnessSetObject))
+  -> Aff (Either (Variant (SignTxError + r)) (CborHex TransactionWitnessSetObject))
 signTx api cbor = toAffEitherE rejectionTxSignError <<< _Api.signTx api cbor
 
 submitTx

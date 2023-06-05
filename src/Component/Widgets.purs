@@ -2,8 +2,8 @@ module Component.Widgets where
 
 import Prelude
 
-import Contrib.React.Bootstrap.Icons (Icon)
-import Contrib.React.Bootstrap.Icons as Icons
+import ReactBootstrap.Icons (Icon)
+import ReactBootstrap.Icons as Icons
 import ConvertableOptions (defaults, class Defaults)
 import Data.Maybe (Maybe, fromMaybe)
 import Effect (Effect)

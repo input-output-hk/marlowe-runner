@@ -6,7 +6,6 @@ import Component.Types (MkComponentM, WalletInfo(..))
 import Component.Widgets (link, spinner)
 import Component.Widgets.Form (mkSingleChoiceField)
 import Component.Widgets.Form as Form
-import Contrib.React.Bootstrap.Modal (modal, modalBody, modalFooter, modalHeader)
 import Data.Array as Array
 import Data.Array.ArrayAL (ArrayAL)
 import Data.Array.ArrayAL as ArrayAL
@@ -15,6 +14,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (un, unwrap)
 import Data.Newtype as Newtype
 import Data.Traversable (traverse)
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, catchError, launchAff_)
 import Effect.Class (liftEffect)
@@ -26,6 +26,7 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (component, useEffectOnce, useState', (/\))
 import React.Basic.Hooks as React
+import ReactBootstrap.Modal (modal, modalBody, modalFooter, modalHeader)
 import Record as Record
 import Type.Prelude (Proxy(..))
 import Wallet (Wallet)
@@ -97,6 +98,7 @@ mkConnectWallet = do
                   selected' = Newtype.over WalletInfo (Record.set (Proxy :: Proxy "wallet") walletApi) selected
                 liftEffect $ onWalletConnect (Connected selected')
               Nothing -> do
+                traceM $ "Error connecting wallet - no api returned"
                 -- FIXME: Error handling
                 liftEffect $ onDismiss
         Nothing -> onDismiss
@@ -112,16 +114,16 @@ mkConnectWallet = do
             let
               choices = wallets <#> \(WalletInfo { icon, name }) -> do
                 let
-                  enabled = name == "nami"
                   label = DOM.span {}
                     [ DOOM.img { src: icon, alt: name, className: "w-2rem me-2" }
                     , DOOM.span_ [ DOOM.text name ]
                     ]
-                name /\ label /\ enabled
+                -- We know that only Nami is working - should we disable all the other wallets?
+                name /\ label /\ false
 
             { formBody: singleChoiceField
                 { initialValue: fromMaybe "" (_.name <<< unwrap <$> selectedWallet)
-                , onValueChange: \walletName ->
+                , onValueChange: \walletName -> do
                     setSelectedWallet $ Array.find (\(WalletInfo wallet) -> wallet.name == walletName) (ArrayAL.toArray wallets)
                 , type: Form.RadioButtonField choices
                 }

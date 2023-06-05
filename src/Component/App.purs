@@ -13,9 +13,9 @@ import Component.Widgets (link, linkWithIcon)
 import Contrib.Data.Map (New(..), Old(..), additions, deletions) as Map
 import Contrib.Halogen.Subscription (MinInterval(..))
 import Contrib.Halogen.Subscription (bindEffect, foldMapThrottle) as Subscription
-import Contrib.React.Bootstrap.Icons as Icons
-import Contrib.React.Bootstrap.Offcanvas (offcanvas)
-import Contrib.React.Bootstrap.Offcanvas as Offcanvas
+import ReactBootstrap.Icons as Icons
+import ReactBootstrap.Offcanvas (offcanvas)
+import ReactBootstrap.Offcanvas as Offcanvas
 import Contrib.React.Svg (SvgUrl(..), svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader.Class (asks)
@@ -96,7 +96,7 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Just Nami -- Nothing
+debugWallet = Just Eternl -- Nami -- Nothing
 
 data DisplayOption = Default | About
 
