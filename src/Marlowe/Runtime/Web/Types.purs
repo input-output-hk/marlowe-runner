@@ -115,6 +115,9 @@ derive instance Ord PolicyId
 instance Show PolicyId where
   show = genericShow
 
+instance EncodeJson PolicyId where
+  encodeJson (PolicyId id) = encodeJson id
+
 instance DecodeJson PolicyId where
   decodeJson = map PolicyId <$> decodeJson
 
@@ -136,6 +139,11 @@ data RolesConfig
   = UsePolicy PolicyId
   | Mint (Map String RoleTokenConfig)
 
+instance EncodeJson RolesConfig where
+  encodeJson (UsePolicy policyId) = encodeJson policyId
+  encodeJson (Mint configs) =
+    encodeJson <<< Object.fromFoldable <<< (Map.toUnfoldable :: _ -> Array _) $ configs
+
 instance DecodeJson RolesConfig where
   decodeJson json | isString json = UsePolicy <$> decodeJson json
   decodeJson json = Mint <$> decodeJson json
@@ -143,6 +151,14 @@ instance DecodeJson RolesConfig where
 data RoleTokenConfig
   = RoleTokenSimple V1.Address
   | RoleTokenAdvanced V1.Address TokenMetadata
+
+instance EncodeJson RoleTokenConfig where
+  encodeJson (RoleTokenSimple addr) = encodeJson addr
+  encodeJson (RoleTokenAdvanced addr metadata) =
+    encodeJson
+      { address: encodeJson addr
+      , metadata: encodeJson metadata
+      }
 
 instance DecodeJson RoleTokenConfig where
   decodeJson json | isString json = RoleTokenSimple <$> decodeJson json
@@ -164,6 +180,7 @@ derive instance Generic TokenMetadata _
 derive instance Newtype TokenMetadata _
 derive instance Eq TokenMetadata
 derive instance Ord TokenMetadata
+derive newtype instance EncodeJson TokenMetadata
 derive newtype instance DecodeJson TokenMetadata
 
 newtype TokenMetadataFile = TokenMetadataFile
@@ -176,6 +193,7 @@ derive instance Generic TokenMetadataFile _
 derive instance Newtype TokenMetadataFile _
 derive instance Eq TokenMetadataFile
 derive instance Ord TokenMetadataFile
+derive newtype instance EncodeJson TokenMetadataFile
 derive newtype instance DecodeJson TokenMetadataFile
 
 data TxStatus
@@ -557,7 +575,7 @@ instance EncodeJsonBody PostContractsRequest where
     { metadata: r.metadata
     , tags: r.tags
     , version: V1
-    , roles: Nothing :: Maybe String
+    , roles: r.roles
     , contract: r.contract
     , minUTxODeposit: r.minUTxODeposit
     }
