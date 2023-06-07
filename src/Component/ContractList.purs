@@ -160,7 +160,6 @@ mkContractList = do
                     , "Contract status should change to 'Confirmed' at that point."
                     ]
                   resetModalAction
-              , inModal: true
               }
             Just (ApplyInputs transactionsEndpoint contract st timeInterval), Just cw -> do
               let

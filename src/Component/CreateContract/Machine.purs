@@ -5,9 +5,13 @@ import Prelude
 import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
+import Component.InputHelper (rolesInContract)
 import Component.Types (WalletInfo(..))
 import Contrib.Fetch (FetchError)
 import Control.Monad.Error.Class (catchError)
+import Data.Array as Array
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as Array.NonEmpty
 import Data.BigInt.Argonaut as BigInt
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -18,10 +22,12 @@ import Effect.Aff.Class (liftAff)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsError, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), ResourceWithLinks, toTextEnvelope)
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsError, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), ResourceWithLinks, RolesConfig, Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), toTextEnvelope)
 import React.Basic (JSX)
 import React.Basic.DOM as DOM
 import React.Basic.DOM.Simplified.Generated as S
+import Record as Record
+import Type.Prelude (Proxy(..))
 import Wallet as Wallet
 import WalletContext (WalletContext(..), walletContext)
 
@@ -44,33 +50,46 @@ type RequiredWalletContext = WalletAddresses
 -- | This state machine is pretty linear and all state which contains `errors` can be retried.
 data State
   = DefiningContract
+  | DefiningRoleTokens
+      { contract :: V1.Contract
+      , roleNames :: NonEmptyArray V1.TokenName
+      , errors :: Maybe String
+      }
   | FetchingRequiredWalletContext
       { contract :: V1.Contract
+      , rolesConfig :: Maybe RolesConfig
       , errors :: Maybe String
       }
   | CreatingTx
       { contract :: V1.Contract
+      , rolesConfig :: Maybe RolesConfig
       , errors :: Maybe String
       , reqWalletContext :: RequiredWalletContext
       }
   | SigningTx
       { contract :: V1.Contract
+      , rolesConfig :: Maybe RolesConfig
       , errors :: Maybe String
       , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
       }
   | SubmittigTx
       { contract :: V1.Contract
+      , rolesConfig :: Maybe RolesConfig
       , errors :: Maybe String
       , txWitnessSet :: CborHex TransactionWitnessSetObject
       , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
       }
   | ContractCreated
       { contract :: V1.Contract
+      , rolesConfig :: Maybe RolesConfig
       , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
       }
 
 data Action
   = TriggerSubmission V1.Contract
+  | DefineRoleTokens
+  | DefineRoleTokensFailed String
+  | DefineRoleTokensSucceeded RolesConfig
   | FetchRequiredWalletContext
   | FetchRequiredWalletContextFailed String
   | FetchRequiredWalletContextSucceeded RequiredWalletContext
@@ -96,36 +115,46 @@ step :: State -> Action -> State
 step state action = do
   case state of
     DefiningContract -> case action of
-      TriggerSubmission contract -> FetchingRequiredWalletContext { contract, errors: Nothing }
+      TriggerSubmission contract -> case Array.uncons (rolesInContract contract) of
+        Nothing -> FetchingRequiredWalletContext { contract, rolesConfig: Nothing, errors: Nothing }
+        Just { head, tail } ->
+          DefiningRoleTokens { contract, roleNames: Array.NonEmpty.cons' head tail, errors: Nothing }
       _ -> state
-    FetchingRequiredWalletContext { contract, errors: Just _ } -> case action of
-      FetchRequiredWalletContext -> FetchingRequiredWalletContext { contract, errors: Nothing }
+    DefiningRoleTokens { contract, roleNames, errors: Just _ } -> case action of
+      DefineRoleTokens -> DefiningRoleTokens { contract, roleNames, errors: Nothing }
       _ -> state
-    FetchingRequiredWalletContext { contract } -> case action of
-      FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ { errors: Just error, contract }
-      FetchRequiredWalletContextSucceeded reqWalletContext -> CreatingTx { contract, errors: Nothing, reqWalletContext }
-      _ ->  state
-    CreatingTx { contract, reqWalletContext, errors: Just _ } -> case action of
-      CreateTx -> CreatingTx { contract, errors: Nothing, reqWalletContext }
+    DefiningRoleTokens { contract, roleNames, errors: Nothing } -> case action of
+      DefineRoleTokensFailed error -> DefiningRoleTokens { contract, roleNames, errors: Just error }
+      DefineRoleTokensSucceeded rolesConfig -> FetchingRequiredWalletContext { contract, rolesConfig: Just rolesConfig, errors: Nothing }
       _ -> state
-    CreatingTx { contract, reqWalletContext } -> case action of
-      CreateTxFailed err -> CreatingTx { contract, errors: Just err, reqWalletContext }
+    FetchingRequiredWalletContext r@{ errors: Just _ } -> case action of
+      FetchRequiredWalletContext -> FetchingRequiredWalletContext $ r{ errors = Nothing }
+      _ -> state
+    FetchingRequiredWalletContext r@{ contract, rolesConfig } -> case action of
+      FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
+      FetchRequiredWalletContextSucceeded reqWalletContext -> CreatingTx $ Record.insert (Proxy :: Proxy "reqWalletContext") reqWalletContext r
+      _ -> state
+    CreatingTx r@{ contract, reqWalletContext, errors: Just _ } -> case action of
+      CreateTx -> CreatingTx $ r { errors = Nothing }
+      _ -> state
+    CreatingTx r@{ contract, rolesConfig } -> case action of
+      CreateTxFailed err -> CreatingTx $ r { errors = Just err }
       CreateTxSucceeded res -> do
-        SigningTx { contract, errors: Nothing, createTxResponse: res }
+        SigningTx $ { contract, createTxResponse: res, errors: Nothing, rolesConfig }
       _ -> state
-    SigningTx { contract, createTxResponse, errors: Just _ } -> case action of
-      SignTx -> SigningTx { contract, errors: Nothing, createTxResponse }
+    SigningTx r@{ contract, createTxResponse, errors: Just _ } -> case action of
+      SignTx -> SigningTx $ r { errors = Nothing }
       _ -> state
-    SigningTx { contract, createTxResponse: createTxResponse } -> case action of
-      SignTxFailed err -> SigningTx { contract, errors: Just err, createTxResponse }
-      SignTxSucceeded txWitnessSet -> SubmittigTx { contract, createTxResponse, errors: Nothing, txWitnessSet }
+    SigningTx r@{ contract, createTxResponse: createTxResponse, rolesConfig } -> case action of
+      SignTxFailed err -> SigningTx $ r { errors = Just err }
+      SignTxSucceeded txWitnessSet -> SubmittigTx { contract, createTxResponse, errors: Nothing, txWitnessSet, rolesConfig }
       _ -> state
-    SubmittigTx { contract, createTxResponse, txWitnessSet, errors: Just _ } -> case action of
-      SubmitTx -> SubmittigTx { contract, createTxResponse, errors: Nothing, txWitnessSet }
+    SubmittigTx r@{ contract, createTxResponse, txWitnessSet, errors: Just _ } -> case action of
+      SubmitTx -> SubmittigTx $ r { errors = Nothing }
       _ -> state
-    SubmittigTx { contract, createTxResponse, txWitnessSet } -> case action of
-      SubmitTxFailed err -> SubmittigTx { contract, createTxResponse, errors: Just err, txWitnessSet }
-      SubmitTxSucceeded -> ContractCreated { contract, createTxResponse }
+    SubmittigTx { contract, createTxResponse, txWitnessSet, rolesConfig } -> case action of
+      SubmitTxFailed err -> SubmittigTx { contract, createTxResponse, errors: Just err, txWitnessSet, rolesConfig }
+      SubmitTxSucceeded -> ContractCreated { contract, createTxResponse, rolesConfig }
       _ -> state
     (ContractCreated _) -> state
 
@@ -134,30 +163,30 @@ step state action = do
 triggerSubmission :: V1.Contract -> Action
 triggerSubmission = TriggerSubmission
 
-initialState ::  State
+initialState :: State
 initialState = DefiningContract
 
 data WalletRequest
   = FetchWalletContextRequest
-    { cardanoMultiplatformLib :: CardanoMultiplatformLib.Lib
-    , walletInfo :: WalletInfo Wallet.Api
-    }
+      { cardanoMultiplatformLib :: CardanoMultiplatformLib.Lib
+      , walletInfo :: WalletInfo Wallet.Api
+      }
   | SignTxRequest
-    { walletInfo :: WalletInfo Wallet.Api
-    , tx :: TextEnvelope TransactionObject
-    }
+      { walletInfo :: WalletInfo Wallet.Api
+      , tx :: TextEnvelope TransactionObject
+      }
 
 data RuntimeRequest
   = CreateTxRequest
-    { contract :: V1.Contract
-    , reqWalletContext :: RequiredWalletContext
-    , runtime :: Runtime
-    }
+      { contract :: V1.Contract
+      , reqWalletContext :: RequiredWalletContext
+      , runtime :: Runtime
+      }
   | SubmitTxRequest
-    { txWitnessSet :: CborHex TransactionWitnessSetObject
-    , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
-    , runtime :: Runtime
-    }
+      { txWitnessSet :: CborHex TransactionWitnessSetObject
+      , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
+      , runtime :: Runtime
+      }
 
 data Request
   = WalletRequest WalletRequest
@@ -224,7 +253,6 @@ driver env state = do
   request <- nextRequest env state
   pure $ requestToAffAction request
 
-
 -- Lower level helpers
 create
   :: ContractData
@@ -245,10 +273,6 @@ create contractData serverUrl contractsEndpoint = do
       , addresses: usedAddresses <> [ changeAddress ]
       , collateralUTxOs: []
       }
-  traceM "WTF:"
-  traceM usedAddresses
-  traceM changeAddress
-
   post' serverUrl contractsEndpoint req
 
 submit
@@ -275,7 +299,6 @@ sign walletApi tx = do
     TextEnvelope { cborHex: txCborHex } = tx
   Wallet.signTx walletApi txCborHex false
 
-
 -- | We want to describe in details what kind of data we are gathering
 -- | when we are performing a given transtition (state determines the next transition in our case)
 -- | The output should be readable to the developer which should understand the whole flow.
@@ -286,12 +309,15 @@ stateToDetailedDescription state = case state of
     [ S.p {} $ DOM.text "We are in the initial state, we are waiting for the user to trigger the contract creation process."
     , S.p {} $ DOM.text "When we get the correct contract value (JSON) we gonna use it as a part of the request to the marlowe-runtime."
     ]
+  DefiningRoleTokens {} -> DOM.div_
+    [ S.p {} $ DOM.text "NOT IMPLEMENTED YET"
+    ]
   FetchingRequiredWalletContext { errors: Nothing } -> DOM.div_
     [ S.p {} $ DOM.text "We are fetching the required wallet context."
     , S.p {} $ DOM.text "marlowe-runtime requires information about wallet addresses so it can pick UTxO to pay for the initial transaction."
     , S.p {} $ DOM.text $
         "To gain the address set from the wallet we use CIP-30 `getUsedAddresses` method and reencoding them from lower "
-        <> "level cardano CBOR hex into Bech32 (`addr_test...`)."
+          <> "level cardano CBOR hex into Bech32 (`addr_test...`)."
     ]
   FetchingRequiredWalletContext { errors: Just error } -> DOM.div_
     [ S.p {} $ DOM.text "It seems that the provided wallet is lacking addresses or failed to execute the method:"
@@ -323,4 +349,3 @@ stateToDetailedDescription state = case state of
   ContractCreated _ -> DOM.div_
     [ S.p {} $ DOM.text "The contract was created successfully."
     ]
-

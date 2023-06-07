@@ -149,8 +149,7 @@ in upstream
       "https://github.com/purescript-react/purescript-react-basic-hooks.git"
       "v8.2.0"
   with
-    react-bootstrap =
-      mkPackage
+    react-bootstrap = mkPackage
       [ "aff", "arrays", "atleast", "bifunctors", "console", "control"
       , "convertable-options", "datetime", "datetime-iso", "debug", "decimals"
       , "effect", "either", "enums", "foldable-traversable", "formatters"

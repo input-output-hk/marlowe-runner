@@ -4,8 +4,8 @@ import Prelude
 
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
-import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple.Nested ((/\))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -50,10 +50,12 @@ useMooreMachine
       { state :: state
       , output :: output
       , applyAction :: action -> Effect Unit
-      , reset :: Maybe (MooreMachineSpec state action output) -> Effect Unit
+      -- If just after the reset in the handler you have to use `applyAction` then
+      -- you can use the returned value to do it.
+      , reset :: Maybe (MooreMachineSpec state action output) -> Effect (action -> Effect Unit)
       }
 useMooreMachine initialSpec = React.coerceHook React.do
-  { state: spec@{ driver, output, step }, version: specVersion } /\ setSpec <- useVersionedState' initialSpec
+  { state: spec, version: specVersion } /\ setSpec <- useVersionedState' initialSpec
   specRef <- useStateRef specVersion spec
 
   { state, version: stateVersion } /\ setState <- useVersionedState' initialSpec.initialState
@@ -63,13 +65,17 @@ useMooreMachine initialSpec = React.coerceHook React.do
   possibleRequestRef <- useStateRef requestTrigger possibleRequest
 
   let
-    applyAction action = do
-      currState <- React.readRef stateRef
+    applyActionFn action currState currSpec = do
       let
-        state' = step currState action
-        possibleNextRequest' = driver state'
+        state' = currSpec.step currState action
+        possibleNextRequest' = currSpec.driver state'
       setState state'
       setPossibleRequest possibleNextRequest'
+
+    applyAction action = do
+      currState <- React.readRef stateRef
+      currSpec <- React.readRef specRef
+      applyActionFn action currState currSpec
 
   void $ useAff requestTrigger do
     currPossibleRequest <- liftEffect $ React.readRef possibleRequestRef
@@ -80,7 +86,7 @@ useMooreMachine initialSpec = React.coerceHook React.do
         liftEffect $ applyAction action
   pure
     { state
-    , output: output state
+    , output: spec.output state
     , applyAction
     , reset: \possibleNewSpec -> do
         currSpec <- React.readRef specRef
@@ -88,8 +94,10 @@ useMooreMachine initialSpec = React.coerceHook React.do
           spec' = fromMaybe
             currSpec
             possibleNewSpec
+
         setSpec spec'
         setState spec'.initialState
         setPossibleRequest Nothing
+        pure \action -> applyActionFn action spec'.initialState spec'
     }
 

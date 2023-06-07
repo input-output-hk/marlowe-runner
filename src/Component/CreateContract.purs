@@ -6,9 +6,11 @@ import Component.CreateContract.Machine as Machine
 import Component.Modal (mkModal)
 import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo)
-import Component.Widgets (link)
+import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
+import Contrib.ReactBootstrap.FormBuilder (genFieldId)
+import Contrib.ReactBootstrap.FormBuilder as FormBuilder
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
@@ -24,9 +26,12 @@ import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
+import Data.Number as Number
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
+import Data.Traversable (for)
 import Data.Tuple.Nested (type (/\))
 import Data.Validation.Semigroup (V(..))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
@@ -36,18 +41,20 @@ import Marlowe.Runtime.Web.Client (ClientError)
 import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError)
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFnEither) as Validator
-import React.Basic (Ref)
+import Polyform.Validator (liftFnM)
+import React.Basic (Ref, fragment)
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (div_, input, text) as DOOM
+import React.Basic.DOM (css)
+import React.Basic.DOM (div, div_, input, text) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, readRef, useRef, (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.UseForm (useForm)
+import React.Basic.Hooks.UseForm (liftValidator, useForm)
 import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (BootstrapForm)
-import ReactBootstrap.FormBuilder as FormBuilder
+import ReactBootstrap.FormBuilder (BootstrapForm, formBuilderT, genId, liftBuilderM)
+import ReactBootstrap.FormBuilder (evalBuilder', textArea, textInput) as FormBuilder
 import Wallet as Wallet
 import Web.DOM.Node (Node)
 import Web.File.File (File)
@@ -57,8 +64,7 @@ import Web.HTML.HTMLInputElement (HTMLInputElement)
 import Web.HTML.HTMLInputElement as HTMLInputElement
 
 type Props =
-  { inModal :: Boolean
-  , onDismiss :: Effect Unit
+  { onDismiss :: Effect Unit
   , onSuccess :: ContractEndpoint -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   }
@@ -67,14 +73,15 @@ newtype AutoRun = AutoRun Boolean
 
 type Result = V1.Contract /\ AutoRun
 
-mkJsonForm :: V1.Contract -> BootstrapForm Effect Query Result
-mkJsonForm initialContract = FormBuilder.evalBuilder' $ ado
+mkJsonForm :: Result -> BootstrapForm Effect Query Result
+mkJsonForm (initialContract /\ (AutoRun initialAutoRun)) = FormBuilder.evalBuilder' $ ado
   contract <- FormBuilder.textArea
     { missingError: "Please provide contract terms JSON value"
     , helpText: Just $ DOOM.div_
         [ DOOM.text "Basic JSON validation"
         ]
     , initial: stringifyWithIndent 2 $ encodeJson initialContract
+    , label: Just $ DOOM.text "Contract JSON"
     , touched: true
     , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
         json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
@@ -82,9 +89,34 @@ mkJsonForm initialContract = FormBuilder.evalBuilder' $ ado
     , rows: 15
     , name: (Just $ FieldId "contract-terms")
     }
-
+  autoRun <- AutoRun <$> do
+    -- FIXME: This should be documented I left this as an example of more hard core lifting of validator
+    -- let
+    --   toAutoRun = liftBuilderM $ pure $ liftValidator $ liftFnM \value -> do
+    --       let
+    --         value' = AutoRun value
+    --       -- onAutoRunChange value'
+    --       pure value'
+    FormBuilder.booleanField
+      { label: DOOM.text "Auto run"
+      , helpText: DOOM.text "Whether to run the contract creation process automatically"
+      , initial: initialAutoRun
+      }
   in
-    contract /\ (AutoRun true)
+    contract /\ autoRun
+
+mkRolesConfigForm :: Array String -> BootstrapForm Effect Query _
+mkRolesConfigForm roleNames = FormBuilder.evalBuilder' $ for roleNames \roleName -> do
+  FormBuilder.textInput
+    { missingError: "Please provide an address for a role token"
+    , helpText: Just $ DOOM.div_
+        [ DOOM.text "Role token destination address"
+        ]
+    , initial: ""
+    , label: Just $ DOOM.text $ show roleName
+    , touched: true
+    , validator: identity
+    }
 
 type ClientError' = ClientError PostContractsError
 
@@ -126,6 +158,24 @@ mkLoadFileButtonComponent =
 
     pure $ DOOM.input { type: "file", onChange: handler_ onChange, ref }
 
+
+machineProps (AutoRun autoRun) connectedWallet cardanoMultiplatformLib runtime = do
+  let
+    env = { connectedWallet, cardanoMultiplatformLib, runtime }
+  { initialState: Machine.initialState
+  , step: Machine.step
+  , driver: if autoRun
+      then Machine.driver env
+      else const Nothing
+  , output: identity
+  }
+
+data CurrentRun
+  = Automatic
+  -- This boolean indicates whether we are actually performing the request
+  -- at the moment. This is useful to avoid double clicking and show throbber
+  | Manual Boolean
+
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   runtime <- asks _.runtime
@@ -135,23 +185,32 @@ mkComponent = do
 
   { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts address
 
-  liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss, inModal } -> React.do
-    { state: submissionState, applyAction, reset } <- useMooreMachine do
+  let
+    initialAutoRun = AutoRun false
+
+  liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss } -> React.do
+    currentRun /\ setCurrentRun <- React.useState' Nothing
+
+    { state: submissionState, applyAction, reset: resetStateMachine } <- do
       let
-        env = { connectedWallet, cardanoMultiplatformLib, runtime }
-      { initialState: Machine.initialState
-      , step: Machine.step
-      , driver: Machine.driver env
-      , output: identity
-      }
+        props = machineProps initialAutoRun connectedWallet cardanoMultiplatformLib runtime
+      useMooreMachine props
 
     let
-      form = mkJsonForm brianContract
+      form = mkJsonForm (brianContract /\ initialAutoRun)
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
-        Just (V (Right (contract /\ AutoRun autorun)) /\ _) -> do
-          applyAction $ Machine.TriggerSubmission contract
+        Just (V (Right (contract /\ autoRun)) /\ _) -> do
+          let
+            props = machineProps autoRun connectedWallet cardanoMultiplatformLib runtime
+          applyAction' <- resetStateMachine (Just props)
+          case autoRun of
+            AutoRun true -> do
+              setCurrentRun $ Just $ Automatic
+            AutoRun false -> do
+              setCurrentRun $ Just $ Manual false
+          applyAction' $ Machine.TriggerSubmission contract
         _ -> pure unit
 
     { formState, onSubmit: onSubmit', result } <- useForm
@@ -159,6 +218,7 @@ mkComponent = do
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
+
 
     pure $ case submissionState of
       Machine.DefiningContract -> do
@@ -183,49 +243,107 @@ mkComponent = do
                   }
                 [ R.text "Submit" ]
             ]
-
-        if inModal
-        then modal
+        modal
           { title: R.text "Add contract"
           , onDismiss
           , body: DOM.div { className: "row" }
               [ DOM.div { className: "col-12" } [ formBody ]
-              -- , DOM.div { className: "col-3" } [ DOOM.text "TEST" ]
               ]
           , footer: formActions
           , size: Modal.ExtraLarge
           }
-        else
-          formBody
-      _ ->
-        if inModal
-        then modal
+      Machine.DefiningRoleTokens { roleNames: _ } -> DOOM.text "FIXME: Define role tokeens component not implemented yet"
+
+      machineState -> do
+        let
+          machineEnv = { connectedWallet, cardanoMultiplatformLib, runtime }
+          possibleRequest = currentRun >>= case _ of
+            Manual _ -> do
+              Machine.driver machineEnv machineState
+            _ -> Nothing
+
+          body = fragment
+              [ do
+                  let
+                    StepIndex index = (machineStateToStepIndex machineState)
+                  if index < machineStepsCardinality
+                  then do
+                    let
+                      stepPercent = Int.ceil $ (Int.toNumber (index - 1)/ Int.toNumber (machineStepsCardinality - 1)) * 100.0
+                      style = css { width: show stepPercent <> "%" }
+                    DOM.div { className: "progress mb-3" } $ do
+                        DOOM.div { className: "progress-bar", style, children: [] }
+                  else mempty
+              , case currentRun of
+                  Just (Manual true) -> do
+                    DOM.div { className: "d-flex justify-content-center" } $ spinner Nothing
+                  _ -> Machine.stateToDetailedDescription submissionState
+              ]
+
+          formActions = case possibleRequest of
+            Nothing -> mempty
+            Just request -> DOOM.fragment
+              [ link
+                  { label: DOOM.text "Cancel"
+                  , onClick: onDismiss
+                  , showBorders: true
+                  }
+              , DOM.button
+                  { className: "btn btn-primary"
+                  , disabled: case currentRun of
+                      Just (Manual b) -> b
+                      _ -> false
+                  , onClick: handler_ do
+                    setCurrentRun (Just $ Manual true)
+                    launchAff_ do
+                      action <- request
+                      liftEffect $ do
+                        applyAction action
+                        setCurrentRun (Just $ Manual false)
+                  }
+                  [ R.text "Run" ]
+              ]
+        modal
           { title: DOOM.text $ stateToTitle submissionState
           , onDismiss
-          , body: DOM.div { className: "row" }
-              [ DOM.div { className: "col-12" }
-                [ Machine.stateToDetailedDescription submissionState ]
-              ]
-          , footer: mempty
+          , body
+          , footer: formActions
           , size: Modal.ExtraLarge
           }
-        else
-          Machine.stateToDetailedDescription submissionState
-
 stateToTitle :: Machine.State -> String
 stateToTitle state = case state of
   Machine.DefiningContract -> "Defining contract"
+  Machine.DefiningRoleTokens {} -> "Defining role tokens"
   Machine.FetchingRequiredWalletContext {} -> "Fetching required wallet context"
   Machine.CreatingTx {} -> "Creating transaction"
   Machine.SigningTx {} -> "Signing transaction"
   Machine.SubmittigTx {} -> "Submitting transaction"
   Machine.ContractCreated {} -> "Contract created"
 
+-- To display progress bar
+newtype StepIndex = StepIndex Int
+
+machineStepsCardinality :: Int
+machineStepsCardinality = 7
+
+machineStateToStepIndex :: Machine.State -> StepIndex
+machineStateToStepIndex state = StepIndex $ case state of
+  Machine.DefiningContract -> 1
+  Machine.DefiningRoleTokens {} -> 2
+  Machine.FetchingRequiredWalletContext {} -> 3
+  Machine.CreatingTx {} -> 4
+  Machine.SigningTx {} -> 5
+  Machine.SubmittigTx {} -> 6
+  Machine.ContractCreated {} -> 7
+
 -- | Let's use error information and other details of the state to describe the sitution.
 -- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOM.text "bar" ]
 stateToDescription :: Machine.State -> JSX
 stateToDescription state = case state of
   Machine.DefiningContract -> DOOM.text "Please define your contract."
+  Machine.DefiningRoleTokens { errors } -> case errors of
+    Nothing -> DOOM.text "Defining role tokens."
+    Just err -> DOOM.text $ "Defining role tokens failed: " <> err
   Machine.FetchingRequiredWalletContext { errors } -> case errors of
     Nothing -> DOOM.text "Fetching required wallet context."
     Just err -> DOOM.text $ "Fetching required wallet context failed: " <> err

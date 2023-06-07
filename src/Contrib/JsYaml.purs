@@ -27,6 +27,7 @@ toJsOrdering = case _ of
 
 type Options =
   { indent :: Opt Int
+  , replacer :: Opt (Fn2 String Json Json)
   , sortKeys :: Opt (Fn2 String String JsOrdering)
   }
 

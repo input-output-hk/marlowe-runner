@@ -56,6 +56,8 @@ nextTimeoutAdvance (Environment { timeInterval: TimeInterval startTime _ }) cont
   nextTimeoutAdvance' Close = Just Close
   nextTimeoutAdvance' _ = Nothing
 
+-- Either possibly incomplete list of role tokens or a complete list.
+-- rolesInContract :: Contract -> Either (Array TokenName) (Array TokenName)
 rolesInContract :: Contract -> Array TokenName
 rolesInContract = foldMapContract (MapStep
   { mapCase: rolesCases

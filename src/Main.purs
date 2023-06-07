@@ -7,6 +7,7 @@ import Component.App (mkApp)
 import Component.MessageHub (mkMessageHub)
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
+import Contrib.JsonBigInt as JsonBigInt
 import Control.Monad.Reader (runReaderT)
 import Data.Argonaut (Json, decodeJson, (.:))
 import Data.Map as Map
@@ -28,32 +29,11 @@ import Marlowe.Runtime.Web.Types (BlockHeader(..), BlockNumber(..), ContractHead
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (createContext)
 import React.Basic.DOM.Client (createRoot, renderRoot)
-import Wallet as Wallet
 import Web.DOM (Element)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (HTMLDocument, window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
 import Web.HTML.Window (document)
-
--- | TODO: move this testing code to a separate "app"
-testWallet :: Effect Unit
-testWallet = launchAff_ do
-  delay (Milliseconds 120_000.0)
-  mC <- liftEffect (Wallet.cardano =<< window)
-  case mC of
-    Nothing -> Console.log "nay"
-    Just c -> do
-      liftEffect (Wallet.nami c)
-        >>= case _ of
-          Nothing -> Console.log "boo"
-          Just nami -> do
-            api <- Wallet.enable_ nami
-            Console.log <<< ("getBalance: " <> _) <<< unsafeStringify =<< Wallet.getBalance api
-            Console.log <<< ("getChangeAddress: " <> _) <<< unsafeStringify =<< Wallet.getChangeAddress api
-            Console.log <<< ("getRewardAddresses: " <> _) <<< unsafeStringify =<< Wallet.getRewardAddresses api
-            Console.log <<< ("getUnusedAddresses: " <> _) <<< unsafeStringify =<< Wallet.getUnusedAddresses api
-            Console.log <<< ("getUsedAddresses: " <> _) <<< unsafeStringify =<< Wallet.getUsedAddresses api
-            Console.log <<< ("getUtxos: " <> _) <<< unsafeStringify =<< Wallet.getUtxos api
 
 type Config =
   { marloweWebServerUrl :: ServerURL
@@ -76,6 +56,9 @@ decodeConfig json = do
 main :: Json -> Effect Unit
 main configJson = do
   config <- Effect.liftEither $ decodeConfig configJson
+
+  JsonBigInt.patchers.patchStringify
+  JsonBigInt.patchers.patchParse
 
   let
     logger :: String -> Effect Unit

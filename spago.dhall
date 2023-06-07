@@ -56,6 +56,7 @@
   , "node-process"
   , "now"
   , "nullable"
+  , "numbers"
   , "ordered-collections"
   , "orders"
   , "parsing"
