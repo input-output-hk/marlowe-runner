@@ -5,8 +5,9 @@ import Prelude
 import Data.Array as Array
 import Data.BigInt.Argonaut as BigInt
 import Data.Maybe (Maybe(..))
+import Language.Marlowe.Core.V1.Folds (MapStep(..), foldMapContract)
 import Language.Marlowe.Core.V1.Semantics (evalObservation, evalValue)
-import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId, Contract(..), Environment(..), Party, State, TimeInterval(..), Token)
+import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId(..), Contract(..), Environment(..), Observation(..), Party(..), Payee(..), State, TimeInterval(..), Token, TokenName, Value(..))
 
 data DepositInput = DepositInput AccountId Party Token BigInt.BigInt (Maybe Contract)
 data ChoiceInput  = ChoiceInput ChoiceId (Array Bound) (Maybe Contract)
@@ -55,3 +56,46 @@ nextTimeoutAdvance (Environment { timeInterval: TimeInterval startTime _ }) cont
   nextTimeoutAdvance' Close = Just Close
   nextTimeoutAdvance' _ = Nothing
 
+rolesInContract :: Contract -> Array TokenName
+rolesInContract = foldMapContract (MapStep
+  { mapCase: rolesCases
+  , mapContract: rolesContract
+  , mapObservation: rolesObservation
+  , mapValue: rolesValue
+  })
+  where
+  rolesObservation :: Observation -> Array TokenName
+  rolesObservation (ChoseSomething (ChoiceId _ (Role t))) = [t]
+  rolesObservation _ = []
+
+  rolesValue :: Value -> Array TokenName
+  rolesValue (AvailableMoney (Role t) _) = [t]
+  rolesValue (ChoiceValue (ChoiceId _ (Role t))) = [t]
+  rolesValue _ = []
+
+  rolesCases :: Case -> Array TokenName
+  rolesCases (Case (Deposit (Role t1) (Role t2) _ _) _) = [t1, t2]
+  rolesCases (Case (Deposit (Role t1) _ _ _) _) = [t1]
+  rolesCases (Case (Deposit _ (Role t2) _ _) _) = [t2]
+  rolesCases (Case (Deposit _ _ _ _) _) = []
+  rolesCases (Case (Choice (ChoiceId _ (Role t)) _) _) = [t]
+  rolesCases (Case (Choice _ _) _) = []
+  rolesCases (Case (Notify _) _) = []
+  rolesCases (MerkleizedCase (Deposit (Role t1) (Role t2) _ _) _) = [t1, t2]
+  rolesCases (MerkleizedCase (Deposit (Role t1) _ _ _) _) = [t1]
+  rolesCases (MerkleizedCase (Deposit _ (Role t2) _ _) _) = [t2]
+  rolesCases (MerkleizedCase (Deposit _ _ _ _) _) = []
+  rolesCases (MerkleizedCase (Choice (ChoiceId _ (Role t)) _) _) = [t]
+  rolesCases (MerkleizedCase (Choice _ _) _) = []
+  rolesCases (MerkleizedCase (Notify _) _) = []
+
+  rolesContract :: Contract -> Array TokenName
+  rolesContract Close = []
+  rolesContract (When _ _ _) = []
+  rolesContract (Pay (Role t1) (Party (Role t2)) _ _ _) = [t1,t2]
+  rolesContract (Pay (Role t) _ _ _ _) = [t]
+  rolesContract (Pay _ (Party (Role t)) _ _ _) = [t]
+  rolesContract (Pay _ _ _ _ _) = []
+  rolesContract (If _ _ _) = []
+  rolesContract (Let _ _ _) = []
+  rolesContract (Assert _ _) = []

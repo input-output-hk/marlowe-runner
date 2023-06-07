@@ -22,6 +22,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, un, unwrap)
 import Data.Profunctor.Strong ((***))
+import Data.Set (Set)
 import Data.Show.Generic (genericShow)
 import Data.String as String
 import Data.Traversable (for)
@@ -334,6 +335,44 @@ derive instance Eq ContractHeader
 
 instance DecodeJson ContractHeader where
   decodeJson = decodeNewtypedRecord metadataFieldDecoder
+
+type WithdrawalHeadersRowBase r =
+  ( withdrawalId :: TxId
+  , status :: TxStatus
+  , block :: Maybe BlockHeader
+  | r
+  )
+
+newtype WithdrawalHeader = WithdrawalHeader { | WithdrawalHeadersRowBase () }
+
+derive instance Generic WithdrawalHeader _
+derive instance Newtype WithdrawalHeader _
+derive instance Eq WithdrawalHeader
+
+instance DecodeJson WithdrawalHeader where
+  decodeJson = decodeNewtypedRecord metadataFieldDecoder
+
+newtype PayoutRef = PayoutRef
+  { contractId :: TxOutRef
+  , payout :: TxOutRef
+  , roleTokenMintingPolicyId :: PolicyId
+  , role :: String
+  }
+
+derive instance Generic PayoutRef _
+derive instance Newtype PayoutRef _
+derive instance Eq PayoutRef
+
+newtype Withdrawal = Withdrawal
+  { payouts :: Set PayoutRef
+  , withdrawalId :: TxId
+  , status :: TxStatus
+  , block :: Maybe BlockHeader
+  }
+
+derive instance Generic Withdrawal _
+derive instance Newtype Withdrawal _
+derive instance Eq Withdrawal
 
 newtype TextEnvelope (a :: Type) = TextEnvelope
   { type_ :: String
@@ -796,9 +835,95 @@ derive instance Eq TransactionEndpoint
 derive instance Newtype TransactionEndpoint _
 derive newtype instance DecodeJson TransactionEndpoint
 
+newtype WithdrawalsEndpoint = WithdrawalsEndpoint
+  ( IndexEndpoint PostWithdrawalsRequest PostWithdrawalsResponseContent (WithdrawalEndpointRow + ()) GetWithdrawalsResponseContent
+      (WithdrawalEndpointRow + TransactionsEndpointRow + ())
+  )
+
+derive instance Eq WithdrawalsEndpoint
+derive instance Newtype WithdrawalsEndpoint _
+derive newtype instance DecodeJson WithdrawalsEndpoint
+
+type GetWithdrawalsResponseContent = WithdrawalHeader
+
+type WithdrawalEndpointRow r = ("withdrawal" :: WithdrawalEndpoint | r)
+
+newtype PostWithdrawalsRequest = PostWithdrawalsRequest
+  { role :: String
+  , contractId :: TxOutRef
+  , minUTxODeposit :: V1.Ada
+  , changeAddress :: Bech32
+  , addresses :: Array Bech32
+  , collateralUTxOs :: Array TxOutRef
+  }
+
+instance EncodeJsonBody PostWithdrawalsRequest where
+  encodeJsonBody (PostWithdrawalsRequest r) = encodeJson
+    { -- FIXME
+    }
+
+type PostWithdrawalsHeadersRow =
+  ( "X-Change-Address" :: String
+  , "X-Address" :: String
+  , "Accept" :: String
+  -- , "X-Collateral-UTxO" :: String
+  )
+
+instance EncodeHeaders PostWithdrawalsRequest PostWithdrawalsHeadersRow where
+  encodeHeaders (PostWithdrawalsRequest { changeAddress, addresses }) =
+    { "X-Change-Address": bech32ToString changeAddress
+    , "X-Address": String.joinWith "," (map bech32ToString addresses)
+    , "Accept": "application/vendor.iog.marlowe-runtime.contract-tx-json"
+    }
+
+derive instance Eq PostWithdrawalsRequest
+derive instance Newtype PostWithdrawalsRequest _
+derive newtype instance DecodeJson PostWithdrawalsRequest
+
+newtype PostWithdrawalsResponseContent = PostWithdrawalsResponseContent
+  { withdrawalId :: TxOutRef
+  , tx :: TextEnvelope TransactionObject
+  }
+
+derive instance Newtype PostWithdrawalsResponseContent _
+
+instance DecodeJson PostWithdrawalsResponseContent where
+  decodeJson = decodeNewtypedRecord
+    { tx: map decodeTransactionObjectTextEnvelope :: Maybe _ -> Maybe _ }
+
+newtype PutWithdrawalRequest = PutWithdrawalRequest (TextEnvelope TransactionWitnessSetObject)
+
+instance EncodeHeaders PutWithdrawalRequest () where
+  encodeHeaders (PutWithdrawalRequest _) = {}
+
+instance EncodeJsonBody PutWithdrawalRequest where
+  encodeJsonBody (PutWithdrawalRequest textEnvelope) = encodeJson textEnvelope
+
+type GetWithdrawalResponse = WithdrawalState
+
+newtype WithdrawalEndpoint = WithdrawalEndpoint
+  (ResourceEndpoint PutWithdrawalRequest GetWithdrawalResponse ())
+
+derive instance Eq WithdrawalEndpoint
+derive instance Newtype WithdrawalEndpoint _
+derive newtype instance DecodeJson WithdrawalEndpoint
+
+type WithdrawalStateRow = WithdrawalHeadersRowBase
+  ( -- FIXME
+  )
+
+newtype WithdrawalState = WithdrawalState { | WithdrawalStateRow }
+
+derive instance Generic WithdrawalState _
+derive instance Newtype WithdrawalState _
+derive instance Eq WithdrawalState
+
 -- Entry point
 api :: ContractsEndpoint
 api = ContractsEndpoint (IndexEndpoint (ResourceLink "contracts"))
+
+withdrawalsApi :: WithdrawalsEndpoint
+withdrawalsApi = WithdrawalsEndpoint (IndexEndpoint (ResourceLink "withdrawals"))
 
 newtype Runtime = Runtime
   { root :: ContractsEndpoint
