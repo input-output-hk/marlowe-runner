@@ -35,6 +35,7 @@ type ClientError' = ClientError PostContractsError
 
 data ContractData = ContractData
   { contract :: V1.Contract
+  , rolesConfig :: Maybe RolesConfig
   , walletAddresses ::
       { changeAddress :: Bech32
       , usedAddresses :: Array Bech32
@@ -179,6 +180,7 @@ data WalletRequest
 data RuntimeRequest
   = CreateTxRequest
       { contract :: V1.Contract
+      , rolesConfig :: Maybe RolesConfig
       , reqWalletContext :: RequiredWalletContext
       , runtime :: Runtime
       }
@@ -200,8 +202,8 @@ nextRequest env = do
   case _ of
     FetchingRequiredWalletContext { errors: Nothing } ->
       Just $ WalletRequest $ FetchWalletContextRequest { cardanoMultiplatformLib, walletInfo }
-    CreatingTx { contract, reqWalletContext, errors: Nothing } ->
-      Just $ RuntimeRequest $ CreateTxRequest { contract, reqWalletContext, runtime }
+    CreatingTx { contract, reqWalletContext, errors: Nothing, rolesConfig } ->
+      Just $ RuntimeRequest $ CreateTxRequest { contract, reqWalletContext, runtime, rolesConfig }
     SigningTx { createTxResponse: { resource: PostContractsResponseContent response }, errors: Nothing } -> do
       let
         { tx } = response
@@ -230,11 +232,12 @@ requestToAffAction = case _ of
         Left err -> pure $ SignTxFailed $ unsafeStringify err
         Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
   RuntimeRequest runtimeRequest -> case runtimeRequest of
-    CreateTxRequest { contract, reqWalletContext, runtime } -> do
+    CreateTxRequest { contract, reqWalletContext, runtime, rolesConfig } -> do
       let
         Runtime { serverURL, root } = runtime
         contractData = ContractData
           { contract
+          , rolesConfig
           , walletAddresses: reqWalletContext
           }
       traceM "WTF?"
@@ -261,11 +264,11 @@ create
   -> Aff (Either ClientError' { resource :: PostContractsResponseContent, links :: { contract :: ContractEndpoint } })
 create contractData serverUrl contractsEndpoint = do
   let
-    ContractData { contract, walletAddresses: { changeAddress, usedAddresses } } = contractData
+    ContractData { contract, rolesConfig, walletAddresses: { changeAddress, usedAddresses } } = contractData
     req = PostContractsRequest
       { metadata: mempty
       -- , version :: MarloweVersion
-      , roles: Nothing
+      , roles: rolesConfig
       , tags: mempty -- TODO: use instead of metadata
       , contract
       , minUTxODeposit: V1.Lovelace (BigInt.fromInt 2_000_000)

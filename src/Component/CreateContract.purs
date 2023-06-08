@@ -2,6 +2,9 @@ module Component.CreateContract where
 
 import Prelude
 
+import CardanoMultiplatformLib (bech32FromString)
+import CardanoMultiplatformLib as CardanoMultiplatformLib
+import CardanoMultiplatformLib.Types (Bech32)
 import Component.CreateContract.Machine as Machine
 import Component.Modal (mkModal)
 import Component.Modal as Modal
@@ -9,51 +12,51 @@ import Component.Types (MkComponentM, WalletInfo)
 import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
-import Contrib.ReactBootstrap.FormBuilder (genFieldId)
-import Contrib.ReactBootstrap.FormBuilder as FormBuilder
+import Contrib.ReactBootstrap.FormBuilder (booleanField) as FormBuilder
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.Argonaut (decodeJson, encodeJson, parseJson, stringifyWithIndent)
 import Data.Array as Array
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (instant, unInstant)
 import Data.Either (Either(..))
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Int as Int
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
-import Data.Number as Number
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
 import Data.Tuple.Nested (type (/\))
 import Data.Validation.Semigroup (V(..))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
-import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError)
+import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..))
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFnEither) as Validator
+import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import Polyform.Validator (liftFnM)
-import React.Basic (Ref, fragment)
+import Polyform.Validator (liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (css)
 import React.Basic.DOM (div, div_, input, text) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
-import React.Basic.Hooks (JSX, component, readRef, useRef, (/\))
+import React.Basic.Hooks (JSX, Ref, component, fragment, readRef, useRef, (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseForm (liftValidator, useForm)
 import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (BootstrapForm, formBuilderT, genId, liftBuilderM)
+import ReactBootstrap.FormBuilder (BootstrapForm, FormBuilder')
 import ReactBootstrap.FormBuilder (evalBuilder', textArea, textInput) as FormBuilder
 import Wallet as Wallet
 import Web.DOM.Node (Node)
@@ -105,18 +108,20 @@ mkJsonForm (initialContract /\ (AutoRun initialAutoRun)) = FormBuilder.evalBuild
   in
     contract /\ autoRun
 
-mkRolesConfigForm :: Array String -> BootstrapForm Effect Query _
-mkRolesConfigForm roleNames = FormBuilder.evalBuilder' $ for roleNames \roleName -> do
-  FormBuilder.textInput
+mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> BootstrapForm Effect Query _
+mkRolesConfigForm roleNames cardanoMultiplatformLib = FormBuilder.evalBuilder' $ Mint <<< Map.fromFoldable <$> for roleNames \roleName -> ado
+  address <- FormBuilder.textInput
     { missingError: "Please provide an address for a role token"
     , helpText: Just $ DOOM.div_
         [ DOOM.text "Role token destination address"
         ]
     , initial: ""
-    , label: Just $ DOOM.text $ show roleName
-    , touched: true
-    , validator: identity
+    , label: Just $ DOOM.text roleName
+    , touched: false
+    , validator: requiredV' $ Validator.liftFnMMaybe (const $ pure [ "Invalid address" ]) \str -> do
+       bech32FromString cardanoMultiplatformLib str
     }
+  in (roleName /\ (RoleTokenSimple address))
 
 type ClientError' = ClientError PostContractsError
 
@@ -176,6 +181,76 @@ data CurrentRun
   -- at the moment. This is useful to avoid double clicking and show throbber
   | Manual Boolean
 
+addressInput :: CardanoMultiplatformLib.Lib -> String -> String -> Maybe FieldId -> FormBuilder' Effect Bech32
+addressInput cardanoMultiplatformLib label initial name = do
+  let
+    props =
+      { initial
+      , label: Just $ DOOM.text label
+      , name
+      , validator: requiredV' $ Validator.liftFnMMaybe (const $ pure [ "Invalid address" ]) \str -> do
+          bech32FromString cardanoMultiplatformLib str
+      }
+  FormBuilder.textInput props
+
+type RoleProps =
+  { onDismiss :: Effect Unit
+  , onSuccess :: RolesConfig -> Effect Unit
+  , connectedWallet :: WalletInfo Wallet.Api
+  , roleNames :: NonEmptyArray String
+  }
+
+mkRoleTokensComponent :: MkComponentM (RoleProps -> JSX)
+mkRoleTokensComponent = do
+  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
+  modal <- liftEffect mkModal
+  liftEffect $ component "RoleTokensAssignment" \{ onDismiss , onSuccess, roleNames } -> React.do
+    let
+      form = mkRolesConfigForm roleNames cardanoMultiplatformLib
+
+      onSubmit :: _ -> Effect Unit
+      onSubmit = _.result >>> case _ of
+        Just (V (Right roleAssignments) /\ _) -> onSuccess roleAssignments
+        _ -> pure unit
+
+    { formState, onSubmit: onSubmit', result } <- useForm
+      { spec: form
+      , onSubmit
+      , validationDebounce: Seconds 0.5
+      }
+
+    pure $ do
+      let
+        fields = UseForm.renderForm form formState
+        formBody = DOM.div { className: "form-group" } fields
+        formActions = DOOM.fragment
+          [ link
+              { label: DOOM.text "Cancel"
+              , onClick: onDismiss
+              , showBorders: true
+              }
+          , DOM.button
+              do
+                let
+                  disabled = case result of
+                    Just (V (Right _) /\ _) -> false
+                    _ -> true
+                { className: "btn btn-primary"
+                , onClick: onSubmit'
+                , disabled
+                }
+              [ R.text "Submit" ]
+          ]
+      modal
+        { title: R.text "Role token assignments"
+        , onDismiss: onDismiss
+        , body: DOM.div { className: "row" }
+            [ DOM.div { className: "col-12" } [ formBody ]
+            ]
+        , footer: formActions
+        , size: Modal.ExtraLarge
+        }
+
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   runtime <- asks _.runtime
@@ -187,6 +262,8 @@ mkComponent = do
 
   let
     initialAutoRun = AutoRun false
+
+  roleTokenComponent <- mkRoleTokensComponent
 
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss } -> React.do
     currentRun /\ setCurrentRun <- React.useState' Nothing
@@ -252,7 +329,14 @@ mkComponent = do
           , footer: formActions
           , size: Modal.ExtraLarge
           }
-      Machine.DefiningRoleTokens { roleNames: _ } -> DOOM.text "FIXME: Define role tokeens component not implemented yet"
+
+      Machine.DefiningRoleTokens { roleNames } -> do
+         let onSuccess' :: RolesConfig -> Effect Unit
+             onSuccess' rolesConfig =
+               let action = Machine.DefineRoleTokensSucceeded rolesConfig
+                in applyAction action
+
+         roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
 
       machineState -> do
         let

@@ -150,8 +150,8 @@ instance DecodeJson RolesConfig where
   decodeJson json = Mint <$> decodeJson json
 
 data RoleTokenConfig
-  = RoleTokenSimple V1.Address
-  | RoleTokenAdvanced V1.Address TokenMetadata
+  = RoleTokenSimple Bech32
+  | RoleTokenAdvanced Bech32 TokenMetadata
 
 instance EncodeJson RoleTokenConfig where
   encodeJson (RoleTokenSimple addr) = encodeJson addr
