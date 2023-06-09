@@ -2,10 +2,12 @@ module Component.Withdrawals where
 
 import Prelude
 
-import CardanoMultiplatformLib (Bech32)
+import CardanoMultiplatformLib (Bech32, CborHex)
+import CardanoMultiplatformLib.Transaction (TransactionObject(..), TransactionWitnessSetObject(..))
 import Component.Modal (mkModal)
 import Component.Modal as Modal
-import Component.Types (MkComponentM, WalletInfo)
+import Component.Types (MkComponentM, WalletInfo(..))
+import Contrib.Fetch (FetchError(..))
 import Control.Monad.Reader.Class (asks)
 import Data.BigInt.Argonaut as BigInt
 import Data.Either (Either(..))
@@ -15,13 +17,14 @@ import Data.Newtype (un)
 import Data.Time.Duration (Seconds(..))
 import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
+import Data.Variant (Variant)
 import Debug (traceM)
 import Effect (Effect)
-import Effect.Aff (launchAff_)
+import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (Ada(..)) as V1
-import Marlowe.Runtime.Web.Client (post')
-import Marlowe.Runtime.Web.Types (PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), Runtime(Runtime), TransactionEndpoint, TxOutRef, WithdrawalsEndpoint, txOutRefFromString)
+import Marlowe.Runtime.Web.Client (post', put')
+import Marlowe.Runtime.Web.Types (PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), PutWithdrawalRequest(..), Runtime(Runtime), ServerURL(..), TextEnvelope(..), TransactionEndpoint, TxOutRef, WithdrawalEndpoint(..), WithdrawalsEndpoint, toTextEnvelope, txOutRefFromString)
 import Polyform.Validator as Validator
 import React.Basic (fragment)
 import React.Basic.DOM as DOOM
@@ -52,7 +55,7 @@ mkWithdrawalForm = FormBuilder.evalBuilder' ado
 type Props =
   { inModal :: Boolean
   , onDismiss :: Effect Unit
-  , onSuccess :: TransactionEndpoint -> Effect Unit
+  , onSuccess :: WithdrawalEndpoint -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , withdrawalsEndpoint :: WithdrawalsEndpoint
   }
@@ -82,25 +85,24 @@ mkComponent = do
           do
             launchAff_ $ do
               withdrawal withdrawalContext runtime.serverURL runtime.withdrawalsEndpoint >>= case _ of
-                -- Right { resource: PostWithdrawalsResponseContent res, links: { transaction: transactionEndpoint } } -> do
-                Right { resource: PostWithdrawalsResponseContent res } -> do
-                   traceM res
-                --  let
-                --    { tx } = postContractsResponse
-                --    TextEnvelope { cborHex: txCborHex } = tx
-                --  let
-                --    WalletInfo { wallet: walletApi } = connectedWallet
-                --  Wallet.signTx walletApi txCborHex true >>= case _ of
-                --    Right witnessSet -> do
-                --      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
-                --        Right _ -> do
-                --          liftEffect $ onSuccess transactionEndpoint
-                --        Left err -> do
-                --          traceM "Error while submitting the transaction"
-                --          traceM err
-                --    Left err -> do
-                --      traceM "Failed to sign transaction"
-                --      traceM err
+                Right { resource: PostWithdrawalsResponseContent res, links: { withdrawal: withdrawalEndpoint } } -> do
+                  traceM res
+                  let
+                    { tx } = res
+                    TextEnvelope { cborHex: txCborHex } = tx
+                  let
+                    WalletInfo { wallet: walletApi } = connectedWallet
+                  Wallet.signTx walletApi txCborHex true >>= case _ of
+                    Right witnessSet -> do
+                      submit witnessSet runtime.serverURL withdrawalEndpoint >>= case _ of
+                        Right _ -> do
+                          liftEffect $ onSuccess withdrawalEndpoint
+                        Left err -> do
+                          traceM "Error while submitting the transaction"
+                          traceM err
+                    Left err -> do
+                      traceM "Failed to sign transaction"
+                      traceM err
 
                 Left err ->
                   traceM $ "Error: " <> show err
@@ -164,3 +166,27 @@ withdrawal (WithdrawalContext ctx) serverURL withdrawalsEndpoint = do
       }
 
   post' @String serverURL (withdrawalsEndpoint :: WithdrawalsEndpoint) req
+
+submit
+  :: CborHex TransactionWitnessSetObject
+  -> ServerURL
+  -> WithdrawalEndpoint
+  -> Aff (Either FetchError Unit)
+submit witnesses serverUrl contractEndpoint = do
+  let
+    textEnvelope = toTextEnvelope witnesses ""
+    req = PutWithdrawalRequest textEnvelope
+  put' serverUrl contractEndpoint req
+
+sign
+  :: Wallet.Api
+  -> TextEnvelope TransactionObject
+  -> Aff
+       ( Either
+           (Variant (Wallet.SignTxError ()))
+           (CborHex TransactionWitnessSetObject)
+       )
+sign walletApi tx = do
+  let
+    TextEnvelope { cborHex: txCborHex } = tx
+  Wallet.signTx walletApi txCborHex false
