@@ -11,6 +11,7 @@ import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (linkWithIcon)
+import Component.Withdrawals as Withdrawals
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Fetch (FetchError)
 import Control.Monad.Reader.Class (asks)
@@ -32,8 +33,9 @@ import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract, TimeInterval(..))
 import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Marlowe.Runtime.Web (Runtime)
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), PutTransactionRequest(..), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString, txOutRefToUrlEncodedString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), PutTransactionRequest(..), Runtime(..), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalEndpoint(..), WithdrawalsEndpoint(..), toTextEnvelope, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import React.Basic (fragment) as DOOM
@@ -77,7 +79,7 @@ type SubmissionError = String
 type ContractListState = { modalAction :: Maybe ModalAction }
 
 type Props =
-  { contractList :: Array ContractInfo
+  { contracts :: Array ContractInfo
   , connectedWallet :: Maybe (WalletInfo Wallet.Api)
   }
 
@@ -95,7 +97,10 @@ submit witnesses serverUrl transactionEndpoint = do
     req = PutTransactionRequest textEnvelope
   put' serverUrl transactionEndpoint req
 
-data ModalAction = NewContract | ApplyInputs TransactionsEndpoint V1.Contract V1.State TimeInterval
+data ModalAction
+  = NewContract
+  | ApplyInputs TransactionsEndpoint V1.Contract V1.State TimeInterval
+  | Withdrawal WithdrawalsEndpoint
 
 derive instance Eq ModalAction
 
@@ -117,11 +122,13 @@ mkForm onFieldValueChange = FormBuilder.evalBuilder' ado
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
+  Runtime runtime <- asks _.runtime
 
   createContractComponent <- CreateContract.mkComponent
   applyInputsComponent <- ApplyInputs.mkComponent
+  withdrawalsComponent <- Withdrawals.mkComponent
 
-  liftEffect $ component "ContractList" \{ connectedWallet, contractList } -> React.do
+  liftEffect $ component "ContractList" \{ connectedWallet, contracts } -> React.do
     possibleModalAction /\ setModalAction /\ resetModalAction <- useMaybeValue'
     possibleModalActionRef <- useStateRef' possibleModalAction
     ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
@@ -135,19 +142,19 @@ mkContractList = do
       }
 
     let
-      contractList' = do
+      contracts' = do
         let
           -- Quick and dirty hack to display just submited contracts as first
           someFutureBlockNumber = Runtime.BlockNumber 9058430
           sortedContracts = case ordering.orderBy of
-            OrderByCreationDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.createdAt)) contractList
-            OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contractList
+            OrderByCreationDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.createdAt)) contracts
+            OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contracts
         if ordering.orderAsc then sortedContracts
         else Array.reverse sortedContracts
-      contractList'' = case possibleQueryValue of
-        Nothing -> contractList'
+      contracts'' = case possibleQueryValue of
+        Nothing -> contracts'
         Just queryValue ->
-          Array.filter (\(ContractInfo { contractId }) -> contains (Pattern queryValue) (txOutRefToString contractId)) contractList'
+          Array.filter (\(ContractInfo { contractId }) -> contains (Pattern queryValue) (txOutRefToString contractId)) contracts'
     pure $ do
       DOOM.div_
         [ case possibleModalAction, connectedWallet of
@@ -173,6 +180,19 @@ mkContractList = do
                 , timeInterval
                 , contract
                 , state: st
+                , connectedWallet: cw
+                , onSuccess
+                , onDismiss: resetModalAction
+                }
+            Just (Withdrawal withdrawalsEndpoint), Just cw -> do
+              let
+                onSuccess = \_ -> do
+                  msgHubProps.add $ Success $ DOOM.text $ fold
+                    [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
+                  resetModalAction
+              withdrawalsComponent
+                { inModal: true
+                , withdrawalsEndpoint
                 , connectedWallet: cw
                 , onSuccess
                 , onDismiss: resetModalAction
@@ -225,6 +245,7 @@ mkContractList = do
                     , th $ DOOM.text "Contract Id"
                     , th $ DOOM.text "Status"
                     , th $ DOOM.text "Inputs"
+                    , th $ DOOM.text "Withdrawals"
                     ]
                 ]
             , DOM.tbody {} $ map
@@ -269,9 +290,16 @@ mkContractList = do
                                 Nothing, _ -> DOOM.text "No transactions endpoint"
                                 _, _ -> DOOM.text ""
                             ]
+                        , tdCentered
+                            [ linkWithIcon
+                                  { icon: Icons.wallet2
+                                  , label: DOOM.text "Withdrawal"
+                                  , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint
+                                  }
+                            ]
                         ]
                 )
-                contractList''
+                contracts''
             ]
         ]
 

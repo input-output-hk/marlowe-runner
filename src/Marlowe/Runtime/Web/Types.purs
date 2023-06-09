@@ -837,7 +837,7 @@ derive newtype instance DecodeJson TransactionEndpoint
 
 newtype WithdrawalsEndpoint = WithdrawalsEndpoint
   ( IndexEndpoint PostWithdrawalsRequest PostWithdrawalsResponseContent (WithdrawalEndpointRow + ()) GetWithdrawalsResponseContent
-      (WithdrawalEndpointRow + TransactionsEndpointRow + ())
+      (WithdrawalEndpointRow + ())
   )
 
 derive instance Eq WithdrawalsEndpoint
@@ -859,7 +859,10 @@ newtype PostWithdrawalsRequest = PostWithdrawalsRequest
 
 instance EncodeJsonBody PostWithdrawalsRequest where
   encodeJsonBody (PostWithdrawalsRequest r) = encodeJson
-    { -- FIXME
+    { role: r.role
+    , contractId: txOutRefToString r.contractId
+    , minUTxODeposit: r.minUTxODeposit
+    --- , collateralUTxOs: r.collateralUTxOs
     }
 
 type PostWithdrawalsHeadersRow =
@@ -873,7 +876,7 @@ instance EncodeHeaders PostWithdrawalsRequest PostWithdrawalsHeadersRow where
   encodeHeaders (PostWithdrawalsRequest { changeAddress, addresses }) =
     { "X-Change-Address": bech32ToString changeAddress
     , "X-Address": String.joinWith "," (map bech32ToString addresses)
-    , "Accept": "application/vendor.iog.marlowe-runtime.contract-tx-json"
+    , "Accept": "application/vendor.iog.marlowe-runtime.withdraw-tx-json"
     }
 
 derive instance Eq PostWithdrawalsRequest
@@ -881,7 +884,7 @@ derive instance Newtype PostWithdrawalsRequest _
 derive newtype instance DecodeJson PostWithdrawalsRequest
 
 newtype PostWithdrawalsResponseContent = PostWithdrawalsResponseContent
-  { withdrawalId :: TxOutRef
+  { withdrawalId :: String
   , tx :: TextEnvelope TransactionObject
   }
 
@@ -909,7 +912,8 @@ derive instance Newtype WithdrawalEndpoint _
 derive newtype instance DecodeJson WithdrawalEndpoint
 
 type WithdrawalStateRow = WithdrawalHeadersRowBase
-  ( -- FIXME
+  ( withdrawalId :: String
+  , txBody :: Maybe (TextEnvelope TransactionObject)
   )
 
 newtype WithdrawalState = WithdrawalState { | WithdrawalStateRow }
@@ -927,9 +931,10 @@ withdrawalsApi = WithdrawalsEndpoint (IndexEndpoint (ResourceLink "withdrawals")
 
 newtype Runtime = Runtime
   { root :: ContractsEndpoint
+  , withdrawalsEndpoint :: WithdrawalsEndpoint
   , serverURL :: ServerURL
   }
 
 runtime :: ServerURL -> Runtime
-runtime serverURL = Runtime { root: api, serverURL }
+runtime serverURL = Runtime { root: api, withdrawalsEndpoint: withdrawalsApi, serverURL }
 

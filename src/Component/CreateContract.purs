@@ -394,6 +394,7 @@ mkComponent = do
           , footer: formActions
           , size: Modal.ExtraLarge
           }
+
 stateToTitle :: Machine.State -> String
 stateToTitle state = case state of
   Machine.DefiningContract -> "Defining contract"

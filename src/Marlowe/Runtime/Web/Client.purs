@@ -323,7 +323,7 @@ post (ServerURL serverUrl) (IndexEndpoint (ResourceLink path)) req = runExceptT 
     Right payload -> pure payload
 
 post'
-  :: forall t err postRequest postResponse postResponseLinks getResponse getResponseLinks extraHeaders
+  :: forall t @err postRequest postResponse postResponseLinks getResponse getResponseLinks extraHeaders
    . Newtype t (IndexEndpoint postRequest postResponse postResponseLinks getResponse getResponseLinks)
   => DecodeJson postResponse
   => DecodeJson (ApiError err)

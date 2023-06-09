@@ -308,7 +308,7 @@ mkApp = do
           let
             -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
             contractArray = Array.fromFoldable contracts
-          subcomponents.contractListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
+          subcomponents.contractListComponent { contracts: contractArray, connectedWallet: possibleWalletInfo }
 
 --          [ tabs { fill: true, justify: true, defaultActiveKey: "contracts" }
 --              [ renderTab
