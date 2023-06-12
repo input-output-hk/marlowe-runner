@@ -2,10 +2,11 @@ module Component.LandingPage where
 
 import Prelude
 
+import Component.ConnectWallet (mkConnectWallet)
 import Component.Types (ContractInfo, MkComponentMBase)
 import Contrib.React.Svg (SvgUrl(..), svgImg)
 import Data.Map (Map)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Marlowe.Runtime.Web.Types as Runtime
@@ -36,6 +37,7 @@ type Props =
 
 mkLandingPage :: MkComponentMBase () (Props -> JSX)
 mkLandingPage = do
+  connectWallet <- mkConnectWallet
   liftEffect $ component "LandingPage" \{ routeToApp } -> React.do
     pure $ DOM.div { className: "mt-6" } $
       [ DOM.div { className: "fixed-top" }
@@ -52,7 +54,9 @@ mkLandingPage = do
           ]
       , DOM.div { className: "container-xl" }
           $ DOM.div { className: "row" }
-              [ DOM.a { href: "#", onClick: handler_ routeToApp } [ DOOM.text "Got to app" ]]
+              [ DOM.a { href: "#", onClick: handler_ routeToApp } [ DOOM.text "Got to app" ]
+              , connectWallet { currentlyConnected: Nothing, onWalletConnect: const $ pure unit, onDismiss: pure unit, inModal: false }
+              ]
       ]
 
 marloweLogoUrl :: SvgUrl
