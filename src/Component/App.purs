@@ -97,7 +97,8 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Just Eternl -- Nami -- Nothing
+-- debugWallet = Just Eternl -- Nami -- Nothing
+debugWallet = Nothing
 
 data DisplayOption = Default | About
 
@@ -124,7 +125,7 @@ mkApp = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   subcomponents <- do
     contractListComponent <- mkContractList
-   -- eventListComponent <- mkEventList
+    -- eventListComponent <- mkEventList
     connectWallet <- mkConnectWallet
     pure { contractListComponent, connectWallet, messageBox }
 
@@ -318,28 +319,28 @@ mkApp = do
               contractArray = Array.fromFoldable contracts
             subcomponents.contractListComponent { contracts: contractArray, connectedWallet: possibleWalletInfo }
 
-  --          [ tabs { fill: true, justify: true, defaultActiveKey: "contracts" }
-  --              [ renderTab
-  --                  { eventKey: "contracts"
-  --                  , title: DOM.div
-  --                      { className: "text-body" }
-  --                      [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.files
-  --                      , DOOM.text "Contracts"
-  --                      ]
-  --                  }
-  --                  $ subcomponents.contractListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
-  --              -- , renderTab
-  --              --     { eventKey: "cash-flows"
-  --              --     , title: DOM.div
-  --              --         { className: "text-body" }
-  --              --         [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.arrowDownShort
-  --              --         , DOOM.text "Apply Inputs"
-  --              --         ]
-  --
-  --              --     }
-  --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
-  --              ]
-  --          ]
+        --          [ tabs { fill: true, justify: true, defaultActiveKey: "contracts" }
+        --              [ renderTab
+        --                  { eventKey: "contracts"
+        --                  , title: DOM.div
+        --                      { className: "text-body" }
+        --                      [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.files
+        --                      , DOOM.text "Contracts"
+        --                      ]
+        --                  }
+        --                  $ subcomponents.contractListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
+        --              -- , renderTab
+        --              --     { eventKey: "cash-flows"
+        --              --     , title: DOM.div
+        --              --         { className: "text-body" }
+        --              --         [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.arrowDownShort
+        --              --         , DOOM.text "Apply Inputs"
+        --              --         ]
+        --
+        --              --     }
+        --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
+        --              ]
+        --          ]
         ]
 
 -- TODO: Currently we ignore role tokens.
