@@ -1,13 +1,14 @@
-@import "bootstrap/scss/functions";
-@import "bootstrap/scss/variables";
-@import "bootstrap/scss/maps";
-@import "bootstrap/scss/utilities";
-
 $font-family-base: 'Outfit', sans-serif;
 $primary: #511CF7;
 $navbar-light-color: #F6F7FF;
 $navbar-light-bg: #F6F7FF;
 $link-color: #511CF7;
+
+@import "bootstrap/scss/functions";
+@import "bootstrap/scss/variables";
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/utilities";
+
 
 $utilities: map-merge(
   $utilities, (
