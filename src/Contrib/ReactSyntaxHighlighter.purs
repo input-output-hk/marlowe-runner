@@ -2,10 +2,12 @@ module Contrib.ReactSyntaxHighlighter where
 
 import Prelude
 
+import Contrib.JsonBigInt as JsonBigInt
 import Data.Argonaut (class EncodeJson, encodeJson, stringifyWithIndent)
 import Data.Undefined.NoProblem (Opt)
 import Data.Undefined.NoProblem.Closed as NoProblem
 import JsYaml as JsYaml
+import Prim.Row as Row
 import React.Basic (JSX, ReactComponent, element)
 
 type SyntaxHighlighterPropsRow =
@@ -29,13 +31,17 @@ jsonSyntaxHighlighter a = syntaxHighlighter { language: "json", children: string
 yamlSyntaxHighlighter
   :: forall a opts
    . EncodeJson a
-  => NoProblem.Coerce { | opts } JsYaml.Options
+  => Row.Lacks "schema" opts
+  => Row.Cons "schema" JsYaml.Schema opts (schema :: JsYaml.Schema | opts)
+  => NoProblem.Coerce { schema :: JsYaml.Schema | opts } JsYaml.Options
   => a
   -> { | opts }
   -> JSX
 yamlSyntaxHighlighter a opts = do
+  let
+    bigIntJson = JsonBigInt.fromJson (encodeJson a)
   syntaxHighlighter
     { language: "yaml"
-    , children: JsYaml.dump opts (encodeJson a)
+    , children: JsYaml.dumpBigIntJson opts bigIntJson
     , wrapLongLines: true
     }

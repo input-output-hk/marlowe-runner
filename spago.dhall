@@ -12,6 +12,7 @@
   , "atleast"
   , "avar"
   , "bifunctors"
+  , "bigints"
   , "console"
   , "control"
   , "convertable-options"

@@ -6,6 +6,7 @@ import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib.Lib as Lib
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
+import Component.ApplyInputs.Machine as Machine
 import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
@@ -13,10 +14,7 @@ import Component.Types (MkComponentM, WalletInfo(..))
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Language.Marlowe.Core.V1 (compareMarloweJsonKeys)
-import React.Basic.Hooks.UseForm (useForm)
-import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (ChoiceFieldChoices(SelectFieldChoices, RadioButtonFieldChoices), choiceField, intInput, radioFieldChoice, selectFieldChoice)
-import ReactBootstrap.FormBuilder as FormBuilder
+import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
@@ -42,8 +40,8 @@ import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JsYaml as JsYaml
-import Language.Marlowe.Core.V1.Semantics.Types (Input(..), InputContent(..))
 import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input, Party(..), State, TimeInterval(..), Token(..), Value(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Input(..), InputContent(..))
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse(PostTransactionsResponse), PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
 import Partial.Unsafe (unsafeCrashWith)
@@ -56,6 +54,10 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, handler_)
 import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks as React
+import React.Basic.Hooks.UseForm (useForm)
+import React.Basic.Hooks.UseForm as UseForm
+import ReactBootstrap.FormBuilder (ChoiceFieldChoices(SelectFieldChoices, RadioButtonFieldChoices), choiceField, intInput, radioFieldChoice, selectFieldChoice)
+import ReactBootstrap.FormBuilder as FormBuilder
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 
@@ -114,11 +116,6 @@ mkDepositFormComponent = do
 
   liftEffect $ component "ApplyInputs.DepositFormComponent" \{ deposits, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
-    -- type ChoiceFieldProps validatorM a =
-    --   { choices :: ChoiceFieldChoices
-    --   , validator :: Batteries.Validator validatorM String (Maybe String) a
-    --   | ChoiceFieldOptionalPropsRow ()
-    --   }
     let
       choices = RadioButtonFieldChoices do
         let
@@ -526,22 +523,62 @@ type Props =
 sortMarloweKeys :: String -> String -> JsYaml.JsOrdering
 sortMarloweKeys a b = JsYaml.toJsOrdering $ compareMarloweJsonKeys a b
 
+newtype AutoRun = AutoRun Boolean
+
+-- type AllInputsChoices = Either
+--   V1.Contract
+--   { deposits :: Maybe (NonEmptyArray DepositInput)
+--   , choices :: Maybe (NonEmptyArray ChoiceInput)
+--   , notifies :: Maybe NotifyInput
+--   }
+
+
+machineProps (AutoRun autoRun) contract state environment transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime = do
+  let
+    env = { connectedWallet, cardanoMultiplatformLib, runtime }
+    allInputsChoices = case nextTimeoutAdvance environment contract of
+      Just advanceContinuation -> Left advanceContinuation
+      Nothing -> do
+        let
+          deposits = NonEmpty.fromArray $ nextDeposit environment state contract
+          choices = NonEmpty.fromArray $ nextChoice environment state contract
+          notifies = NonEmpty.head <$> NonEmpty.fromArray (nextNotify environment state contract)
+        Right { deposits, choices, notifies }
+
+  { initialState: Machine.initialState allInputsChoices transactionsEndpoint
+  , step: Machine.step
+  , driver: if autoRun
+      then Machine.driver env
+      else const Nothing
+  , output: identity
+  }
+
+
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
-  Runtime runtime <- asks _.runtime
+  runtime <- asks _.runtime
   modal <- liftEffect mkModal
-  walletInfoCtx <- asks _.walletInfoCtx
+  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
   depositFormComponent <- mkDepositFormComponent
   choiceFormComponent <- mkChoiceFormComponent
   notifyFormComponent <- mkNotifyFormComponent
   advanceFormComponent <- mkAdvanceFormComponent
 
+  let
+    initialAutoRun = AutoRun false
+
   liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, timeInterval, transactionsEndpoint } -> React.do
-    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
-    step /\ setStep <- useState' (Creating SelectingInputType)
     let
       environment = V1.Environment { timeInterval }
+
+    machine <- do
+      let
+        props = machineProps initialAutoRun contract state environment transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime
+      useMooreMachine props
+
+    step /\ setStep <- useState' (Creating SelectingInputType)
+    let
 
       possibleDeposits = do
         let
@@ -627,6 +664,17 @@ mkComponent = do
 
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
+
+-- data TimeInterval = TimeInterval Instant Instant
+defaultTimeInterval :: Effect V1.TimeInterval
+defaultTimeInterval = do
+  nowInstant <- now
+  let
+    nowMilliseconds = unInstant nowInstant
+    inTenMinutesInstant = case instant (nowMilliseconds <> Milliseconds (Int.toNumber $ 10 * 60 * 1000)) of
+      Just i -> i
+      Nothing -> unsafeCrashWith "Invalid instant"
+  pure $ V1.TimeInterval nowInstant inTenMinutesInstant
 
 mkInitialContract :: Effect V1.Contract
 mkInitialContract = do

@@ -256,7 +256,6 @@ mkComponent = do
   runtime <- asks _.runtime
   modal <- liftEffect mkModal
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-  walletInfoCtx <- asks _.walletInfoCtx
 
   { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts address
 
