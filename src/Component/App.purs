@@ -114,8 +114,6 @@ newtype AppContractInfoMap = AppContractInfoMap
   , map :: ContractInfoMap
   }
 
-data Route = LandingPage | AppPage
-
 mkApp :: MkComponentMBase () (Unit -> JSX)
 mkApp = do
   landingPage <- mkLandingPage
@@ -142,8 +140,6 @@ mkApp = do
   about <- asks _.aboutMarkdown
 
   liftEffect $ component "App" \_ -> React.do
-    currentRoute /\ setCurrentRoute <- useState' LandingPage
-
     possibleWalletInfo /\ setWalletInfo <- useState' Nothing
     let
       walletInfoName = _.name <<< un WalletInfo <$> possibleWalletInfo
@@ -219,8 +215,8 @@ mkApp = do
     let
       AppContractInfoMap { map: contracts } = contractMap
 
-    pure $ case currentRoute of
-      LandingPage -> landingPage { routeToApp: setCurrentRoute AppPage }
+    pure $ case possibleWalletInfo of
+      Nothing -> landingPage { setWalletInfo: setWalletInfo <<< Just }
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $ Array.singleton $ DOM.div { className: "mt-6" } $
         [ DOM.div { className: "fixed-top" }
             [ DOM.nav { className: "navbar mb-lg-3 navbar-expand-sm navbar-light bg-light" } $

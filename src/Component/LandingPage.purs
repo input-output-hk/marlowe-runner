@@ -3,18 +3,23 @@ module Component.LandingPage where
 import Prelude
 
 import Component.ConnectWallet (mkConnectWallet)
-import Component.Types (ContractInfo, MkComponentMBase)
+import Component.ConnectWallet as ConnectWallet
+import Component.Types (ContractInfo, MkComponentMBase, WalletInfo)
 import Contrib.React.Svg (SvgUrl(..), svgImg)
 import Data.Map (Map)
 import Data.Maybe (Maybe(..))
+import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Exception (Error)
+import JS.Unsafe.Stringify (unsafeStringify)
 import Marlowe.Runtime.Web.Types as Runtime
-import React.Basic (JSX, fragment)
+import React.Basic (JSX)
 import React.Basic.DOM (text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (handler_)
-import React.Basic.Hooks (component)
+import React.Basic.Hooks (component, useState')
+import React.Basic.Hooks as React
+import Wallet as Wallet
 import WalletContext (WalletContext)
 
 data DisplayOption = Default | About
@@ -32,13 +37,19 @@ newtype AppContractInfoMap = AppContractInfoMap
   }
 
 type Props =
-  { routeToApp :: Effect Unit
+  { setWalletInfo :: WalletInfo Wallet.Api -> Effect Unit
   }
+
+data ConnectionErrors
+  = NoWallets
+  | ConnectionError Error
+
 
 mkLandingPage :: MkComponentMBase () (Props -> JSX)
 mkLandingPage = do
   connectWallet <- mkConnectWallet
-  liftEffect $ component "LandingPage" \{ routeToApp } -> React.do
+  liftEffect $ component "LandingPage" \{ setWalletInfo } -> React.do
+    possibleErrors /\ setErrors <- useState' Nothing
     pure $ DOM.div { className: "mt-6" } $
       [ DOM.div { className: "fixed-top" }
           [ DOM.nav { className: "navbar mb-lg-3 navbar-expand-sm navbar-light bg-light" } $
@@ -55,8 +66,18 @@ mkLandingPage = do
       , DOM.div { className: "container" }
           $ DOM.div { className: "row justify-content-center" }
           $ DOM.div { className: "col-lg-6 col-12" }
-              [ DOM.a { href: "#", onClick: handler_ routeToApp } [ DOOM.text "Go to the app" ]
-              , connectWallet { currentlyConnected: Nothing, onWalletConnect: const $ pure unit, onDismiss: pure unit, inModal: false }
+              [ case possibleErrors of
+                  -- FIXME: Should we present errors on the connectWallet level?
+                  Just NoWallets -> DOOM.text "NO WALLETS?"
+                  Just (ConnectionError err) -> DOOM.text $ unsafeStringify err
+                  Nothing -> connectWallet
+                    { currentlyConnected: Nothing
+                    , onWalletConnect: case _ of
+                        ConnectWallet.Connected walletInfo -> setWalletInfo walletInfo
+                        ConnectWallet.NoWallets -> setErrors $ Just NoWallets
+                        ConnectWallet.ConnectionError err -> setErrors $ Just $ ConnectionError err
+                    , onDismiss: pure unit, inModal: false
+                    }
               ]
       ]
 
