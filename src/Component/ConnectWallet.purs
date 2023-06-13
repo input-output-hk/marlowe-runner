@@ -128,20 +128,35 @@ mkConnectWallet = do
                 , type: Form.RadioButtonField choices
                 }
             , formActions: DOOM.fragment
-                [ link { label: DOOM.text "Cancel", onClick: onDismiss, showBorders: true }
-                , DOOM.button do
-                    let
-                      _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
-                      _name = map $ (_.name <<< unwrap)
-                      selectedIsConnected = _name selectedWallet == _name currentlyConnected
+                if inModal then
+                  [ link { label: DOOM.text "Cancel", onClick: onDismiss, showBorders: true }
+                  , DOOM.button do
+                      let
+                        _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
+                        _name = map $ (_.name <<< unwrap)
+                        selectedIsConnected = _name selectedWallet == _name currentlyConnected
 
-                    { type: "button"
-                    , className: "btn btn-primary"
-                    , onClick: handler_ onSubmit
-                    , disabled: selectedIsConnected
-                    , children: [ DOOM.text "Connect wallet" ]
-                    }
-                ]
+                      { type: "button"
+                      , className: "btn btn-primary"
+                      , onClick: handler_ onSubmit
+                      , disabled: selectedIsConnected
+                      , children: [ DOOM.text "Connect wallet" ]
+                      }
+                  ]
+                else
+                  [ DOOM.button do
+                      let
+                        _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
+                        _name = map $ (_.name <<< unwrap)
+                        selectedIsConnected = _name selectedWallet == _name currentlyConnected
+
+                      { type: "button"
+                      , className: "btn btn-primary"
+                      , onClick: handler_ onSubmit
+                      , disabled: selectedIsConnected
+                      , children: [ DOOM.text "Connect wallet" ]
+                      }
+                  ]
             }
       if inModal then modal
         { onHide: onDismiss -- : setConfiguringWallet false
@@ -150,16 +165,15 @@ mkConnectWallet = do
         -- , title: DOOM.text "Connect wallet"
         , show: true
         }
-        [ modalHeader {} $ DOOM.text "Connect wallet"
+        [ modalHeader {} $ DOOM.text "Choose a wallet"
         , modalBody {} formBody
         , modalFooter {} formActions
         ]
 
       else
-        DOM.div { className: "d-flex flex-column align-items-center" }
-          [ DOM.div { className: "d-flex flex-column align-items-center" }
-              [ DOOM.h2_ [ DOOM.text "Connect wallet" ]
-              , formBody
-              ]
+        DOM.div { className: "card p-5 m-5" }
+          [ DOOM.h2_ [ DOOM.text "Choose a wallet" ]
+          , DOOM.text "Please select a wallet to deploy a contract"
+          , formBody
           , formActions
           ]

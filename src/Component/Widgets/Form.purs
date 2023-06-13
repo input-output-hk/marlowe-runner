@@ -126,8 +126,11 @@ mkSingleChoiceField = do
                 let
                   id = idPrefix <> show idx
                   checked = currValue == value
-                DOM.div { className: "form-check form-switch text-start my-3" }
-                  [ R.input
+                DOM.div { className: "form-check form-switch my-3" }
+                  [ DOM.label
+                      { className: "form-check-label", htmlFor: id }
+                      [ label :: JSX ]
+                  , R.input
                       { className: "form-check-input"
                       , type: inputType
                       , checked
@@ -139,9 +142,6 @@ mkSingleChoiceField = do
                       , disabled
                       , name: "radio"
                       }
-                  , DOM.label
-                      { className: "form-check-label text-start", htmlFor: id }
-                      [ label :: JSX ]
                   ]
             Nothing -> mempty
     pure jsx

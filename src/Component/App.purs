@@ -97,7 +97,8 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Just Eternl -- Nami -- Nothing
+-- debugWallet = Just Eternl -- Nami -- Nothing
+debugWallet = Nothing
 
 data DisplayOption = Default | About
 
@@ -124,7 +125,7 @@ mkApp = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   subcomponents <- do
     contractListComponent <- mkContractList
-   -- eventListComponent <- mkEventList
+    -- eventListComponent <- mkEventList
     connectWallet <- mkConnectWallet
     pure { contractListComponent, connectWallet, messageBox }
 
@@ -222,11 +223,11 @@ mkApp = do
       LandingPage -> landingPage { routeToApp: setCurrentRoute AppPage }
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $ Array.singleton $ DOM.div { className: "mt-6" } $
         [ DOM.div { className: "fixed-top" }
-            [ DOM.nav { className: "navbar mb-lg-3 navbar-expand-sm navbar-light bg-light py-0" } $
+            [ DOM.nav { className: "navbar mb-lg-3 navbar-expand-sm navbar-light bg-light" } $
                 DOM.div { className: "container-xl" }
                   [ DOM.a { href: "#", className: "navbar-brand" }
                       [ svgImg { src: marloweLogoUrl, height: "30px", className: "me-2" }
-                      , DOOM.text "Marlowe Run Lite"
+                      , DOOM.text "marlowe"
                       ]
                   , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
                       [ DOM.ul { className: "navbar-nav gap-2" }
@@ -318,28 +319,28 @@ mkApp = do
               contractArray = Array.fromFoldable contracts
             subcomponents.contractListComponent { contracts: contractArray, connectedWallet: possibleWalletInfo }
 
-  --          [ tabs { fill: true, justify: true, defaultActiveKey: "contracts" }
-  --              [ renderTab
-  --                  { eventKey: "contracts"
-  --                  , title: DOM.div
-  --                      { className: "text-body" }
-  --                      [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.files
-  --                      , DOOM.text "Contracts"
-  --                      ]
-  --                  }
-  --                  $ subcomponents.contractListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
-  --              -- , renderTab
-  --              --     { eventKey: "cash-flows"
-  --              --     , title: DOM.div
-  --              --         { className: "text-body" }
-  --              --         [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.arrowDownShort
-  --              --         , DOOM.text "Apply Inputs"
-  --              --         ]
-  --
-  --              --     }
-  --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
-  --              ]
-  --          ]
+        --          [ tabs { fill: true, justify: true, defaultActiveKey: "contracts" }
+        --              [ renderTab
+        --                  { eventKey: "contracts"
+        --                  , title: DOM.div
+        --                      { className: "text-body" }
+        --                      [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.files
+        --                      , DOOM.text "Contracts"
+        --                      ]
+        --                  }
+        --                  $ subcomponents.contractListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
+        --              -- , renderTab
+        --              --     { eventKey: "cash-flows"
+        --              --     , title: DOM.div
+        --              --         { className: "text-body" }
+        --              --         [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.arrowDownShort
+        --              --         , DOOM.text "Apply Inputs"
+        --              --         ]
+        --
+        --              --     }
+        --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
+        --              ]
+        --          ]
         ]
 
 -- TODO: Currently we ignore role tokens.
@@ -380,4 +381,4 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
   AppContractInfoMap { walletContext, map }
 
 marloweLogoUrl :: SvgUrl
-marloweLogoUrl = SvgUrl "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iNTAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA1MCA2MCI+CiAgICA8ZGVmcz4KICAgICAgICA8cGF0aCBpZD0idG82NzR1ODZhYSIgZD0iTTAgMEw1MCAwIDUwIDYwIDAgNjB6Ii8+CiAgICA8L2RlZnM+CiAgICA8ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPgogICAgICAgIDxnPgogICAgICAgICAgICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtODQ5IC0zNjgpIHRyYW5zbGF0ZSg4NDkgMzY4KSI+CiAgICAgICAgICAgICAgICA8bWFzayBpZD0ibDk5N3EzbWw4YiIgZmlsbD0iI2ZmZiI+CiAgICAgICAgICAgICAgICAgICAgPHVzZSB4bGluazpocmVmPSIjdG82NzR1ODZhYSIvPgogICAgICAgICAgICAgICAgPC9tYXNrPgogICAgICAgICAgICAgICAgPHBhdGggZmlsbD0iIzAwRTM5QyIgZD0iTTUuOTEgNjBjLS41NiAwLTEuMTE3LS4wOC0xLjY1OS0uMjM5LTEuNTEzLS40NDMtMi43NjUtMS40NS0zLjUyMi0yLjgzNi0uNzU4LTEuMzg1LS45MzItMi45ODMtLjQ5LTQuNUwxMS4yIDE0Ljg0NmMuMzYtMS4yMzMgMS4wOTItMi4yOTQgMi4xMTctMy4wNjcgMS4wMjQtLjc3MiAyLjI0NC0xLjE4NCAzLjUyNy0xLjE4OWguMDI0YzEuMjc4IDAgMi40OTYuNDA0IDMuNTIyIDEuMTY3IDEuMDI2Ljc2NCAxLjc2MyAxLjgxNiAyLjEzMiAzLjA0M2wyLjM5NyA3Ljk3NyA1LjQxLTE4LjUyM2MuMzYtMS4yMzMgMS4wOTItMi4yOTQgMi4xMTgtMy4wNjZDMzMuNDcyLjQxNiAzNC42OTIuMDA1IDM1Ljk3NCAwaC4wMjJjMS4yNzkgMCAyLjQ5Ny40MDQgMy41MjMgMS4xNjggMS4wMjYuNzY1IDEuNzYzIDEuODE3IDIuMTMyIDMuMDQ1TDQ5Ljc0NyAzMS4yYy40NTQgMS41MTMuMjkzIDMuMTEzLS40NTQgNC41MDQtLjc0NyAxLjM5Mi0xLjk5IDIuNDA4LTMuNTAxIDIuODYzLS41NTQuMTY3LTEuMTI3LjI1Mi0xLjcwMS4yNTItMS4yNDMgMC0yLjQ4My0uNDA3LTMuNDktMS4xNDYtMS4wNDMtLjc2NS0xLjc5LTEuODI2LTIuMTYzLTMuMDY4bC0yLjM2Ni03Ljg4Ny01LjQwNSAxOC41MDZjLS4zNiAxLjIzNC0xLjA5MiAyLjI5NC0yLjExNyAzLjA2Ni0xLjAyNS43NzItMi4yNDQgMS4xODMtMy41MjcgMS4xODhIMjVjLTEuMjc4IDAtMi40OTYtLjQwMy0zLjUyMi0xLjE2Ny0xLjAyNi0uNzY0LTEuNzYzLTEuODE2LTIuMTMyLTMuMDQybC0yLjM5My03Ljk2NS01LjM3OCAxOC40MzhjLS4zNjUgMS4yNTItMS4xMTEgMi4zMjMtMi4xNTcgMy4wOTdDOC40MDcgNTkuNTg4IDcuMTYxIDYwIDUuOTEgNjAiIG1hc2s9InVybCgjbDk5N3EzbWw4YikiLz4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgIDwvZz4KPC9zdmc+Cg=="
+marloweLogoUrl = SvgUrl "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzciIGhlaWdodD0iNDMiIHZpZXdCb3g9IjAgMCAzNyA0MyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxLjU1MzIgMS43NzIyMkwxOC40ODI1IDBMMC4wNjMyMzI0IDEwLjYzNDlWMzEuOTAzMUwwLjc3MDkwNSAzMi4zMTE2TDMuMTMzODcgMzMuNjc1M0wxOC40ODI1IDQyLjUzNzlMMjQuNjIyMyAzOC45OTM1VjM1LjQ0NzVWMTcuNzIzOEwxMi4zNDI3IDEwLjYzNDlMOS4yNzM2MyAxMi40MDcxTDIxLjU1MzIgMTkuNDk2VjM3LjIxOTdMMTguNDgyNSAzOC45OTM1TDMuMTMzODcgMzAuMTMwOFYxMi40MDcxTDE4LjQ4MjUgMy41NDQ0NUwzMy44MzI3IDEyLjQwNzFWMzMuNjc1M0wzNi45MDE4IDMxLjkwMzFWMTAuNjM0OUwyMS41NTMyIDEuNzcyMjJaIiBmaWxsPSIjNTExQ0Y3Ii8+CjxwYXRoIGQ9Ik0xNS40MTM4IDguODYyNTVMMjcuNjkzMyAxNS45NTE0VjM3LjIxOTZMMzAuNzYyNSAzNS40NDc0VjE0LjE3OTJMMTguNDgyOSA3LjA4ODgxTDE1LjQxMzggOC44NjI1NVoiIGZpbGw9IiM1MTFDRjciLz4KPC9zdmc+Cg=="
