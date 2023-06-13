@@ -6,6 +6,7 @@ import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
 import Component.CreateContract as CreateContract
+import Component.InputHelper (rolesInContract)
 import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
@@ -17,6 +18,7 @@ import Contrib.Fetch (FetchError)
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (encodeJson, stringify)
 import Data.Array as Array
+import Data.Array.NonEmpty as NonEmptyArray
 import Data.Either (Either)
 import Data.Foldable (fold, foldMap)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
@@ -100,7 +102,7 @@ submit witnesses serverUrl transactionEndpoint = do
 data ModalAction
   = NewContract
   | ApplyInputs TransactionsEndpoint V1.Contract V1.State TimeInterval
-  | Withdrawal WithdrawalsEndpoint
+  | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
 
 derive instance Eq ModalAction
 
@@ -184,7 +186,7 @@ mkContractList = do
                 , onSuccess
                 , onDismiss: resetModalAction
                 }
-            Just (Withdrawal withdrawalsEndpoint), Just cw -> do
+            Just (Withdrawal withdrawalsEndpoint roles contractId), Just cw -> do
               let
                 onSuccess = \_ -> do
                   msgHubProps.add $ Success $ DOOM.text $ fold
@@ -193,6 +195,8 @@ mkContractList = do
               withdrawalsComponent
                 { inModal: true
                 , withdrawalsEndpoint
+                , roles
+                , contractId
                 , connectedWallet: cw
                 , onSuccess
                 , onDismiss: resetModalAction
@@ -265,7 +269,7 @@ mkContractList = do
                           ]
                         , DOM.td { className: "text-center" } $ do
                             let
-                              tooltipJSX = tooltip {} (-- DOOM.text $
+                              tooltipJSX = tooltip {} (
                                             case marloweInfo of
                                                 Just (MarloweInfo {currentContract: Just contract, state: Just contractState}) ->
                                                   [DOM.div {} [text $ show contract], DOOM.hr {}, DOM.div {} [text $ prettyState contractState] ]
@@ -291,11 +295,17 @@ mkContractList = do
                                 _, _ -> DOOM.text ""
                             ]
                         , tdCentered
-                            [ linkWithIcon
-                                  { icon: Icons.wallet2
-                                  , label: DOOM.text "Withdrawal"
-                                  , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint
-                                  }
+                            [ case marloweInfo of
+                                Just (MarloweInfo {initialContract, state: _}) ->
+                                  case Array.uncons (rolesInContract initialContract) of
+                                      Just { head, tail } ->
+                                        linkWithIcon
+                                             { icon: Icons.wallet2
+                                             , label: DOOM.text "Withdrawal"
+                                             , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                             }
+                                      _ -> mempty
+                                _ -> DOOM.text "No Marlowe info"
                             ]
                         ]
                 )

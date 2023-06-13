@@ -59,7 +59,7 @@ nextTimeoutAdvance (Environment { timeInterval: TimeInterval startTime _ }) cont
 -- Either possibly incomplete list of role tokens or a complete list.
 -- rolesInContract :: Contract -> Either (Array TokenName) (Array TokenName)
 rolesInContract :: Contract -> Array TokenName
-rolesInContract = foldMapContract (MapStep
+rolesInContract = Array.nub <<< foldMapContract (MapStep
   { mapCase: rolesCases
   , mapContract: rolesContract
   , mapObservation: rolesObservation

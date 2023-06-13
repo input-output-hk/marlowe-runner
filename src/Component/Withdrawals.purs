@@ -4,15 +4,21 @@ import Prelude
 
 import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionObject(..), TransactionWitnessSetObject(..))
+import Component.InputHelper (ChoiceInput(..))
 import Component.Modal (mkModal)
 import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo(..))
+import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError(..))
 import Control.Monad.Reader.Class (asks)
+import Data.Array.ArrayAL as ArrayAL
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.BigInt.Argonaut as BigInt
 import Data.Either (Either(..))
 import Data.FormURLEncoded.Query (Query)
-import Data.Maybe (Maybe(..))
+import Data.FunctorWithIndex (mapWithIndex)
+import Data.Map as Map
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (un)
 import Data.Time.Duration (Seconds(..))
 import Data.Tuple (snd)
@@ -22,9 +28,11 @@ import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
-import Language.Marlowe.Core.V1.Semantics.Types (Ada(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Ada(..), ChoiceId(..)) as V1
 import Marlowe.Runtime.Web.Client (post', put')
-import Marlowe.Runtime.Web.Types (PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), PutWithdrawalRequest(..), Runtime(Runtime), ServerURL(..), TextEnvelope(..), TransactionEndpoint, TxOutRef, WithdrawalEndpoint(..), WithdrawalsEndpoint, toTextEnvelope, txOutRefFromString)
+import Marlowe.Runtime.Web.Types (PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), PutWithdrawalRequest(..), Runtime(Runtime), ServerURL(..), TextEnvelope(..), TransactionEndpoint, TxOutRef, WithdrawalEndpoint(..), WithdrawalsEndpoint, toTextEnvelope, txOutRefFromString, txOutRefToString)
+import Polyform.Batteries as Batteries
+import Polyform.Validator (liftFn, liftFnM, liftFnMaybe)
 import Polyform.Validator as Validator
 import React.Basic (fragment)
 import React.Basic.DOM as DOOM
@@ -34,23 +42,10 @@ import React.Basic.Hooks (JSX, component, useContext, (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseForm (useForm)
 import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (BootstrapForm, requiredV')
+import ReactBootstrap.FormBuilder (BootstrapForm, ChoiceFieldChoices(..), choiceField, radioFieldChoice, requiredV', selectFieldChoice)
 import ReactBootstrap.FormBuilder as FormBuilder
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
-
-mkWithdrawalForm :: BootstrapForm Effect Query { role :: String, contractId :: TxOutRef }
-mkWithdrawalForm = FormBuilder.evalBuilder' ado
-  role <- FormBuilder.textInput 
-    { label: Just (DOOM.text "Role Name")
-    , validator: requiredV' $ Validator.liftFnMaybe (const $ pure "Invalid TxOutRef") Just -- FIXME: no-empty validator
-    }
-  contractId <- FormBuilder.textInput 
-    { label: Just (DOOM.text "Contract Id")
-    , validator: requiredV' $ Validator.liftFnMaybe (const $ pure "Invalid TxOutRef") txOutRefFromString
-    }
-  in
-    { role, contractId }
 
 type Props =
   { inModal :: Boolean
@@ -58,6 +53,8 @@ type Props =
   , onSuccess :: WithdrawalEndpoint -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , withdrawalsEndpoint :: WithdrawalsEndpoint
+  , roles :: NonEmptyArray String
+  , contractId :: TxOutRef
   }
 
 mkComponent :: MkComponentM (Props -> JSX)
@@ -66,16 +63,28 @@ mkComponent = do
   modal <- liftEffect mkModal
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, withdrawalsEndpoint } -> React.do
+  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, roles, contractId, withdrawalsEndpoint } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
 
     let
-      form = mkWithdrawalForm
+      choices = RadioButtonFieldChoices do
+        let toRole idx role = radioFieldChoice (show idx) (DOOM.text role)
+        { switch: true
+        , choices: ArrayAL.fromNonEmptyArray (mapWithIndex toRole roles)
+        }
+
+      form = FormBuilder.evalBuilder' $ ado
+        role <- choiceField
+          { choices
+          , validator: mempty
+          }
+
+        in { role }
 
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
 
-        Just (V (Right { role, contractId }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
+        Just (V (Right { role }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
           let
             withdrawalContext = WithdrawalContext
               { wallet: { changeAddress, usedAddresses }
@@ -107,7 +116,7 @@ mkComponent = do
                 Left err ->
                   traceM $ "Error: " <> show err
             traceM "withdrawal"
-            traceM role
+            -- traceM role
             traceM contractId
             pure unit
         _, _ -> do
