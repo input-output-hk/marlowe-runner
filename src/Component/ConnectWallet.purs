@@ -114,7 +114,7 @@ mkConnectWallet = do
             let
               choices = wallets <#> \(WalletInfo { icon, name }) -> do
                 let
-                  label = DOM.span {}
+                  label = DOM.span { className: "h5" }
                     [ DOOM.img { src: icon, alt: name, className: "w-2rem me-2" }
                     , DOOM.span_ [ DOOM.text name ]
                     ]
@@ -151,10 +151,10 @@ mkConnectWallet = do
                         selectedIsConnected = _name selectedWallet == _name currentlyConnected
 
                       { type: "button"
-                      , className: "btn btn-primary"
+                      , className: "btn btn-primary mt-3"
                       , onClick: handler_ onSubmit
                       , disabled: selectedIsConnected
-                      , children: [ DOOM.text "Connect wallet" ]
+                      , children: [ DOM.p { className: "h4 font-weight-bold" } [ DOOM.text "Connect wallet" ] ]
                       }
                   ]
             }
@@ -172,8 +172,8 @@ mkConnectWallet = do
 
       else
         DOM.div { className: "card p-5 m-5" }
-          [ DOOM.h2_ [ DOOM.text "Choose a wallet" ]
-          , DOOM.text "Please select a wallet to deploy a contract"
+          [ DOM.p { className: "h2 font-weight-bold" } [ DOOM.text "Choose a wallet" ]
+          , DOM.span { className: "h5 text-muted" } [ DOOM.text "Please select a wallet to deploy a contract" ]
           , formBody
           , formActions
           ]

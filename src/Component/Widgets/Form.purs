@@ -126,23 +126,47 @@ mkSingleChoiceField = do
                 let
                   id = idPrefix <> show idx
                   checked = currValue == value
-                DOM.div { className: "form-check form-switch my-3" }
-                  [ DOM.label
-                      { className: "form-check-label", htmlFor: id }
-                      [ label :: JSX ]
-                  , R.input
-                      { className: "form-check-input"
-                      , type: inputType
-                      , checked
-                      , id: id
-                      -- This `if` covers single checkbox case
-                      , onChange: handler_
-                          if checked then onChange ""
-                          else onChange value
-                      , disabled
-                      , name: "radio"
-                      }
+                DOM.div { className: "form-check form-switch my-3 p-0" }
+                  [ DOM.div { className: "row" }
+                      [ DOM.div { className: "col-6" }
+                          [ DOM.label
+                              { className: "form-check-label", htmlFor: id }
+                              [ label :: JSX ]
+                          ]
+                      , DOM.div { className: "col-6 d-flex justify-content-end" }
+                          [ R.input
+                              { className: "form-check-input large-switch"
+                              , type: inputType
+                              , checked
+                              , id: id
+                              -- This `if` covers single checkbox case
+                              , onChange: handler_
+                                  if checked then onChange ""
+                                  else onChange value
+                              , disabled
+                              , name: "radio"
+                              }
+                          ]
+                      ]
                   ]
+
+            -- DOM.div { className: "form-check form-switch my-3" }
+            --   [ DOM.label
+            --       { className: "form-check-label", htmlFor: id }
+            --       [ label :: JSX ]
+            --   , R.input
+            --       { className: "form-check-input"
+            --       , type: inputType
+            --       , checked
+            --       , id: id
+            --       -- This `if` covers single checkbox case
+            --       , onChange: handler_
+            --           if checked then onChange ""
+            --           else onChange value
+            --       , disabled
+            --       , name: "radio"
+            --       }
+            --   ]
             Nothing -> mempty
     pure jsx
 
