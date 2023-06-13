@@ -157,7 +157,6 @@ mkConnectWallet = do
                       , children: [ DOOM.text "Connect wallet" ]
                       }
                   ]
-
             }
       if inModal then modal
         { onHide: onDismiss -- : setConfiguringWallet false
@@ -172,7 +171,7 @@ mkConnectWallet = do
         ]
 
       else
-        DOM.div { className: "card p-3 m-3" }
+        DOM.div { className: "card p-5 m-5" }
           [ DOOM.h2_ [ DOOM.text "Choose a wallet" ]
           , DOOM.text "Please select a wallet to deploy a contract"
           , formBody
