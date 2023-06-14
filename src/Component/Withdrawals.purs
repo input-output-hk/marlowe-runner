@@ -13,10 +13,12 @@ import Contrib.Fetch (FetchError(..))
 import Control.Monad.Reader.Class (asks)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NonEmptyArray
 import Data.BigInt.Argonaut as BigInt
 import Data.Either (Either(..))
 import Data.FormURLEncoded.Query (Query)
 import Data.FunctorWithIndex (mapWithIndex)
+import Data.Int (fromString)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (un)
@@ -73,10 +75,12 @@ mkComponent = do
         , choices: ArrayAL.fromNonEmptyArray (mapWithIndex toRole roles)
         }
 
+      rolesMap = Map.fromFoldableWithIndex roles
       form = FormBuilder.evalBuilder' $ ado
         role <- choiceField
           { choices
-          , validator: mempty
+          , validator: liftFn \idx ->
+              fromMaybe "" (idx >>= fromString >>= flip Map.lookup rolesMap)
           }
 
         in { role }
