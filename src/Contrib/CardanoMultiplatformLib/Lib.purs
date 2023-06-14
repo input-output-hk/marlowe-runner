@@ -9,6 +9,7 @@ import CardanoMultiplatformLib.Transaction as Transaction
 
 type Props =
   { "Address" :: Address.Address
+  , "Value" :: Transaction.Value
   , "Transaction" :: Transaction.Transaction
   , "TransactionWitnessSet" :: Transaction.TransactionWitnessSet
   , "TransactionBody" :: Transaction.TransactionBody
@@ -17,6 +18,7 @@ type Props =
 
 newtype Lib = Lib
   { "Address" :: Address.Address
+  , "Value" :: Transaction.Value
   , "Transaction" :: Transaction.Transaction
   , "TransactionWitnessSet" :: Transaction.TransactionWitnessSet
   , "TransactionBody" :: Transaction.TransactionBody

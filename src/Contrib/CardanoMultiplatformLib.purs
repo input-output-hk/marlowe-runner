@@ -20,8 +20,9 @@ import CardanoMultiplatformLib.Address as Address
 import CardanoMultiplatformLib.Lib (Lib)
 import CardanoMultiplatformLib.Lib (Lib) as Exports
 import CardanoMultiplatformLib.Lib as Lib
-import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
+import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject, ValueObject(..), valueObject)
 import CardanoMultiplatformLib.Transaction as Transaction
+import CardanoMultiplatformLib.Transaction as Value
 import CardanoMultiplatformLib.Types (Bech32, Cbor, CborHex, cborHexToCbor, unsafeBech32)
 import CardanoMultiplatformLib.Types (CborHex(..), Bech32, cborToCborHex, cborHexToHex, bech32ToString) as Exports
 import Control.Monad.Error.Class (throwError)
@@ -111,6 +112,12 @@ transactionWitnessSetFromBytes :: Cbor TransactionWitnessSetObject -> GarbageCol
 transactionWitnessSetFromBytes twCbor = do
   { "TransactionWitnessSet": tws } <- GarbageCollector $ asks (Lib.props <<< _.lib)
   allocate $ Transaction.transactionWitnessSet.from_bytes tws twCbor
+
+valueFromCbor :: Cbor ValueObject -> GarbageCollector (Cbor ValueObject)
+valueFromCbor cbor = do
+  { "Value": addrClass } <- GarbageCollector $ asks (Lib.props <<< _.lib)
+  valObject <- allocate $ Value.value.from_bytes addrClass cbor
+  liftEffect $ valueObject.to_bytes valObject
 
 bech32FromCbor :: Cbor AddressObject -> Opt String -> GarbageCollector Bech32
 bech32FromCbor cbor prefix = do
