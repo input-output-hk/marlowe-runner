@@ -26,11 +26,16 @@ import Data.Foldable (fold, foldMap)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
 import Data.Int as Int
+import Data.List (concat)
+import Data.List as List
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (un)
+import Data.Set as Set
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
+import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\))
 import Debug (traceM)
 import Effect (Effect)
@@ -49,7 +54,7 @@ import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, handler)
-import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useState, useState', (/\))
+import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useState, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import React.Basic.Hooks.UseForm (useForm)
@@ -63,6 +68,7 @@ import ReactBootstrap.Table (table)
 import ReactBootstrap.Types as OverlayTrigger
 import Utils.React.Basic.Hooks (useMaybeValue', useStateRef')
 import Wallet as Wallet
+import WalletContext (WalletContext(..))
 
 type ContractId = TxOutRef
 
@@ -129,6 +135,7 @@ mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
   Runtime runtime <- asks _.runtime
+  walletInfoCtx <- asks _.walletInfoCtx
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
   createContractComponent <- CreateContract.mkComponent
@@ -136,6 +143,8 @@ mkContractList = do
   withdrawalsComponent <- Withdrawals.mkComponent
 
   liftEffect $ component "ContractList" \{ connectedWallet, contracts } -> React.do
+    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
+
     possibleModalAction /\ setModalAction /\ resetModalAction <- useMaybeValue'
     possibleModalActionRef <- useStateRef' possibleModalAction
     ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
@@ -148,26 +157,6 @@ mkContractList = do
       , validationDebounce: Seconds 0.5
       }
 
-    roleTokensFromWallet <- useAff unit do
-      case connectedWallet of
-          Just (WalletInfo { wallet : walletApi }) -> do
-              Wallet.getBalance walletApi >>= case _ of
-                Right valueCborHex -> do
-                   -- Value.value.from_bytes Value.Value value
-                  let
-                    valueCbor :: Cbor ValueObject
-                    valueCbor = cborHexToCbor valueCborHex
-                  traceM "Value from wallet"
-                  json <- liftEffect $ runGarbageCollector cardanoMultiplatformLib $ valueFromCbor valueCbor
-                  traceM json
-
-                  pure ["sadf"] -- value
-                Left err -> do
-                   traceM err
-                   pure []
-          _ -> pure []
-
-    traceM roleTokensFromWallet
     let
       contracts' = do
         let
@@ -322,10 +311,12 @@ mkContractList = do
                         , tdCentered
                             [ case marloweInfo of
                                 Just (MarloweInfo {initialContract, state: _}) ->
-                                  case roleTokensFromWallet of
-                                      Just roleTokens ->
-                                        let rolesFromContract = rolesInContract initialContract
-                                         in case Array.uncons (Array.intersect roleTokens rolesFromContract) of
+                                  case possibleWalletContext of
+                                      Just { balance } -> do
+                                        let
+                                          rolesFromContract = rolesInContract initialContract
+                                          roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
+                                        case Array.uncons (Array.intersect roleTokens rolesFromContract) of
                                             Just { head, tail } ->
                                               linkWithIcon
                                                    { icon: Icons.wallet2
@@ -333,7 +324,7 @@ mkContractList = do
                                                    , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
                                                    }
                                             _ -> mempty
-                                      _ -> mempty
+                                      Nothing -> mempty
                                 _ -> DOOM.text "No Marlowe info"
                             ]
                         ]
