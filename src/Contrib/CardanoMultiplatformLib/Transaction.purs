@@ -815,8 +815,8 @@ newtype AssetsObject = AssetsObject
     , to_json :: EffectMth0 JsonString
     , to_js_value :: EffectMth0 Json
     , len :: EffectMth0 Int
-    -- , insert :: EffectMth2 AssetName BigNum (Opt BigNum)
-    -- , get :: EffectMth1 AssetName (Opt BigNum)
+    , insert :: EffectMth2 AssetName BigNum (Opt BigNum)
+    , get :: EffectMth1 AssetName (Opt BigNum)
     , keys :: EffectMth0 AssetNames
     )
   )
@@ -829,8 +829,8 @@ assetsObject
      , to_json :: AssetsObject -> Effect JsonString
      , to_js_value :: AssetsObject -> Effect Json
      , len :: AssetsObject -> Effect Int
-     -- , insert :: AssetsObject -> AssetName -> BigNum -> Effect (Opt BigNum)
-     -- , get :: AssetsObject -> AssetName -> Effect (Opt BigNum)
+     , insert :: AssetsObject -> AssetName -> BigNum -> Effect (Opt BigNum)
+     , get :: AssetsObject -> AssetName -> Effect (Opt BigNum)
      , keys :: AssetsObject -> Effect AssetNames
      }
 assetsObject = mkNewtypedFFI (Proxy :: Proxy AssetsObject)
@@ -1147,5 +1147,183 @@ transactionUnspentOutputObject = mkNewtypedFFI (Proxy :: Proxy TransactionUnspen
 -- Just a stub
 foreign import data TransactionHashObject :: Type
 
+-- export class BigNum {
+--   free(): void;
+-- /**
+-- * @returns {Uint8Array}
+-- */
+--   to_bytes(): Uint8Array;
+-- /**
+-- * @param {Uint8Array} bytes
+-- * @returns {BigNum}
+-- */
+--   static from_bytes(bytes: Uint8Array): BigNum;
+-- /**
+-- * @param {string} string
+-- * @returns {BigNum}
+-- */
+--   static from_str(string: string): BigNum;
+-- /**
+-- * @returns {string}
+-- */
+--   to_str(): string;
+-- /**
+-- * @returns {BigNum}
+-- */
+--   static zero(): BigNum;
+-- /**
+-- * @returns {boolean}
+-- */
+--   is_zero(): boolean;
+-- /**
+-- * @param {BigNum} other
+-- * @returns {BigNum}
+-- */
+--   checked_mul(other: BigNum): BigNum;
+-- /**
+-- * @param {BigNum} other
+-- * @returns {BigNum}
+-- */
+--   checked_add(other: BigNum): BigNum;
+-- /**
+-- * @param {BigNum} other
+-- * @returns {BigNum}
+-- */
+--   checked_sub(other: BigNum): BigNum;
+-- /**
+-- * returns 0 if it would otherwise underflow
+-- * @param {BigNum} other
+-- * @returns {BigNum}
+-- */
+--   clamped_sub(other: BigNum): BigNum;
+-- /**
+-- * @param {BigNum} other
+-- * @returns {BigNum}
+-- */
+--   checked_div(other: BigNum): BigNum;
+-- /**
+-- * @param {BigNum} other
+-- * @returns {BigNum}
+-- */
+--   checked_div_ceil(other: BigNum): BigNum;
+-- /**
+-- * @param {BigNum} rhs_value
+-- * @returns {number}
+-- */
+--   compare(rhs_value: BigNum): number;
+-- }
 
+newtype BigNum = BigNum
+  ( JSObject
+      ( from_bytes :: EffectMth1 (Cbor BigNumObject) BigNumObject
+      , from_str :: EffectMth1 String BigNumObject
+      , to_str :: EffectMth0 String
+      )
+  )
+
+derive instance Newtype BigNum _
+
+bigNum
+  :: { from_bytes :: BigNum -> (Cbor BigNumObject) -> Effect BigNumObject
+     , from_str :: BigNum -> String -> Effect BigNumObject
+     , to_str :: BigNum -> Effect String
+     }
+bigNum = mkNewtypedFFI (Proxy :: Proxy BigNum)
+
+newtype BigNumObject = BigNumObject
+  ( JSObject
+      ( free :: EffectMth0 Unit
+      , to_bytes :: EffectMth0 Uint8Array
+      , is_zero :: EffectMth0 Boolean
+      , checked_mul :: EffectMth1 BigNum BigNum
+      , checked_add :: EffectMth1 BigNum BigNum
+      , checked_sub :: EffectMth1 BigNum BigNum
+      , clamped_sub :: EffectMth1 BigNum BigNum
+      , checked_div :: EffectMth1 BigNum BigNum
+      , checked_div_ceil :: EffectMth1 BigNum BigNum
+      , compare :: EffectMth1 BigNum Number
+      )
+  )
+
+derive instance Newtype BigNumObject _
+
+bigNumObject
+  :: { free :: BigNumObject -> Effect Unit
+     , to_bytes :: BigNumObject -> Effect Uint8Array
+     , is_zero :: BigNumObject -> Effect Boolean
+     , checked_mul :: BigNumObject -> BigNum -> Effect BigNum
+     , checked_add :: BigNumObject -> BigNum -> Effect BigNum
+     , checked_sub :: BigNumObject -> BigNum -> Effect BigNum
+     , clamped_sub :: BigNumObject -> BigNum -> Effect BigNum
+     , checked_div :: BigNumObject -> BigNum -> Effect BigNum
+     , checked_div_ceil :: BigNumObject -> BigNum -> Effect BigNum
+     , compare :: BigNumObject -> BigNum -> Effect Number
+     }
+bigNumObject = mkNewtypedFFI (Proxy :: Proxy BigNumObject)
+
+-- export class BigInt {
+--   free(): void;
+-- /**
+-- * @returns {Uint8Array}
+-- */
+--   to_bytes(): Uint8Array;
+-- /**
+-- * @param {Uint8Array} bytes
+-- * @returns {BigInt}
+-- */
+--   static from_bytes(bytes: Uint8Array): BigInt;
+-- /**
+-- * @returns {BigNum | undefined}
+-- */
+--   as_u64(): BigNum | undefined;
+-- /**
+-- * @returns {Int | undefined}
+-- */
+--   as_int(): Int | undefined;
+-- /**
+-- * @param {string} string
+-- * @returns {BigInt}
+-- */
+--   static from_str(string: string): BigInt;
+-- /**
+-- * @returns {string}
+-- */
+--   to_str(): string;
+-- }
+
+newtype BigInt = BigInt
+  ( JSObject
+      ( from_bytes :: EffectMth1 (Cbor BigIntObject) BigIntObject
+      , from_str :: EffectMth1 String BigIntObject
+      )
+  )
+
+derive instance Newtype BigInt _
+
+bigInt ::
+  { from_bytes :: BigInt -> (Cbor BigIntObject) -> Effect BigIntObject
+  , from_str :: BigInt -> String -> Effect BigIntObject
+  }
+bigInt = mkNewtypedFFI (Proxy :: Proxy BigInt)
+
+newtype BigIntObject = BigIntObject
+  ( JSObject
+      ( free :: EffectMth0 Unit
+      , to_bytes :: EffectMth0 Uint8Array
+      , as_u64 :: EffectMth0 (Opt BigNumObject)
+      , as_int :: EffectMth0 (Opt BigIntObject)
+      , to_str :: EffectMth0 String
+      )
+  )
+
+derive instance Newtype BigIntObject _
+
+bigIntObject ::
+  { free :: BigIntObject -> Effect Unit
+  , to_bytes :: BigIntObject -> Effect Uint8Array
+  , as_u64 :: BigIntObject -> Effect (Opt BigNumObject)
+  , as_int :: BigIntObject -> Effect (Opt BigIntObject)
+  , to_str :: BigIntObject -> Effect String
+  }
+bigIntObject = mkNewtypedFFI (Proxy :: Proxy BigIntObject)
 
