@@ -431,8 +431,8 @@ newtype ValueObject = ValueObject
       , to_json :: EffectMth0 JsonString
       , to_js_value :: EffectMth0 Json
       , is_zero :: EffectMth0 Boolean
-      -- , coin :: EffectMth0 BigNum
-      -- , set_coin :: EffectMth1 BigNum Unit
+      , coin :: EffectMth0 BigNum
+      , set_coin :: EffectMth1 BigNum Unit
       , multiasset :: EffectMth0 (Opt MultiAssetObject)
       , set_multiasset :: EffectMth1 MultiAssetObject Unit
       , checked_add :: EffectMth1 ValueObject ValueObject
@@ -450,8 +450,8 @@ valueObject
      , to_json :: ValueObject -> Effect JsonString
      , to_js_value :: ValueObject -> Effect Json
      , is_zero :: ValueObject -> Effect Boolean
-     -- , coin :: ValueObject -> Effect BigNum
-     -- , set_coin :: ValueObject -> BigNum -> Effect Unit
+     , coin :: ValueObject -> Effect BigNum
+     , set_coin :: ValueObject -> BigNum -> Effect Unit
      , multiasset :: ValueObject -> Effect (Opt MultiAssetObject)
      , set_multiasset :: ValueObject -> MultiAssetObject -> Effect Unit
      , checked_add :: ValueObject -> ValueObject -> Effect ValueObject
@@ -562,11 +562,11 @@ newtype MultiAssetObject = MultiAssetObject
     , to_json :: EffectMth0 JsonString
     , to_js_value :: EffectMth0 Json
     , len :: EffectMth0 Int
-    , insert :: EffectMth2 ScriptHash Assets (Opt Assets)
-    , get :: EffectMth1 ScriptHash (Opt Assets)
-    -- , set_asset :: EffectMth3 ScriptHash AssetName BigNum (Opt BigNum)
-    -- , get_asset :: EffectMth2 ScriptHash AssetName BigNum
-    , keys :: EffectMth0 ScriptHashes
+    , insert :: EffectMth2 ScriptHashObject AssetsObject (Opt AssetsObject)
+    , get :: EffectMth1 ScriptHashObject (Opt AssetsObject)
+    , set_asset :: EffectMth3 ScriptHashObject AssetNameObject BigNumObject (Opt BigNumObject)
+    , get_asset :: EffectMth2 ScriptHashObject AssetNameObject BigNumObject
+    , keys :: EffectMth0 ScriptHashesObject
     , sub :: EffectMth1 MultiAssetObject MultiAssetObject
     )
   )
@@ -579,11 +579,11 @@ multiAssetObject
      , to_json :: MultiAssetObject -> Effect JsonString
      , to_js_value :: MultiAssetObject -> Effect Json
      , len :: MultiAssetObject -> Effect Int
-     , insert :: MultiAssetObject -> ScriptHash -> Assets -> Effect (Opt Assets)
-     , get :: MultiAssetObject -> ScriptHash -> Effect (Opt Assets)
-     -- , set_asset :: MultiAssetObject -> ScriptHash -> AssetName -> BigNum -> Effect (Opt BigNum)
-     -- , get_asset :: MultiAssetObject -> ScriptHash -> AssetName -> Effect BigNum
-     , keys :: MultiAssetObject -> Effect ScriptHashes
+     , insert :: MultiAssetObject -> ScriptHashObject -> AssetsObject -> Effect (Opt AssetsObject)
+     , get :: MultiAssetObject -> ScriptHashObject -> Effect (Opt AssetsObject)
+     , set_asset :: MultiAssetObject -> ScriptHashObject -> AssetNameObject -> BigNumObject -> Effect (Opt BigNumObject)
+     , get_asset :: MultiAssetObject -> ScriptHashObject -> AssetNameObject -> Effect BigNumObject
+     , keys :: MultiAssetObject -> Effect ScriptHashesObject
      , sub :: MultiAssetObject -> MultiAssetObject -> Effect MultiAssetObject
      }
 multiAssetObject = mkNewtypedFFI (Proxy :: Proxy MultiAssetObject)
@@ -723,8 +723,8 @@ newtype ScriptHashesObject = ScriptHashesObject
     , to_json :: EffectMth0 JsonString
     , to_js_value :: EffectMth0 Json
     , len :: EffectMth0 Int
-    , get :: EffectMth1 Int ScriptHash
-    , add :: EffectMth1 ScriptHash Unit
+    , get :: EffectMth1 Int ScriptHashObject
+    , add :: EffectMth1 ScriptHashObject Unit
     )
   )
 
@@ -736,8 +736,8 @@ scriptHashesObject
      , to_json :: ScriptHashesObject -> Effect JsonString
      , to_js_value :: ScriptHashesObject -> Effect Json
      , len :: ScriptHashesObject -> Effect Int
-     , get :: ScriptHashesObject -> Int -> Effect ScriptHash
-     , add :: ScriptHashesObject -> ScriptHash -> Effect Unit
+     , get :: ScriptHashesObject -> Int -> Effect ScriptHashObject
+     , add :: ScriptHashesObject -> ScriptHashObject -> Effect Unit
      }
 scriptHashesObject = mkNewtypedFFI (Proxy :: Proxy ScriptHashesObject)
 
@@ -815,9 +815,9 @@ newtype AssetsObject = AssetsObject
     , to_json :: EffectMth0 JsonString
     , to_js_value :: EffectMth0 Json
     , len :: EffectMth0 Int
-    , insert :: EffectMth2 AssetName BigNum (Opt BigNum)
-    , get :: EffectMth1 AssetName (Opt BigNum)
-    , keys :: EffectMth0 AssetNames
+    , insert :: EffectMth2 AssetNameObject BigNum (Opt BigNum)
+    , get :: EffectMth1 AssetNameObject (Opt BigNum)
+    , keys :: EffectMth0 AssetNamesObject
     )
   )
 
@@ -829,9 +829,9 @@ assetsObject
      , to_json :: AssetsObject -> Effect JsonString
      , to_js_value :: AssetsObject -> Effect Json
      , len :: AssetsObject -> Effect Int
-     , insert :: AssetsObject -> AssetName -> BigNum -> Effect (Opt BigNum)
-     , get :: AssetsObject -> AssetName -> Effect (Opt BigNum)
-     , keys :: AssetsObject -> Effect AssetNames
+     , insert :: AssetsObject -> AssetNameObject -> BigNum -> Effect (Opt BigNum)
+     , get :: AssetsObject -> AssetNameObject -> Effect (Opt BigNum)
+     , keys :: AssetsObject -> Effect AssetNamesObject
      }
 assetsObject = mkNewtypedFFI (Proxy :: Proxy AssetsObject)
 
@@ -976,8 +976,8 @@ newtype AssetNamesObject = AssetNamesObject
     , to_json :: EffectMth0 JsonString
     , to_js_value :: EffectMth0 Json
     , len :: EffectMth0 Int
-    , get :: EffectMth1 Int AssetName
-    , add :: EffectMth1 AssetName Unit
+    , get :: EffectMth1 Int AssetNameObject
+    , add :: EffectMth1 AssetNameObject Unit
     )
   )
 
@@ -989,8 +989,8 @@ assetNamesObject ::
   , to_json :: AssetNamesObject -> Effect JsonString
   , to_js_value :: AssetNamesObject -> Effect Json
   , len :: AssetNamesObject -> Effect Int
-  , get :: AssetNamesObject -> Int -> Effect AssetName
-  , add :: AssetNamesObject -> AssetName -> Effect Unit
+  , get :: AssetNamesObject -> Int -> Effect AssetNameObject
+  , add :: AssetNamesObject -> AssetNameObject -> Effect Unit
   }
 assetNamesObject = mkNewtypedFFI (Proxy :: Proxy AssetNamesObject)
 
@@ -1217,7 +1217,6 @@ newtype BigNum = BigNum
   ( JSObject
       ( from_bytes :: EffectMth1 (Cbor BigNumObject) BigNumObject
       , from_str :: EffectMth1 String BigNumObject
-      , to_str :: EffectMth0 String
       )
   )
 
@@ -1226,7 +1225,6 @@ derive instance Newtype BigNum _
 bigNum
   :: { from_bytes :: BigNum -> (Cbor BigNumObject) -> Effect BigNumObject
      , from_str :: BigNum -> String -> Effect BigNumObject
-     , to_str :: BigNum -> Effect String
      }
 bigNum = mkNewtypedFFI (Proxy :: Proxy BigNum)
 
@@ -1234,6 +1232,7 @@ newtype BigNumObject = BigNumObject
   ( JSObject
       ( free :: EffectMth0 Unit
       , to_bytes :: EffectMth0 Uint8Array
+      , to_str :: EffectMth0 String
       , is_zero :: EffectMth0 Boolean
       , checked_mul :: EffectMth1 BigNum BigNum
       , checked_add :: EffectMth1 BigNum BigNum
@@ -1250,6 +1249,7 @@ derive instance Newtype BigNumObject _
 bigNumObject
   :: { free :: BigNumObject -> Effect Unit
      , to_bytes :: BigNumObject -> Effect Uint8Array
+     , to_str :: BigNumObject -> Effect String
      , is_zero :: BigNumObject -> Effect Boolean
      , checked_mul :: BigNumObject -> BigNum -> Effect BigNum
      , checked_add :: BigNumObject -> BigNum -> Effect BigNum

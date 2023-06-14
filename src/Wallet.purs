@@ -13,7 +13,6 @@ module Wallet
   , TxSignError
   , TransactionUnspentOutput
   , UnknownError
-  , Value(..)
   , Wallet
   , apiVersion
   , cardano
@@ -46,7 +45,7 @@ import Prelude
 
 import CardanoMultiplatformLib (AddressObject, Bech32, CborHex, bech32FromCborHex, bech32FromString, runGarbageCollector)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
-import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionUnspentOutputObject, TransactionWitnessSetObject, TransactionHashObject)
+import CardanoMultiplatformLib.Transaction (TransactionHashObject, TransactionObject, TransactionUnspentOutputObject, TransactionWitnessSetObject, ValueObject)
 import CardanoMultiplatformLib.Types (unsafeCborHex)
 import Control.Alt ((<|>))
 import Control.Monad.Except (runExcept, runExceptT)
@@ -85,8 +84,6 @@ data TransactionUnspentOutput
 data Coin
 
 data Transaction
-
-data Value
 
 data HashObject32
 
@@ -202,7 +199,7 @@ type Api = JSObject
   ( getNetworkId :: EffectMth0 (Promise Int)
   , getUtxos :: EffectMth0 (Promise (Nullable (Array (CborHex TransactionUnspentOutputObject))))
   , getCollateral :: EffectMth1 (Cbor Coin) (Promise (Nullable (Array (Cbor TransactionUnspentOutput))))
-  , getBalance :: EffectMth0 (Promise (Cbor Value))
+  , getBalance :: EffectMth0 (Promise (CborHex ValueObject))
   , getUsedAddresses :: EffectMth0 (Promise (Array SomeAddress))
   , getUnusedAddresses :: EffectMth0 (Promise (Array (CborHex AddressObject)))
   , getChangeAddress :: EffectMth0 (Promise SomeAddress)
@@ -213,7 +210,7 @@ type Api = JSObject
   )
 
 _Api
-  :: { getBalance :: Api -> Effect (Promise (Cbor Value))
+  :: { getBalance :: Api -> Effect (Promise (CborHex ValueObject))
      , getChangeAddress :: Api -> Effect (Promise SomeAddress)
      , getCollateral :: Api -> Cbor Coin -> Effect (Promise (Nullable (Array (Cbor TransactionUnspentOutput))))
      , getNetworkId :: Api -> Effect (Promise Int)
@@ -337,7 +334,7 @@ getNetworkId :: forall r. Api -> Aff (Either (Variant (| ApiError + ApiForeignEr
 getNetworkId = toAffEitherE rejectionAPIError <<< _Api.getNetworkId
 
 -- | Manually tested and works with Nami.
-getBalance :: forall r. Api -> Aff (Either (Variant (| ApiError + ApiForeignErrors + UnknownError r)) (Cbor Value))
+getBalance :: forall r. Api -> Aff (Either (Variant (| ApiError + ApiForeignErrors + UnknownError r)) (CborHex ValueObject))
 getBalance = toAffEitherE rejectionAPIError <<< _Api.getBalance
 
 -- | Manually tested and works with Nami.

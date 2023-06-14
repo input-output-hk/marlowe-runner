@@ -2,9 +2,10 @@ module Component.ContractList where
 
 import Prelude
 
-import CardanoMultiplatformLib (CborHex)
-import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
+import CardanoMultiplatformLib (CborHex, runGarbageCollector, valueFromCbor)
+import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject, ValueObject(..))
 import CardanoMultiplatformLib.Transaction as Value
+import CardanoMultiplatformLib.Types (Cbor, cborHexToCbor)
 import Component.ApplyInputs as ApplyInputs
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
@@ -128,6 +129,7 @@ mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
   Runtime runtime <- asks _.runtime
+  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
   createContractComponent <- CreateContract.mkComponent
   applyInputsComponent <- ApplyInputs.mkComponent
@@ -150,11 +152,16 @@ mkContractList = do
       case connectedWallet of
           Just (WalletInfo { wallet : walletApi }) -> do
               Wallet.getBalance walletApi >>= case _ of
-                Right value -> do
+                Right valueCborHex -> do
                    -- Value.value.from_bytes Value.Value value
-                   traceM value
+                  let
+                    valueCbor :: Cbor ValueObject
+                    valueCbor = cborHexToCbor valueCborHex
+                  traceM "Value from wallet"
+                  json <- liftEffect $ runGarbageCollector cardanoMultiplatformLib $ valueFromCbor valueCbor
+                  traceM json
 
-                   pure ["sadf"] -- value
+                  pure ["sadf"] -- value
                 Left err -> do
                    traceM err
                    pure []
