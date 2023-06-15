@@ -6,6 +6,7 @@
     "@dcspark/cardano-multiplatform-lib-nodejs": "^3.1.2",
     "@emurgo/cardano-message-signing-browser": "^1.0.1",
     "@emurgo/cardano-message-signing-nodejs": "^1.0.1",
+    "@types/react-dom": "^18.2.4",
     "big-integer": "^1.6.51",
     "bip39": "^3.0.4",
     "bootstrap": "^5.2.3",
@@ -26,13 +27,14 @@
     "react-icons": "^4.7.1",
     "react-markdown": "^8.0.5",
     "react-syntax-highlighter": "^15.5.0",
+    "reactflow": "^11.7.2",
     "remark-html": "^15.0.1",
     "remark-loader": "^5.0.0",
     "sass": "^1.57.1",
     "sass-loader": "^13.2.0",
     "style-loader": "^3.3.1",
     "tiny-secp256k1": "^2.2.1",
-    "typescript": "^4.9.5",
+    "typescript": "^5.1.3",
     "typescript-language-server": "^3.1.0",
     "webpack": "^5.75.0",
     "webpack-dev-server": "^4.11.1"
@@ -40,6 +42,7 @@
   "devDependencies": {
     "esbuild": "^0.15.18",
     "express": "^4.18.2",
+    "live-server": "^1.2.2",
     "webpack-cli": "^5.0.1"
   },
   "type": "module",

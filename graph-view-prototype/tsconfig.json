@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "jsx": "react",
+    "strict": true,
+    "rootDir": "./"
+  },
+  "exclude": ["node_modules"]
+}
