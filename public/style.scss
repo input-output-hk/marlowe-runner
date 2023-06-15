@@ -77,6 +77,21 @@ $link-color: #511CF7;
   backdrop-filter: blur(5px);
 }
 
+.footer {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+
+.no-scroll {
+  overflow: hidden;
+  height: 100%;
+}
+.form-control {
+  height: 46px;
+}
+
+
 $utilities: map-merge(
   $utilities, (
     "text-decoration": (

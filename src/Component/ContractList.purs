@@ -56,7 +56,7 @@ import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, handler)
-import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useState, useState', (/\))
+import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useEffect, useState, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import React.Basic.Hooks.UseForm (useForm)
@@ -160,7 +160,6 @@ mkContractList = do
       , onSubmit: const $ pure unit
       , validationDebounce: Seconds 0.5
       }
-
     let
       contracts' = do
         let

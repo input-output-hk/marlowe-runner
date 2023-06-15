@@ -5,6 +5,7 @@ import Prelude
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (mkContractList)
+import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
@@ -331,6 +332,7 @@ mkApp = do
         --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
         --              ]
         --          ]
+        , footer
         ]
 
 -- TODO: Currently we ignore role tokens.
