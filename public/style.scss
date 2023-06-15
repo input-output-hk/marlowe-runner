@@ -1,5 +1,6 @@
 $font-family-base: 'Outfit', sans-serif;
 $primary: #511CF7;
+$sucess: #00C48C;
 $navbar-light-color: #F6F7FF;
 $navbar-light-bg: #F6F7FF;
 $link-color: #511CF7;
@@ -34,6 +35,10 @@ $link-color: #511CF7;
 
 .disabled-color {
   color: #BDBDBD;
+}
+
+.success-color {
+  color: $sucess;
 }
 
 .loading {

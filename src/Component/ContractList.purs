@@ -311,7 +311,7 @@ mkContractList = do
                                       setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState interval
                                   }
                                 _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                  { icon: unsafeIcon "file-earmark-check-fill h2"
+                                  { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
                                   , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
                                   , label: mempty
                                   , onClick: mempty
