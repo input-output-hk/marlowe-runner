@@ -221,7 +221,7 @@ mkContractList = do
                 , onDismiss: resetModalAction
                 }
             _, _ -> mempty
-        , DOM.div { className: "row" } do
+        , DOM.div { className: "row position-sticky top-0 bg-white pt-5 shadow-bottom mb-5" } do
             let
               disabled = isNothing connectedWallet
               newContractButton = buttonWithIcon
