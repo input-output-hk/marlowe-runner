@@ -225,7 +225,7 @@ mkContractList = do
             let
               disabled = isNothing connectedWallet
               newContractButton = buttonWithIcon
-                { icon: Icons.fileEarmarkPlus
+                { icon: unsafeIcon "file-earmark-plus h5 mr-2"
                 , label: DOOM.text "New Contract"
                 , extraClassNames: "font-weight-bold"
                 , disabled
