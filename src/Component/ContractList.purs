@@ -48,6 +48,7 @@ import Marlowe.Runtime.Web.Client (put')
 import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), PutTransactionRequest(..), Runtime(..), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalEndpoint(..), WithdrawalsEndpoint(..), toTextEnvelope, txOutRefToString, txOutRefToUrlEncodedString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
+import Promise (then_)
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_, span_, text, hr) as DOOM
 import React.Basic.DOM (text)
@@ -255,87 +256,98 @@ mkContractList = do
                 else
                   newContractButton
             ]
-        , table { striped: Table.striped.boolean true, hover: true }
-            [ DOM.thead {} do
-                let
-                  orderingTh = Table.orderingHeader ordering updateOrdering
-                  th label = DOM.th { className: "text-center text-muted" } [ label ]
-                [ DOM.tr {}
-                    [ do
-                        let
-                          label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                        orderingTh label OrderByCreationDate
-                    , th $ DOOM.text "Contract Id"
-                    , th $ DOOM.text "Actions"
-                    ]
-                ]
-            , DOM.tbody {} $ map
-                ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo }) ->
+        , DOM.div { className: "row" }
+            [ table { striped: Table.striped.boolean true, hover: true }
+                [ DOM.thead {} do
                     let
-                      ContractHeader { contractId, status } = _runtime.contractHeader
-                      tdCentered = DOM.td { className: "text-center" }
-                    in
-                      DOM.tr {}
-                        [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
-                        , tdCentered
-                            [ DOM.a
-                                { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
-                                , target: "_blank"
-                                , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
-                                }
-                                [ text $ txOutRefToString contractId ]
-                            ]
-                        -- , DOM.td { className: "text-center" } $ do
-                        --     let
-                        --       tooltipJSX = tooltip {}
-                        --         ( case marloweInfo of
-                        --             Just (MarloweInfo { currentContract: Just contract, state: Just contractState }) ->
-                        --               [ DOM.div {} [ text $ show contract ], DOOM.hr {}, DOM.div {} [ text $ prettyState contractState ] ]
-                        --             _ -> mempty
-                        --         )
-                        --     overlayTrigger
-                        --       { overlay: tooltipJSX
-                        --       , placement: OverlayTrigger.placement.bottom
-                        --       } $ DOM.span {} [ show status ]
-                        , tdCentered
-                            [ case endpoints.transactions, marloweInfo of
-                                Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
-                                  { icon: unsafeIcon "fast-forward-fill h2"
-                                  , label: mempty
-                                  , tooltipText: Just "Apply available inputs to the contract"
-                                  , onClick: do
-                                      invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-5) * 60 * 1000))
-                                      invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
-                                      let
-                                        interval = TimeInterval invalidBefore invalidHereafter
-                                      setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState interval
-                                  }
-                                _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                  { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
-                                  , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
-                                  , label: mempty
-                                  , onClick: mempty
-                                  }
-                                _, _ -> mempty
-                            , case marloweInfo, possibleWalletContext of
-                                Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
-                                  let
-                                    rolesFromContract = rolesInContract initialContract
-                                    roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
-                                  case Array.uncons (Array.intersect roleTokens rolesFromContract) of
-                                    Just { head, tail } ->
-                                      linkWithIcon
-                                        { icon: unsafeIcon "cash-coin h2"
-                                        , label: mempty
-                                        , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                        , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
-                                        }
-                                    _ -> mempty
-                                _, _ -> mempty
-                            ]
+                      orderingTh = Table.orderingHeader ordering updateOrdering
+                      th label = DOM.th { className: "text-center text-muted" } [ label ]
+                    [ DOM.tr {}
+                        [ do
+                            let
+                              label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                            orderingTh label OrderByCreationDate
+                        , th $ DOOM.text "Contract Id"
+                        , th $ DOOM.text "Actions"
                         ]
-                )
-                contracts''
+                    ]
+                , DOM.tbody {} $ map
+                    ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo }) ->
+                        let
+                          ContractHeader { contractId, status } = _runtime.contractHeader
+                          tdCentered = DOM.td { className: "text-center" }
+                        in
+                          DOM.tr {}
+                            [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
+                            , tdCentered
+                                [ DOM.a
+                                    { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
+                                    , target: "_blank"
+                                    , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
+                                    }
+                                    [ text $ txOutRefToString contractId ]
+                                ]
+                            -- , DOM.td { className: "text-center" } $ do
+                            --     let
+                            --       tooltipJSX = tooltip {}
+                            --         ( case marloweInfo of
+                            --             Just (MarloweInfo { currentContract: Just contract, state: Just contractState }) ->
+                            --               [ DOM.div {} [ text $ show contract ], DOOM.hr {}, DOM.div {} [ text $ prettyState contractState ] ]
+                            --             _ -> mempty
+                            --         )
+                            --     overlayTrigger
+                            --       { overlay: tooltipJSX
+                            --       , placement: OverlayTrigger.placement.bottom
+                            --       } $ DOM.span {} [ show status ]
+                            , tdCentered
+                                [ case endpoints.transactions, marloweInfo of
+                                    Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
+                                      { icon: unsafeIcon "fast-forward-fill h2"
+                                      , label: mempty
+                                      , tooltipText: Just "Apply available inputs to the contract"
+                                      , onClick: do
+                                          invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-5) * 60 * 1000))
+                                          invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
+                                          let
+                                            interval = TimeInterval invalidBefore invalidHereafter
+                                          setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState interval
+                                      }
+                                    _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
+                                      { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
+                                      , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
+                                      , label: mempty
+                                      , onClick: mempty
+                                      }
+                                    _, _ -> mempty
+                                , case marloweInfo, possibleWalletContext of
+                                    Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
+                                      let
+                                        rolesFromContract = rolesInContract initialContract
+                                        roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
+                                      case Array.uncons (Array.intersect roleTokens rolesFromContract) of
+                                        Just { head, tail } ->
+                                          linkWithIcon
+                                            { icon: unsafeIcon "cash-coin h2"
+                                            , label: mempty
+                                            , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                            , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                            }
+                                        _ -> mempty
+                                    _, _ -> mempty
+                                ]
+                            ]
+                    )
+                    contracts''
+                ]
+            , if isLoadingContracts then
+                DOM.div
+                  { className: "position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
+                  }
+                  [ DOM.div { className: "spinner-border text-primary", role: "status" }
+                      [ DOM.span { className: "visually-hidden" } [ DOOM.text "Loading..." ] ]
+                  ]
+              else
+                mempty
             ]
         ]
 

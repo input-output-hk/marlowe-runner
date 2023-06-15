@@ -72,7 +72,10 @@ $link-color: #511CF7;
   }
 }
 
-
+.blur-bg {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
+}
 
 $utilities: map-merge(
   $utilities, (
