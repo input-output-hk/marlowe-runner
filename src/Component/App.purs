@@ -47,6 +47,7 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (component, provider, readRef, useEffect, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
+import ReactBootstrap.Icons (unsafeIcon)
 import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Offcanvas (offcanvas)
 import ReactBootstrap.Offcanvas as Offcanvas
@@ -226,18 +227,12 @@ mkApp = do
                       [ svgImg { src: marloweLogoUrl } ]
                   , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
                       [ DOM.ul { className: "navbar-nav gap-2" }
-                          [ DOM.li { className: "nav-item" } $
-                              linkWithIcon
-                                { icon: Icons.infoSquare
-                                , label: (DOOM.text "About")
-                                , extraClassNames: "nav-link"
-                                , onClick: setDisplayOption About
-                                }
-                          , DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
+                          [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
                               [ linkWithIcon
-                                  { icon: if List.null msgs then Icons.bellSlash else Icons.bellFill
-                                  , label: DOOM.text "Notifications"
+                                  { icon: if List.null msgs then unsafeIcon "bell-slash disabled-color h5" else unsafeIcon "bell-fill primary-color h5"
+                                  , label: mempty
                                   , extraClassNames: "nav-link"
+                                  , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
                                   , onClick: setCheckingNotifications true
                                   , disabled: List.null msgs
                                   }
@@ -253,7 +248,7 @@ mkApp = do
                           , DOM.li { className: "nav-item" } $
                               case possibleWalletInfo of
                                 Just (WalletInfo wallet) -> link
-                                  { label: DOOM.span_
+                                  { label: DOM.span { className: "h5" }
                                       [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
                                       , DOOM.span_ [ DOOM.text $ wallet.name <> " wallet" ]
                                       ]
