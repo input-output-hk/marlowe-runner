@@ -89,7 +89,29 @@ linkWithIcon provided = do
       if disabled then " disabled"
       else ""
   DOM.button
-    { className: "btn btn-link text-decoration-none text-reset" <> extraClassNames'
+    { className: "btn btn-link " <> extraClassNames'
+    , onClick: handler preventDefault (const $ onClick)
+    , type: "button"
+    }
+    [ Icons.toJSX icon
+    , DOOM.text " "
+    , label
+    ]
+
+buttonWithIcon
+  :: forall provided
+   . Defaults { | LinkWithIconOptionalProps } { | provided } { | LinkWithIconProps }
+  => { | provided }
+  -> JSX
+buttonWithIcon provided = do
+  let
+    { icon, label, extraClassNames, onClick, disabled } =
+      defaults defaultLinkOptionalProps provided
+    extraClassNames' = " " <> extraClassNames <>
+      if disabled then " disabled"
+      else ""
+  DOM.button
+    { className: "btn btn-primary" <> extraClassNames'
     , onClick: handler preventDefault (const $ onClick)
     , type: "button"
     }

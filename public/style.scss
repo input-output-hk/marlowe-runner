@@ -22,6 +22,37 @@ $link-color: #511CF7;
   font-size: 20px;
 }
 
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.primary-color {
+  color: $primary;
+}
+
+.disabled-color {
+  color: #BDBDBD;
+}
+
+.loading {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+
 
 $utilities: map-merge(
   $utilities, (

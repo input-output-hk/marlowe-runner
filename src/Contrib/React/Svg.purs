@@ -1,9 +1,10 @@
 module Contrib.React.Svg where
 
+import Data.Array.NonEmpty (elem)
 import Data.Newtype (class Newtype, un)
 import Prim.Row as Row
-import React.Basic (JSX)
-import React.Basic.DOM (Props_img)
+import React.Basic (JSX, ReactComponent, element)
+import React.Basic.DOM (Props_img, p)
 import React.Basic.DOM as DOM
 import React.Basic.DOM.SVG as DOM.SVG
 import Record as Record
@@ -27,3 +28,12 @@ svgImg props = do
     props' = unsafeCoerce props -- Record.modify (Proxy :: Proxy "src") (un SvgUrl) props
   DOM.img props'
 
+foreign import _SvgProgress :: ReactComponent { progress :: Int, svg :: JSX }
+
+svgProgress :: { progress :: Int, svg :: JSX } -> JSX
+svgProgress = element _SvgProgress
+
+foreign import _LoadingSpinnerLogo :: ReactComponent {}
+
+loadingSpinnerLogo :: {} -> JSX
+loadingSpinnerLogo = element _LoadingSpinnerLogo

@@ -2,10 +2,12 @@ module Component.ConnectWallet where
 
 import Prelude
 
+import Component.Assets.Svgs as Svgs
 import Component.Types (MkComponentM, WalletInfo(..))
 import Component.Widgets (link, spinner)
 import Component.Widgets.Form (mkSingleChoiceField)
 import Component.Widgets.Form as Form
+import Contrib.React.Svg (loadingSpinnerLogo, svgProgress)
 import Data.Array as Array
 import Data.Array.ArrayAL (ArrayAL)
 import Data.Array.ArrayAL as ArrayAL
@@ -107,7 +109,7 @@ mkConnectWallet = do
       let
         { formBody, formActions } = case possibleWallets of
           Nothing ->
-            { formBody: DOM.div { className: "d-flex justify-content-center" } $ spinner Nothing
+            { formBody: DOM.div { className: "d-flex justify-content-center" } $ loadingSpinnerLogo {}
             , formActions: mempty
             }
           Just wallets -> do
@@ -172,7 +174,7 @@ mkConnectWallet = do
 
       else
         DOM.div { className: "card p-5 m-5" }
-          [ DOM.p { className: "h2 font-weight-bold" } [ DOOM.text "Choose a wallet" ]
+          [ DOM.p { className: "h3 font-weight-bold" } [ DOOM.text "Choose a wallet" ]
           , DOM.span { className: "h5 text-muted" } [ DOOM.text "Please select a wallet to deploy a contract" ]
           , formBody
           , formActions
