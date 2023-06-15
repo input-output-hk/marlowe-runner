@@ -17,6 +17,7 @@ import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Fetch (FetchError)
+import Contrib.React.Svg (loadingSpinnerLogo)
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (encodeJson, stringify)
 import Data.Array as Array
@@ -71,6 +72,7 @@ import ReactBootstrap.Types as OverlayTrigger
 import Utils.React.Basic.Hooks (useMaybeValue', useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
+import Web.HTML.HTMLMediaElement (load)
 
 type ContractId = TxOutRef
 
@@ -343,9 +345,9 @@ mkContractList = do
                 DOM.div
                   { className: "position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
                   }
-                  [ DOM.div { className: "spinner-border text-primary", role: "status" }
-                      [ DOM.span { className: "visually-hidden" } [ DOOM.text "Loading..." ] ]
-                  ]
+                  $ loadingSpinnerLogo
+                      {}
+
               else
                 mempty
             ]
