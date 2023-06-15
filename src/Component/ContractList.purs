@@ -300,9 +300,9 @@ mkContractList = do
                         , tdCentered
                             [ case endpoints.transactions, marloweInfo of
                                 Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
-                                  { icon: unsafeIcon "fast-forward-fill"
+                                  { icon: unsafeIcon "fast-forward-fill h2"
                                   , label: mempty
-                                  , extraClassNames: "primary-color h3"
+                                  , tooltipText: Just "Apply available inputs to the contract"
                                   , onClick: do
                                       invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-5) * 60 * 1000))
                                       invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
@@ -311,7 +311,8 @@ mkContractList = do
                                       setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState interval
                                   }
                                 _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                  { icon: unsafeIcon "file-earmark-check-fill"
+                                  { icon: unsafeIcon "file-earmark-check-fill h2"
+                                  , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
                                   , label: mempty
                                   , onClick: mempty
                                   }
@@ -324,8 +325,9 @@ mkContractList = do
                                   case Array.uncons (Array.intersect roleTokens rolesFromContract) of
                                     Just { head, tail } ->
                                       linkWithIcon
-                                        { icon: unsafeIcon "cash-coin"
+                                        { icon: unsafeIcon "cash-coin h2"
                                         , label: mempty
+                                        , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
                                         , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
                                         }
                                     _ -> mempty
