@@ -51,7 +51,7 @@ mkLandingPage = do
     possibleErrors /\ setErrors <- useState' Nothing
     pure $ DOM.div { className: "mt-6" } $
       [ DOM.div { className: "fixed-top" }
-          [ DOM.nav { className: "navbar mb-lg-3 navbar-expand-sm navbar-light bg-light" } $
+          [ DOM.nav { className: "navbar mb-lg-3 navbar-expand-sm navbar-light bg-light shadow-bottom" } $
               DOM.div { className: "container-xl" }
                 [ DOM.a { href: "#", className: "navbar-brand" }
                     [ svgImg { src: marloweLogoUrl } ]
