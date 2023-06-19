@@ -3,27 +3,22 @@ module Component.ApplyInputs where
 import Prelude
 
 import CardanoMultiplatformLib (Bech32, CborHex)
-import CardanoMultiplatformLib.Lib as Lib
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
-import CardanoMultiplatformLib.Types (cborHexToCbor)
 import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..))
 import Component.ApplyInputs.Machine as Machine
-import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance, toIChoice, toIDeposit)
-import Component.Modal (mkModal)
-import Component.Modal as Modal
+import Component.BodyLayout as BodyLayout
+import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, toIChoice, toIDeposit)
 import Component.Types (MkComponentM, WalletInfo(..))
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Language.Marlowe.Core.V1 (compareMarloweJsonKeys)
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
-import Contrib.ReactBootstrap.FormBuilder as FormBuilder
+import Contrib.ReactBootstrap.FormBuilder (booleanField) as FormBuilder
 import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
-import Data.Array as Array
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
-import Data.Array.NonEmpty as NonEmpty
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (instant, toDateTime, unInstant)
 import Data.Either (Either(..))
@@ -31,23 +26,22 @@ import Data.Function.Uncurried (mkFn2)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int as Int
 import Data.Map as Map
-import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
 import Data.Nullable as Argonaut
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
-import Debug (traceM)
 import Effect (Effect)
-import Effect.Aff (Aff, launchAff_)
+import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import JsYaml as JsYaml
-import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), State, TimeInterval(..), Token(..), Value(..)) as V1
-import Language.Marlowe.Core.V1.Semantics.Types (Input(..), InputContent(..))
+import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Input(..), InputContent(..), Party(..), State, TimeInterval(..), Token(..), Value(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Input(..))
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse(PostTransactionsResponse), PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse, PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Batteries as Batteries
 import Polyform.Validator (liftFnMMaybe, liftFnMaybe)
@@ -55,13 +49,13 @@ import React.Basic (fragment)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (EventHandler, handler_)
+import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseForm (useForm)
 import React.Basic.Hooks.UseForm as UseForm
 import ReactBootstrap.FormBuilder (ChoiceFieldChoices(SelectFieldChoices, RadioButtonFieldChoices), choiceField, intInput, radioFieldChoice, selectFieldChoice)
-import ReactBootstrap.FormBuilder as FormBuilder
+import ReactBootstrap.FormBuilder (evalBuilder') as FormBuilder
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 
@@ -111,17 +105,11 @@ type DepositFormComponentProps =
 
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
 mkDepositFormComponent = do
-  modal <- liftEffect mkModal
-  Runtime runtime <- asks _.runtime
-  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-  walletInfoCtx <- asks _.walletInfoCtx
-
-  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ depositInputs, connectedWallet, onDismiss, onSuccess } -> React.do
-    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ depositInputs, onDismiss, onSuccess } -> React.do
     let
       choices = RadioButtonFieldChoices do
         let
-          toChoice idx (DepositInput account party token value cont) = do
+          toChoice idx (DepositInput _ _ _ value _) = do
             let
               label = show value
             radioFieldChoice (show idx) (DOOM.text label)
@@ -152,7 +140,7 @@ mkDepositFormComponent = do
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
-    pure $ modal do
+    pure $ BodyLayout.component do
       let
         fields = UseForm.renderForm form formState
         body = DOM.div { className: "form-group" } fields
@@ -170,10 +158,9 @@ mkDepositFormComponent = do
               [ R.text "Submit" ]
           ]
       { title: R.text "Perform deposit"
+      , description: DOOM.text "We are creating the initial transaction."
       , body
       , footer: actions
-      , onDismiss
-      , size: Modal.ExtraLarge
       }
 
 type ChoiceFormComponentProps =
@@ -185,7 +172,6 @@ type ChoiceFormComponentProps =
 
 mkChoiceFormComponent :: MkComponentM (ChoiceFormComponentProps -> JSX)
 mkChoiceFormComponent = do
-  modal <- liftEffect mkModal
   Runtime runtime <- asks _.runtime
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
@@ -234,7 +220,7 @@ mkChoiceFormComponent = do
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
-    pure $ modal do
+    pure $ BodyLayout.component do
       let
         fields = UseForm.renderForm form formState
         body = DOOM.div_ $
@@ -260,10 +246,9 @@ mkChoiceFormComponent = do
               [ R.text "Submit" ]
           ]
       { title: R.text "Perform choice"
+      , description: DOOM.text "Perform choice description"
       , body
       , footer: actions
-      , onDismiss
-      , size: Modal.ExtraLarge
       }
 
 type NotifyFormComponentProps =
@@ -275,14 +260,13 @@ type NotifyFormComponentProps =
 
 mkNotifyFormComponent :: MkComponentM (NotifyFormComponentProps -> JSX)
 mkNotifyFormComponent = do
-  modal <- liftEffect mkModal
   Runtime runtime <- asks _.runtime
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
   liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ notifyInput, connectedWallet, onDismiss, onSuccess } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
-    pure $ modal do
+    pure $ BodyLayout.component do
       let
         body = DOOM.text ""
         actions = fragment
@@ -294,10 +278,9 @@ mkNotifyFormComponent = do
               [ R.text "Submit" ]
           ]
       { title: R.text "Perform notify"
+      , description: DOOM.text "Perform notify description"
       , body
       , footer: actions
-      , onDismiss
-      , size: Modal.ExtraLarge
       }
 
 type AdvanceFormComponentProps =
@@ -308,10 +291,8 @@ type AdvanceFormComponentProps =
 
 mkAdvanceFormComponent :: MkComponentM (AdvanceFormComponentProps -> JSX)
 mkAdvanceFormComponent = do
-  modal <- liftEffect mkModal
-
   liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ contract, onDismiss, onSuccess } -> React.do
-    pure $ modal do
+    pure $ BodyLayout.component do
       let
         body = DOOM.text ""
         actions = fragment
@@ -323,10 +304,9 @@ mkAdvanceFormComponent = do
               [ R.text "Submit" ]
           ]
       { title: R.text "Advance Contract"
+      , description: DOOM.text "Advance Contract description"
       , body
       , footer: actions
-      , onDismiss
-      , size: Modal.ExtraLarge
       }
 
 data CreateInputStep
@@ -394,7 +374,6 @@ mkContractDetailsComponent = do
       , initial: true
       , touched: true
       }
-  modal <- liftEffect mkModal
   liftEffect $ component "ApplyInputs.ContractDetailsComponent" \{ marloweContext: { contract, state }, onSuccess, onDismiss } -> React.do
     { formState, onSubmit: onSubmit' } <- useForm
       { spec: autoRunForm
@@ -423,16 +402,15 @@ mkContractDetailsComponent = do
             }
             [ R.text "Submit" ]
         ]
-    pure $ modal
+    pure $ BodyLayout.component
       { title: R.text "Apply Inputs | Contract Details"
+      , description: DOOM.text "Contract Details"
       , body
       , footer
-      , onDismiss
-      , size: Modal.ExtraLarge
       }
 
 -- In here we want to summarize the initial interaction with the wallet
-fetchingRequiredWalletContextDetails modal onNext possibleWalletResponse = do
+fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
@@ -461,18 +439,20 @@ fetchingRequiredWalletContextDetails modal onNext possibleWalletResponse = do
           }
           [ R.text "Next" ]
       ]
-  modal
-    { title: R.text "Apply Inputs | Fetching Wallet Context"
-    , body
-    , footer
-    , onDismiss: pure unit
-    , size: Modal.ExtraLarge
-    }
+  DOM.div { className: "row" } $
+    [ DOM.div { className: "col-6" } $ DOOM.text "We are creating a transaction for input application"
+    , DOM.div { className: "col-6" } $ BodyLayout.component
+        { title: R.text "Apply Inputs | Fetching Wallet Context"
+        , description: DOOM.text "Fetching Wallet Context description"
+        , body
+        , footer
+        }
+    ]
 
 -- Now we want to to describe the interaction with the API where runtimeRequest is
 -- a { headers: Map String String, body: JSON }.
 -- We really want to provide the detailed informatin (headers and payoload)
-creatingTxDetails modal onNext runtimeRequest possibleRuntimeResponse = do
+creatingTxDetails onNext runtimeRequest possibleRuntimeResponse = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
@@ -496,12 +476,11 @@ creatingTxDetails modal onNext runtimeRequest possibleRuntimeResponse = do
           }
           [ R.text "Next" ]
       ]
-  modal
+  DOM.div { className: "row" } $ BodyLayout.component
     { title: R.text "Apply Inputs | Creating Transaction"
+    , description: DOOM.text "We are creating the initial transaction."
     , body
     , footer
-    , onDismiss: pure unit
-    , size: Modal.ExtraLarge
     }
 
 
@@ -520,7 +499,6 @@ shouldShowPrevStep SimplifiedFlow = false
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   runtime <- asks _.runtime
-  modal <- liftEffect mkModal
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
   contractDetailsComponent <- mkContractDetailsComponent
@@ -555,12 +533,12 @@ mkComponent = do
 
         contractDetailsComponent { marloweContext, onSuccess: onStepSuccess, onDismiss }
       Machine.FetchingRequiredWalletContext _ -> case previewFlow of
-        DetailedFlow _ -> fetchingRequiredWalletContextDetails modal (pure unit) Nothing
+        DetailedFlow _ -> fetchingRequiredWalletContextDetails (pure unit) Nothing
         SimplifiedFlow -> DOOM.text "Auto fetching... (progress bar?)"
 
       Machine.ChoosingInputType {allInputsChoices, requiredWalletContext} -> case previewFlow of
         DetailedFlow { showPrevStep: true } ->
-          fetchingRequiredWalletContextDetails modal (setPreviewFlow $ DetailedFlow { showPrevStep: false }) $ Just requiredWalletContext
+          fetchingRequiredWalletContextDetails (setPreviewFlow $ DetailedFlow { showPrevStep: false }) $ Just requiredWalletContext
         _ -> do
           let
             body = DOM.div { className: "row" }
@@ -610,15 +588,12 @@ mkComponent = do
                     [ R.text "Advance" ]
               ]
 
-          if inModal then modal
+          BodyLayout.component
             { title: R.text "Select input type"
-            , onDismiss
+            , description: DOOM.text "We are creating the initial transaction."
             , body
             , footer
-            , size: Modal.ExtraLarge
             }
-          else
-            body
       Machine.PickingInput { inputChoices } -> do
         let
           applyPickInputSucceeded input = do
@@ -637,11 +612,11 @@ mkComponent = do
         DetailedFlow _ -> do
           let
             req = allInputsChoices
-          creatingTxDetails modal (pure unit) Argonaut.null Nothing
+          creatingTxDetails (pure unit) Argonaut.null Nothing
         SimplifiedFlow -> DOOM.text "Auto creating tx... (progress bar?)"
       Machine.SigningTx { createTxResponse } -> case previewFlow of
         DetailedFlow { showPrevStep: true } ->
-          creatingTxDetails modal (setPreviewFlow $ DetailedFlow { showPrevStep: false }) Argonaut.null $ Just createTxResponse
+          creatingTxDetails (setPreviewFlow $ DetailedFlow { showPrevStep: false }) Argonaut.null $ Just createTxResponse
         DetailedFlow _ -> DOOM.text "Signing tx..."
           -- signingTxDetails modal (pure unit) Argonaut.null Nothing
         SimplifiedFlow -> DOOM.text "Auto signing tx... (progress bar?)"

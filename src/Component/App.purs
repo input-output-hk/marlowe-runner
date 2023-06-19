@@ -221,7 +221,7 @@ mkApp = do
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $ Array.singleton $ DOM.div { className: "mt-6" } $
         [ DOM.div { className: "fixed-top" }
             [ DOM.nav { className: "navbar mb-lg-3 navbar-expand-sm navbar-light bg-light shadow-bottom" } $
-                DOM.div { className: "container-xl" }
+                DOM.div { className: "container-fluid" }
                   [ DOM.a { href: "#", className: "navbar-brand" }
                       [ svgImg { src: marloweLogoUrl } ]
                   , DOM.div { className: "navbar-collapse justify-content-end text-end" } $

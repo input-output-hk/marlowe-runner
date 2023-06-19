@@ -2,12 +2,11 @@ module Component.CreateContract where
 
 import Prelude
 
-import CardanoMultiplatformLib (bech32FromString)
+import CardanoMultiplatformLib (bech32FromString, bech32ToString)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
-import CardanoMultiplatformLib.Types (Bech32)
+import CardanoMultiplatformLib.Types (Bech32, unsafeBech32)
+import Component.BodyLayout as BodyLayout
 import Component.CreateContract.Machine as Machine
-import Component.Modal (mkModal)
-import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo)
 import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
@@ -21,6 +20,7 @@ import Data.Argonaut (decodeJson, encodeJson, parseJson, stringifyWithIndent)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (lmap)
+import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (instant, unInstant)
 import Data.Either (Either(..))
@@ -28,10 +28,12 @@ import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (un)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
+import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
 import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
@@ -42,10 +44,7 @@ import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
 import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..))
 import Partial.Unsafe (unsafeCrashWith)
-import Polyform.Validator (liftFnEither) as Validator
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
-import Polyform.Validator (liftFnM)
-import Polyform.Validator (liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (css)
 import React.Basic.DOM (div, div_, input, text) as DOOM
@@ -54,11 +53,12 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, Ref, component, fragment, readRef, useRef, (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.UseForm (liftValidator, useForm)
+import React.Basic.Hooks.UseForm (useForm)
 import React.Basic.Hooks.UseForm as UseForm
 import ReactBootstrap.FormBuilder (BootstrapForm, FormBuilder')
 import ReactBootstrap.FormBuilder (evalBuilder', textArea, textInput) as FormBuilder
 import Wallet as Wallet
+import WalletContext (WalletContext(..))
 import Web.DOM.Node (Node)
 import Web.File.File (File)
 import Web.File.FileList (FileList)
@@ -76,14 +76,16 @@ newtype AutoRun = AutoRun Boolean
 
 type Result = V1.Contract /\ AutoRun
 
-mkJsonForm :: Result -> BootstrapForm Effect Query Result
-mkJsonForm (initialContract /\ (AutoRun initialAutoRun)) = FormBuilder.evalBuilder' $ ado
+mkJsonForm :: (Maybe V1.Contract /\ AutoRun) -> BootstrapForm Effect Query Result
+mkJsonForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuilder.evalBuilder' $ ado
   contract <- FormBuilder.textArea
     { missingError: "Please provide contract terms JSON value"
     , helpText: Just $ DOOM.div_
         [ DOOM.text "Basic JSON validation"
         ]
-    , initial: stringifyWithIndent 2 $ encodeJson initialContract
+    , initial: case possibleInitialContract of
+        Nothing -> ""
+        Just initialContract -> stringifyWithIndent 2 $ encodeJson initialContract
     , label: Just $ DOOM.text "Contract JSON"
     , touched: true
     , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
@@ -203,7 +205,6 @@ type RoleProps =
 mkRoleTokensComponent :: MkComponentM (RoleProps -> JSX)
 mkRoleTokensComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-  -- modal <- liftEffect mkModal
   liftEffect $ component "RoleTokensAssignment" \{ onDismiss , onSuccess, roleNames } -> React.do
     let
       form = mkRolesConfigForm roleNames cardanoMultiplatformLib
@@ -241,39 +242,20 @@ mkRoleTokensComponent = do
                 }
               [ R.text "Submit" ]
           ]
-      modal'
+      BodyLayout.component
         { title: R.text "Role token assignments"
-        , onDismiss: onDismiss
+        , description: R.text "Assign addresses to role tokens"
         , body: DOM.div { className: "row" }
             [ DOM.div { className: "col-12" } [ formBody ]
             ]
         , footer: formActions
-        -- , fullscreen: true
-        -- , size: Modal.FullScreen
         }
-
---        modal
---          { title: R.text "Add contract"
---          , onDismiss
---          , body: DOM.div { className: "row" }
---              [ DOM.div { className: "col-12" } [ formBody ]
---              ]
---          , footer: formActions
---          , fullscreen: true
---          , size: Modal.ExtraLarge
---          }
---
-modal' :: { title :: JSX, onDismiss :: Effect Unit, body :: JSX, footer :: JSX } -> JSX
-modal' { title, onDismiss, body, footer } = DOM.div {} [ title, body, footer ]
-
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   runtime <- asks _.runtime
-  -- modal <- liftEffect mkModal
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-
-  { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts address
+  walletInfoCtx <- asks _.walletInfoCtx
 
   let
     initialAutoRun = AutoRun false
@@ -282,14 +264,24 @@ mkComponent = do
 
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss } -> React.do
     currentRun /\ setCurrentRun <- React.useState' Nothing
+    initialContract /\ setInitialContract <- React.useState' Nothing
 
     { state: submissionState, applyAction, reset: resetStateMachine } <- do
       let
         props = machineProps initialAutoRun connectedWallet cardanoMultiplatformLib runtime
       useMooreMachine props
 
+    possibleWalletInfo <- React.useContext walletInfoCtx
+    React.useEffect (_.changeAddress <<< un WalletContext <<< snd <$> possibleWalletInfo) $ do
+      case possibleWalletInfo of
+        Just (_ /\ (WalletContext { changeAddress: Just changeAddress })) -> do
+          { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts changeAddress
+          setInitialContract $ Just initialContract
+        _ -> setInitialContract Nothing
+      pure (pure unit)
+
     let
-      form = mkJsonForm (brianContract /\ initialAutoRun)
+      form = mkJsonForm (initialContract /\ initialAutoRun)
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
@@ -337,15 +329,13 @@ mkComponent = do
             ]
         [ DOM.div { className: "col-6" } $ DOOM.text "Description"
         , DOM.div { className: "col-6" } $
-            modal'
+            BodyLayout.component
               { title: R.text "Add contract"
-              , onDismiss
+              , description: R.text "Add a new contract"
               , body: DOM.div { className: "row" }
                   [ DOM.div { className: "col-12" } [ formBody ]
                   ]
               , footer: formActions
-              -- , fullscreen: true
-              -- , size: Modal.ExtraLarge
               }
         ]
 
@@ -411,13 +401,11 @@ mkComponent = do
                   [ R.text "Run" ]
               ]
         [ DOM.div { className: "col-6" } $ DOOM.text "Description"
-        , DOM.div { className: "col-6" } $ modal'
+        , DOM.div { className: "col-6" } $ BodyLayout.component
           { title: DOOM.text $ stateToTitle submissionState
-          , onDismiss
+          , description: DOOM.text "Creating contract"
           , body
           , footer: formActions
-          -- , size: Modal.ExtraLarge
-          -- , fullscreen: true
           }
         ]
 
@@ -469,16 +457,19 @@ stateToDescription state = case state of
     Just err -> DOOM.text $ "Submitting transaction failed: " <> err
   Machine.ContractCreated {} -> DOOM.text "Contract created."
 
-zero = BigInt.fromInt 0
-one = BigInt.fromInt 1
+three :: BigInt
 three = BigInt.fromInt 3
+four :: BigInt
 four = BigInt.fromInt 4
 
-address :: String
-address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
+address :: Bech32
+address = unsafeBech32 "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
 
-mkInitialContracts :: String -> Effect { multiChoiceTest :: V1.Contract }
-mkInitialContracts address = do
+mkInitialContracts :: Bech32 -> Effect
+  { brianContract :: V1.Contract
+  , multiChoiceTest :: V1.Contract
+  }
+mkInitialContracts bech32 = do
   nowMilliseconds <- unInstant <$> now
   let
     timeout = case instant (nowMilliseconds <> Milliseconds (Int.toNumber $ 20 * 60 * 1000)) of
@@ -486,11 +477,14 @@ mkInitialContracts address = do
       Nothing -> unsafeCrashWith "Invalid instant"
 
   pure
-    { multiChoiceTest: mkMultiChoiceTest address timeout
+    { brianContract: brianContract bech32
+    , multiChoiceTest: mkMultiChoiceTest bech32 timeout
     }
 
-brianContract = do
+brianContract :: Bech32 -> V1.Contract
+brianContract bech32 = do
   let
+    address = bech32ToString bech32
     timeout = BigInt.fromString "1684937880000"
     possibleContract = decodeJson $
       encodeJson { "when": [ { "then": { "when": [ { "then": { "when": [ { "then": "close", "case": { "notify_if": true } } ], "timeout_continuation": "close", "timeout": timeout }, "case": { "for_choice": { "choice_owner": { "address": address }, "choice_name": "Release" }, "choose_between": [ { "to": 1, "from": 1 } ] } } ], "timeout_continuation": "close", "timeout": timeout }, "case": { "party": { "address": address }, "of_token": { "token_name": "", "currency_symbol": "" }, "into_account": { "address": address }, "deposits": 10000000 } } ], "timeout_continuation": "close", "timeout": timeout }
@@ -498,80 +492,10 @@ brianContract = do
     Left err -> unsafeCrashWith $ "Failed to decode contract: " <> show err
     Right contract -> contract
 
---    , escrow : mkEscrow address
---    }
---
--- mkEscrowWithCollateral :: String -> Int -> Int -> V1.Contract
--- mkEscrowWithCollateral address collateralLovelace priceLovelace = do
---   let
---     collateral = V1.Constant $ BigInt.fromInt collateralLovelace
---     price = V1.Constant $ BigInt.fromInt priceLovelace
---   V1.When [
---     (V1.Case
---        (V1.Deposit
---           (V1.Role "Seller")
---           (V1.Role "Seller")
---           (V1.Token "" "")
---           collateral
---        (V1.When [
---           (V1.Case
---              (V1.Deposit
---                 (V1.Role "Buyer")
---                 (V1.Role "Buyer")
---                 (V1.Token "" "")
---                 collateral
---              (V1.When [
---                 (V1.Case
---                    (V1.Deposit
---                       (V1.Role "Seller")
---                       (V1.Role "Buyer")
---                       (V1.Token "" "")
---                       price)
---                    (V1.When [
---                          (V1.Case
---                             (V1.Choice
---                                (V1.ChoiceId "Everything is alright"
---                                   (V1.Role "Buyer")) [
---                                (V1.Bound 0 0)]) Close)
---                          ,
---                          (V1.Case
---                             (V1.Choice
---                                (V1.ChoiceId "Report problem"
---                                   (V1.Role "Buyer")) [
---                                (V1.Bound 1 1)])
---                             (V1.Pay
---                                (V1.Role "Seller")
---                                (V1.Account
---                                   (V1.Role "Buyer"))
---                                (V1.Token "" "")
---                                price
---                                (V1.When [
---                                      (V1.Case
---                                         (V1.Choice
---                                            (V1.ChoiceId "Confirm problem"
---                                               (V1.Role "Seller")) [
---                                            (V1.Bound 1 1)]) Close)
---                                      ,
---                                      (V1.Case
---                                         (V1.Choice
---                                            (V1.ChoiceId "Dispute problem"
---                                               (V1.Role "Seller")) [
---                                            (V1.Bound 0 0)])
---                                         (V1.Pay
---                                            (V1.Role "Seller")
---                                            (V1.Party
---                                               (V1.PK "0000000000000000000000000000000000000000000000000000000000000000"))
---                                            (V1.Token "" "")
---                                            collateral
---                                            (V1.Pay
---                                               (V1.Role "Buyer")
---                                               (V1.Party
---                                                  (V1.PK "0000000000000000000000000000000000000000000000000000000000000000"))
---                                               (V1.Token "" "")
---                                               (V1.ConstantParam "Collateral amount") Close)))] (TimeParam "Complaint deadline") Close)))] (TimeParam "Dispute by buyer timeout") Close))] (TimeParam "Deposit of price by buyer timeout") Close))] (TimeParam "Deposit of collateral by buyer timeout") Close))] (TimeParam "Collateral deposit by seller timeout") Close
-
-mkMultiChoiceTest :: String -> _ -> V1.Contract
-mkMultiChoiceTest address timeout =
+mkMultiChoiceTest :: Bech32 -> _ -> V1.Contract
+mkMultiChoiceTest bech32 timeout = do
+  let
+    address = bech32ToString bech32
   V1.When
     [ V1.Case
         ( V1.Choice
