@@ -16,7 +16,7 @@ import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
 import Control.Promise as Promise
-import Data.Argonaut (decodeJson, encodeJson, parseJson, stringifyWithIndent)
+import Data.Argonaut (decodeJson, encodeJson, parseJson, stringify, stringifyWithIndent)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (lmap)
@@ -28,6 +28,7 @@ import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (un)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
@@ -76,8 +77,10 @@ newtype AutoRun = AutoRun Boolean
 
 type Result = V1.Contract /\ AutoRun
 
-mkJsonForm :: (Maybe V1.Contract /\ AutoRun) -> BootstrapForm Effect Query Result
-mkJsonForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuilder.evalBuilder' $ ado
+contractFieldId = FieldId "contract-json"
+
+mkContractForm :: (Maybe V1.Contract /\ AutoRun) -> BootstrapForm Effect Query Result
+mkContractForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuilder.evalBuilder' $ ado
   contract <- FormBuilder.textArea
     { missingError: "Please provide contract terms JSON value"
     , helpText: Just $ DOOM.div_
@@ -92,7 +95,7 @@ mkJsonForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuilder.e
         json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
         lmap (Array.singleton <<< show) (decodeJson json)
     , rows: 15
-    , name: (Just $ FieldId "contract-terms")
+    , name: Just contractFieldId
     }
   autoRun <- AutoRun <$> do
     -- FIXME: This should be documented I left this as an example of more hard core lifting of validator
@@ -264,25 +267,14 @@ mkComponent = do
 
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss } -> React.do
     currentRun /\ setCurrentRun <- React.useState' Nothing
-    possibleInitialContract /\ setInitialContract <- React.useState' Nothing
-
     { state: submissionState, applyAction, reset: resetStateMachine } <- do
       let
         props = machineProps initialAutoRun connectedWallet cardanoMultiplatformLib runtime
       useMooreMachine props
 
-    possibleWalletInfo <- React.useContext walletInfoCtx
-    React.useEffect (_.changeAddress <<< un WalletContext <<< snd <$> possibleWalletInfo) $ do
-      case possibleWalletInfo of
-        Just (_ /\ (WalletContext { changeAddress: Just changeAddress })) -> do
-          { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts changeAddress
-          setInitialContract $ Just initialContract
-        _ -> setInitialContract Nothing
-      pure (pure unit)
+    form <- React.useMemo unit \_ -> mkContractForm (Nothing /\ initialAutoRun)
 
     let
-      form = mkJsonForm (possibleInitialContract /\ initialAutoRun)
-
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
         Just (V (Right (contract /\ autoRun)) /\ _) -> do
@@ -302,6 +294,20 @@ mkComponent = do
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
+
+
+    possibleWalletInfo <- React.useContext walletInfoCtx
+    React.useEffect (_.changeAddress <<< un WalletContext <<< snd <$> possibleWalletInfo) $ do
+      case possibleWalletInfo of
+        Just (_ /\ (WalletContext { changeAddress: Just changeAddress })) -> do
+          { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts changeAddress
+          case Map.lookup contractFieldId formState.fields of
+            Just { touched, onChange } -> do
+              when (not $ un Disj touched) do
+                onChange [ stringifyWithIndent 2 $ encodeJson initialContract ]
+            Nothing -> pure unit
+        _ -> pure unit
+      pure (pure unit)
 
 
     pure $ DOM.div { className: "container-fluid" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" } $ case submissionState of
