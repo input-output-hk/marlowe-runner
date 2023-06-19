@@ -439,15 +439,13 @@ fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
           }
           [ R.text "Next" ]
       ]
-  DOM.div { className: "row" } $
-    [ DOM.div { className: "col-6" } $ DOOM.text "We are creating a transaction for input application"
-    , DOM.div { className: "col-6" } $ BodyLayout.component
-        { title: R.text "Apply Inputs | Fetching Wallet Context"
-        , description: DOOM.text "Fetching Wallet Context description"
-        , body
-        , footer
-        }
-    ]
+
+  BodyLayout.component
+    { title: R.text "Apply Inputs | Fetching Wallet Context"
+    , description: DOOM.text "Fetching Wallet Context description"
+    , body
+    , footer
+    }
 
 -- Now we want to to describe the interaction with the API where runtimeRequest is
 -- a { headers: Map String String, body: JSON }.

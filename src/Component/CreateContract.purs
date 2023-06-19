@@ -4,7 +4,7 @@ import Prelude
 
 import CardanoMultiplatformLib (bech32FromString, bech32ToString)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
-import CardanoMultiplatformLib.Types (Bech32, unsafeBech32)
+import CardanoMultiplatformLib.Types (Bech32)
 import Component.BodyLayout as BodyLayout
 import Component.CreateContract.Machine as Machine
 import Component.Types (MkComponentM, WalletInfo)
@@ -22,7 +22,7 @@ import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
-import Data.DateTime.Instant (instant, unInstant)
+import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Int as Int
@@ -110,7 +110,7 @@ mkJsonForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuilder.e
   in
     contract /\ autoRun
 
-mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> BootstrapForm Effect Query _
+mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> BootstrapForm Effect Query RolesConfig
 mkRolesConfigForm roleNames cardanoMultiplatformLib = FormBuilder.evalBuilder' $ Mint <<< Map.fromFoldable <$> for roleNames \roleName -> ado
   address <- FormBuilder.textInput
     { missingError: "Please provide an address for a role token"
@@ -304,7 +304,7 @@ mkComponent = do
       }
 
 
-    pure $ DOM.div { className: "container-fluid" } $ DOM.div { className: "row" } $ case submissionState of
+    pure $ DOM.div { className: "container-fluid" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" } $ case submissionState of
       Machine.DefiningContract -> do
         let
           fields = UseForm.renderForm form formState
@@ -327,17 +327,12 @@ mkComponent = do
                   }
                 [ R.text "Submit" ]
             ]
-        [ DOM.div { className: "col-6" } $ DOOM.text "Description"
-        , DOM.div { className: "col-6" } $
-            BodyLayout.component
-              { title: R.text "Add contract"
-              , description: R.text "Add a new contract"
-              , body: DOM.div { className: "row" }
-                  [ DOM.div { className: "col-12" } [ formBody ]
-                  ]
-              , footer: formActions
-              }
-        ]
+        BodyLayout.component
+          { title: R.text "Add contract"
+          , description: R.text "Add a new contract"
+          , body: formBody
+          , footer: formActions
+          }
 
       Machine.DefiningRoleTokens { roleNames } -> do
         let
@@ -346,10 +341,18 @@ mkComponent = do
             let action = Machine.DefineRoleTokensSucceeded rolesConfig
             in applyAction action
 
-        [ DOM.div { className: "col-6" } $ DOOM.text "Description"
-        , DOM.div { className: "col-6" } $
-            roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
-        ]
+        BodyLayout.component
+          { title: R.text "Define role token distribution"
+          , description: R.text "Define role token distribution"
+          , body: roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
+          , footer: DOOM.fragment
+              [ link
+                  { label: DOOM.text "Cancel"
+                  , onClick: onDismiss
+                  , showBorders: true
+                  }
+              ]
+          }
 
       machineState -> do
         let
@@ -400,14 +403,12 @@ mkComponent = do
                   }
                   [ R.text "Run" ]
               ]
-        [ DOM.div { className: "col-6" } $ DOOM.text "Description"
-        , DOM.div { className: "col-6" } $ BodyLayout.component
+        BodyLayout.component
           { title: DOOM.text $ stateToTitle submissionState
           , description: DOOM.text "Creating contract"
           , body
           , footer: formActions
           }
-        ]
 
 stateToTitle :: Machine.State -> String
 stateToTitle state = case state of
@@ -462,12 +463,9 @@ three = BigInt.fromInt 3
 four :: BigInt
 four = BigInt.fromInt 4
 
-address :: Bech32
-address = unsafeBech32 "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
-
 mkInitialContracts :: Bech32 -> Effect
-  { brianContract :: V1.Contract
-  , multiChoiceTest :: V1.Contract
+  { -- brianContract :: V1.Contract
+    multiChoiceTest :: V1.Contract
   }
 mkInitialContracts bech32 = do
   nowMilliseconds <- unInstant <$> now
@@ -477,8 +475,8 @@ mkInitialContracts bech32 = do
       Nothing -> unsafeCrashWith "Invalid instant"
 
   pure
-    { brianContract: brianContract bech32
-    , multiChoiceTest: mkMultiChoiceTest bech32 timeout
+    { -- brianContract: brianContract bech32
+      multiChoiceTest: mkMultiChoiceTest bech32 timeout
     }
 
 brianContract :: Bech32 -> V1.Contract
@@ -492,7 +490,7 @@ brianContract bech32 = do
     Left err -> unsafeCrashWith $ "Failed to decode contract: " <> show err
     Right contract -> contract
 
-mkMultiChoiceTest :: Bech32 -> _ -> V1.Contract
+mkMultiChoiceTest :: Bech32 -> Instant -> V1.Contract
 mkMultiChoiceTest bech32 timeout = do
   let
     address = bech32ToString bech32
