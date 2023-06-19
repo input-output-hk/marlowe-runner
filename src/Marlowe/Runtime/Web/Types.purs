@@ -300,21 +300,11 @@ instance EncodeJson Tags where
     <<< un Tags
 
 instance DecodeJson Tags where
-  decodeJson _ = Right mempty
-
--- FIXME: properly decode Tags
-{-
-decodeJson json = do
-  (obj :: Object Metadata) <- decodeJson json
-
-  (arr :: Array (String /\ Metadata)) <- for (Object.toUnfoldable obj) \(idx /\ value) -> do
-    idx' <- do
-      let
-        err = TypeMismatch $ "Expecting an integer metadata label but got: " <> show idx
-      note err (Just idx)
-    pure (idx' /\ value)
-  pure <<< Tags <<< Map.fromFoldable $ arr
-  -}
+  decodeJson json = do
+    (obj :: Object Metadata) <- decodeJson json
+    let
+      (arr :: Array (String /\ Metadata)) = Object.toUnfoldable obj
+    pure <<< Tags <<< Map.fromFoldable $ arr
 
 type ContractHeadersRowBase r =
   ( contractId :: TxOutRef
