@@ -27,7 +27,7 @@ import Data.Either (Either(..))
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Int as Int
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Newtype (un)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
@@ -87,7 +87,7 @@ mkJsonForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuilder.e
         Nothing -> ""
         Just initialContract -> stringifyWithIndent 2 $ encodeJson initialContract
     , label: Just $ DOOM.text "Contract JSON"
-    , touched: true
+    , touched: isJust possibleInitialContract
     , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
         json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
         lmap (Array.singleton <<< show) (decodeJson json)
@@ -264,7 +264,7 @@ mkComponent = do
 
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss } -> React.do
     currentRun /\ setCurrentRun <- React.useState' Nothing
-    initialContract /\ setInitialContract <- React.useState' Nothing
+    possibleInitialContract /\ setInitialContract <- React.useState' Nothing
 
     { state: submissionState, applyAction, reset: resetStateMachine } <- do
       let
@@ -281,7 +281,7 @@ mkComponent = do
       pure (pure unit)
 
     let
-      form = mkJsonForm (initialContract /\ initialAutoRun)
+      form = mkJsonForm (possibleInitialContract /\ initialAutoRun)
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
