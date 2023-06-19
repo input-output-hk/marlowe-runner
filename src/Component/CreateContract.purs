@@ -41,6 +41,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
+import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
 import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..))
@@ -334,8 +335,8 @@ mkComponent = do
                 [ R.text "Submit" ]
             ]
         BodyLayout.component
-          { title: R.text "Add contract"
-          , description: R.text "Add a new contract"
+          { title: stateToTitle submissionState
+          , description: stateToDetailedDescription submissionState
           , body: formBody
           , footer: formActions
           }
@@ -348,8 +349,8 @@ mkComponent = do
             in applyAction action
 
         BodyLayout.component
-          { title: R.text "Define role token distribution"
-          , description: R.text "Define role token distribution"
+          { title: stateToTitle submissionState
+          , description: stateToDetailedDescription submissionState
           , body: roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
           , footer: DOOM.fragment
               [ link
@@ -383,7 +384,7 @@ mkComponent = do
               , case currentRun of
                   Just (Manual true) -> do
                     DOM.div { className: "d-flex justify-content-center" } $ spinner Nothing
-                  _ -> Machine.stateToDetailedDescription submissionState
+                  _ -> mempty -- stateToDetailedDescription submissionState
               ]
 
           formActions = case possibleRequest of
@@ -410,14 +411,14 @@ mkComponent = do
                   [ R.text "Run" ]
               ]
         BodyLayout.component
-          { title: DOOM.text $ stateToTitle submissionState
-          , description: DOOM.text "Creating contract"
+          { title: stateToTitle submissionState
+          , description: stateToDetailedDescription submissionState
           , body
           , footer: formActions
           }
 
-stateToTitle :: Machine.State -> String
-stateToTitle state = case state of
+stateToTitle :: Machine.State -> JSX
+stateToTitle state = DOOM.text case state of
   Machine.DefiningContract -> "Defining contract"
   Machine.DefiningRoleTokens {} -> "Defining role tokens"
   Machine.FetchingRequiredWalletContext {} -> "Fetching required wallet context"
@@ -442,8 +443,59 @@ machineStateToStepIndex state = StepIndex $ case state of
   Machine.SubmittigTx {} -> 6
   Machine.ContractCreated {} -> 7
 
+-- | We want to describe in details what kind of data we are gathering
+-- | when we are performing a given transtition (state determines the next transition in our case)
+-- | The output should be readable to the developer which should understand the whole flow.
+-- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]
+stateToDetailedDescription :: Machine.State -> JSX
+stateToDetailedDescription state = case state of
+  Machine.DefiningContract -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "We are in the initial state, we are waiting for the user to trigger the contract creation process."
+    , DOM.p {} $ DOOM.text "When we get the correct contract value (JSON) we gonna use it as a part of the request to the marlowe-runtime."
+    ]
+  Machine.DefiningRoleTokens {} -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "NOT IMPLEMENTED YET"
+    ]
+  Machine.FetchingRequiredWalletContext { errors: Nothing } -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "We are fetching the required wallet context."
+    , DOM.p {} $ DOOM.text "marlowe-runtime requires information about wallet addresses so it can pick UTxO to pay for the initial transaction."
+    , DOM.p {} $ DOOM.text $
+        "To gain the address set from the wallet we use CIP-30 `getUsedAddresses` method and reencoding them from lower "
+          <> "level cardano CBOR hex into Bech32 (`addr_test...`)."
+    ]
+  Machine.FetchingRequiredWalletContext { errors: Just error } -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "It seems that the provided wallet is lacking addresses or failed to execute the method:"
+    , DOM.p {} $ DOOM.text error
+    ]
+  Machine.CreatingTx { errors: Nothing } -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "We are using the marlowe-runtime to create the initial transaction."
+    ]
+  Machine.CreatingTx { reqWalletContext, errors: Just error } -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "It seems that the marlowe-runtime failed to create the initial transaction:"
+    , DOM.p {} $ DOOM.text error
+    , DOM.p {} $ DOOM.text "The wallet context we used:"
+    , DOM.p {} $ DOOM.text $ unsafeStringify reqWalletContext
+    ]
+  Machine.SigningTx { errors: Nothing } -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "We are signing the initial transaction."
+    ]
+  Machine.SigningTx { errors: Just error } -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "It seems that the wallet failed to sign the initial transaction:"
+    , DOM.p {} $ DOOM.text error
+    ]
+  Machine.SubmittigTx { errors: Nothing } -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "We are submitting the initial transaction."
+    ]
+  Machine.SubmittigTx { errors: Just error } -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "It seems that the marlowe-runtime failed to submit the initial transaction:"
+    , DOM.p {} $ DOOM.text error
+    ]
+  Machine.ContractCreated _ -> DOOM.div_
+    [ DOM.p {} $ DOOM.text "The contract was created successfully."
+    ]
+
 -- | Let's use error information and other details of the state to describe the sitution.
--- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOM.text "bar" ]
+-- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]
 stateToDescription :: Machine.State -> JSX
 stateToDescription state = case state of
   Machine.DefiningContract -> DOOM.text "Please define your contract."
