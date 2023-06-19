@@ -21,16 +21,14 @@ import CardanoMultiplatformLib.Address as Address
 import CardanoMultiplatformLib.Lib (Lib)
 import CardanoMultiplatformLib.Lib (Lib) as Exports
 import CardanoMultiplatformLib.Lib as Lib
-import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject, ValueObject(..), assetNameObject, assetNamesObject, assetsObject, bigNumObject, multiAssetObject, scriptHashObject, scriptHashesObject, value, valueObject)
+import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject, ValueObject, assetNameObject, assetNamesObject, assetsObject, bigNumObject, multiAssetObject, scriptHashObject, scriptHashesObject, value, valueObject)
 import CardanoMultiplatformLib.Transaction as Transaction
-import CardanoMultiplatformLib.Transaction as Value
 import CardanoMultiplatformLib.Types (Bech32, Cbor, CborHex, cborHexToCbor, cborHexToHex, unsafeBech32)
 import CardanoMultiplatformLib.Types (CborHex(..), Bech32, cborToCborHex, cborHexToHex, bech32ToString) as Exports
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (catchError)
 import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Monad.Reader.Class (asks)
-import Data.Argonaut (Json)
 import Data.Array as Array
 import Data.BigInt.Argonaut as BigInt.Argonaut
 import Data.Foldable (sequence_)
@@ -38,24 +36,23 @@ import Data.List (List)
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple.Nested ((/\))
 import Data.Undefined.NoProblem (Opt, toMaybe)
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Exception as Effect.Exception
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import HexString (hexToString)
 import JS.Object (EffectMth0, JSObject, runEffectMth0)
 import Promise.Aff (Promise, toAff)
 import Type.Prelude (Proxy(..))
-import Unsafe.Coerce (unsafeCoerce)
 import Web.Encoding.TextDecoder as TextDecoder
 import Web.Encoding.UtfLabel (utf8)
 
@@ -114,6 +111,19 @@ allocate alloc = GarbageCollector do
   liftEffect $ Ref.modify_ (List.Cons (runEffectMth0 _free jsobj)) freesRef
   pure obj
 
+allocateOpt :: forall r t. Newtype t (UnmanagedObject r) => Effect (Opt t) -> GarbageCollector (Opt t)
+allocateOpt alloc = GarbageCollector do
+  freesRef <- asks _.frees
+  possibleObj <- liftEffect alloc
+  case toMaybe possibleObj of
+    Just obj -> do
+      let
+        jsobj = unwrap obj
+        _free = Proxy :: Proxy "free"
+      liftEffect $ Ref.modify_ (List.Cons (runEffectMth0 _free jsobj)) freesRef
+    Nothing -> pure unit
+  pure possibleObj
+
 askLib :: GarbageCollector Lib
 askLib = GarbageCollector do
   asks _.lib
@@ -133,9 +143,7 @@ valueFromCbor cbor = do
   textDecoder <- liftEffect $ TextDecoder.new utf8
   { "Value": valueClass } <- GarbageCollector $ asks (Lib.props <<< _.lib)
   valObj <- allocate $ value.from_bytes valueClass cbor
-
-  -- FIXME: THIS IS LEAKING MEMORY - we have to use some kind of allocate over Opt
-  possibleMultiAssetObj <- liftEffect $ valueObject.multiasset valObj
+  possibleMultiAssetObj <- allocateOpt $ valueObject.multiasset valObj
   case toMaybe possibleMultiAssetObj of
     Nothing -> pure Map.empty
     Just multiAssetObj -> do
@@ -146,25 +154,22 @@ valueFromCbor cbor = do
         hex <- liftEffect $ scriptHashObject.to_hex scriptHashObj
         let
           policyId = (hexToString <<< cborHexToHex $ hex)
-
-        -- FIXME: THIS IS LEAKING MEMORY - we have to use some kind of allocate over Opt
-        possibleAssets <- liftEffect $ multiAssetObject.get multiAssetObj scriptHashObj
+        possibleAssets <- allocateOpt $ multiAssetObject.get multiAssetObj scriptHashObj
         case toMaybe possibleAssets of
           Nothing -> pure $ policyId /\ Map.empty
           Just assetsObj -> do
-            assetNamesObj <- liftEffect $ assetsObject.keys assetsObj
+            assetNamesObj <- allocate $ assetsObject.keys assetsObj
             assetNamesLen <- liftEffect $ assetNamesObject.len assetNamesObj
             ((policyId /\ _) <<< Map.fromFoldable) <$> forWithIndex (Array.replicate assetNamesLen unit) \idx' _ -> do
               assetNameObj <- allocate $ assetNamesObject.get assetNamesObj idx'
               nameUint8Array <- liftEffect $ assetNameObject.name assetNameObj
               assetName <- liftEffect $ TextDecoder.decode nameUint8Array textDecoder
 
-
               bigNumObj <- allocate $ multiAssetObject.get_asset multiAssetObj scriptHashObj assetNameObj
               numStr <- liftEffect $ bigNumObject.to_str bigNumObj
-              let
-                int = fromMaybe zero $ BigInt.Argonaut.fromString numStr
-              pure (assetName /\ int)
+              case BigInt.Argonaut.fromString numStr of
+                Nothing -> liftEffect $ throwError $ Effect.Exception.error $ "CardanoMultiplatformLib.valueFromCbor: Failed to parse BigInt: " <> numStr
+                Just num -> pure $ assetName /\ num
 
 bech32FromCbor :: Cbor AddressObject -> Opt String -> GarbageCollector Bech32
 bech32FromCbor cbor prefix = do

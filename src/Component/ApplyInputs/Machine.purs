@@ -5,17 +5,24 @@ import Prelude
 import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
-import Component.InputHelper (ChoiceInput, DepositInput, NotifyInput)
+import Component.InputHelper (ChoiceInput, DepositInput, NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Types (WalletInfo(..))
+import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Fetch (FetchError)
+import Control.Alternative as Alternative
 import Control.Monad.Error.Class (catchError)
+import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NonEmpty
 import Data.DateTime.Instant (instant, toDateTime, unInstant)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
-import Data.Time.Duration (fromDuration)
+import Data.Either (Either(..), isLeft)
+import Data.Foldable (foldMap)
+import Data.Int as Int
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Time.Duration (Milliseconds(..), fromDuration)
 import Data.Time.Duration as Time.Duration
 import Data.Variant (Variant)
+import Debug (traceM)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
@@ -29,15 +36,6 @@ import WalletContext (WalletContext(..), walletContext)
 
 type ClientError' = ClientError PostContractsError
 
-data ContractData = ContractData
-  { contract :: V1.Contract
-  , walletAddresses ::
-      { changeAddress :: Bech32
-      , usedAddresses :: Array Bech32
-      }
-  -- , collateralUTxOs :: Array TxOutRef
-  }
-
 type WalletAddresses = { usedAddresses :: Array Bech32, changeAddress :: Bech32 }
 
 type RequiredWalletContext = WalletAddresses
@@ -46,77 +44,122 @@ type AllInputsChoices = Either
   V1.Contract
   { deposits :: Maybe (NonEmptyArray DepositInput)
   , choices :: Maybe (NonEmptyArray ChoiceInput)
-  , notifies :: Maybe NotifyInput
+  , notify :: Maybe NotifyInput
   }
 
+canDeposit :: AllInputsChoices -> Boolean
+canDeposit (Right { deposits }) = isJust deposits
+canDeposit _ = false
+
+canChoose :: AllInputsChoices -> Boolean
+canChoose (Right { choices }) = isJust choices
+canChoose _ = false
+
+canNotify :: AllInputsChoices -> Boolean
+canNotify (Right { notify }) = isJust notify
+canNotify _ = false
+
+canAdvance :: AllInputsChoices -> Boolean
+canAdvance possibleInputs = isLeft possibleInputs
+
 data InputChoices
-  = DepositInputs (Array DepositInput)
-  | ChoiceInputs (Array ChoiceInput)
+  = DepositInputs (NonEmptyArray DepositInput)
+  | ChoiceInputs (NonEmptyArray ChoiceInput)
   | SpecificNotifyInput NotifyInput
+  | AdvanceContract V1.Contract
+
+
+newtype AutoRun = AutoRun Boolean
 
 data State
-  = ChoosingInputType
-      { errors :: Maybe String
-      , allInputsChoices :: AllInputsChoices
-      , transactionsEndpoint :: TransactionsEndpoint
-      }
-  | PickingInput
-      { errors :: Maybe String
-      , allInputsChoices :: AllInputsChoices
-      , inputChoices :: InputChoices
+  = PresentingContractDetails
+      { marloweContext :: MarloweContext
       , transactionsEndpoint :: TransactionsEndpoint
       }
   | FetchingRequiredWalletContext
-      { allInputsChoices :: AllInputsChoices
+      { autoRun :: AutoRun
+      , marloweContext :: MarloweContext
       , transactionsEndpoint :: TransactionsEndpoint
-      , inputChoices :: InputChoices
       , errors :: Maybe String
-      , input :: V1.Input
+      }
+  | ChoosingInputType
+      { autoRun :: AutoRun
+      , errors :: Maybe String
+      , allInputsChoices :: AllInputsChoices
+      , requiredWalletContext :: RequiredWalletContext
+      , transactionsEndpoint :: TransactionsEndpoint
+      }
+  | PickingInput
+      { autoRun :: AutoRun
+      , errors :: Maybe String
+      , allInputsChoices :: AllInputsChoices
+      , inputChoices :: InputChoices
+      , requiredWalletContext :: RequiredWalletContext
+      , transactionsEndpoint :: TransactionsEndpoint
       }
   | CreatingTx
-      { errors :: Maybe String
+      { autoRun :: AutoRun
+      , errors :: Maybe String
       , allInputsChoices :: AllInputsChoices
       , transactionsEndpoint :: TransactionsEndpoint
       , inputChoices :: InputChoices
-      , input :: V1.Input
+      , input :: Maybe V1.Input
       , requiredWalletContext :: RequiredWalletContext
       }
   | SigningTx
-      { errors :: Maybe String
+      { autoRun :: AutoRun
+      , errors :: Maybe String
       , allInputsChoices :: AllInputsChoices
       , inputChoices :: InputChoices
-      , input :: V1.Input
+      , input :: Maybe V1.Input
       , createTxResponse :: ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint)
       }
   | SubmittingTx
-      { errors :: Maybe String
+      { autoRun :: AutoRun
+      , errors :: Maybe String
       , allInputsChoices :: AllInputsChoices
       , inputChoices :: InputChoices
-      , input :: V1.Input
+      , input :: Maybe V1.Input
       , createTxResponse :: ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint)
       , txWitnessSet :: CborHex TransactionWitnessSetObject
       }
   | InputApplied
-      { allInputsChoices :: AllInputsChoices
+      { autoRun :: AutoRun
+      , allInputsChoices :: AllInputsChoices
       , inputChoices :: InputChoices
-      , input :: V1.Input
+      , input :: Maybe V1.Input
       , txWitnessSet :: CborHex TransactionWitnessSetObject
       , createTxResponse :: ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint)
       }
 
+autoRunFromState :: State -> Maybe AutoRun
+autoRunFromState = case _ of
+  PresentingContractDetails _ -> Nothing
+  FetchingRequiredWalletContext { autoRun } -> Just autoRun
+  ChoosingInputType { autoRun } -> Just autoRun
+  PickingInput { autoRun } -> Just autoRun
+  CreatingTx { autoRun } -> Just autoRun
+  SigningTx { autoRun } -> Just autoRun
+  SubmittingTx { autoRun } -> Just autoRun
+  InputApplied { autoRun } -> Just autoRun
+
 data Action
-  = ChooseInputType
-      { allInputsChoices :: AllInputsChoices
-      , transactionEndpoint :: TransactionsEndpoint
+  = FetchRequiredWalletContext
+      { autoRun :: AutoRun
+      , marloweContext :: MarloweContext
+      , transactionsEndpoint :: TransactionsEndpoint
       }
+  | FetchRequiredWalletContextFailed String
+  | FetchRequiredWalletContextSucceeded
+      { allInputsChoices :: AllInputsChoices
+      , requiredWalletContext :: RequiredWalletContext
+      }
+  | ChooseInputType
   | ChooseInputTypeFailed String
   | ChooseInputTypeSucceeded InputChoices
   | PickInput
   | PickInputFailed String
-  | PickInputSucceeded V1.Input
-  | FetchRequiredWalletContext
-  | FetchRequiredWalletContextFailed String
-  | FetchRequiredWalletContextSucceeded RequiredWalletContext
+  | PickInputSucceeded (Maybe V1.Input)
   | CreateTx
   | CreateTxFailed String
   | CreateTxSucceeded (ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint))
@@ -130,38 +173,50 @@ data Action
 step :: State -> Action -> State
 step state action = do
   case state of
-    ChoosingInputType r@{ errors: Just _ } -> case action of
-      ChooseInputType _ -> ChoosingInputType $ r { errors = Nothing }
+    PresentingContractDetails _ -> case action of
+      FetchRequiredWalletContext { autoRun, marloweContext, transactionsEndpoint } -> FetchingRequiredWalletContext
+        { autoRun
+        , marloweContext
+        , transactionsEndpoint
+        , errors: Nothing
+        }
       _ -> state
-    ChoosingInputType r@{ allInputsChoices, transactionsEndpoint } -> case action of
+    FetchingRequiredWalletContext { errors: Just _ } -> case action of
+      FetchRequiredWalletContext { autoRun, marloweContext, transactionsEndpoint } ->
+        FetchingRequiredWalletContext $ { autoRun, marloweContext, transactionsEndpoint, errors: Nothing }
+      _ -> state
+    FetchingRequiredWalletContext r@{ autoRun, transactionsEndpoint } -> case action of
+      FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
+      FetchRequiredWalletContextSucceeded { requiredWalletContext, allInputsChoices } -> ChoosingInputType
+        { autoRun
+        , errors: Nothing
+        , allInputsChoices
+        , requiredWalletContext
+        , transactionsEndpoint
+        }
+      _ -> state
+    ChoosingInputType r@{ errors: Just _ } -> case action of
+      ChooseInputType -> ChoosingInputType r { errors = Nothing }
+      _ -> state
+    ChoosingInputType r@{ allInputsChoices, autoRun, requiredWalletContext, transactionsEndpoint } -> case action of
       ChooseInputTypeFailed error -> ChoosingInputType $ r { errors = Just error }
       ChooseInputTypeSucceeded inputChoices -> PickingInput
-        { errors: Nothing
+        { autoRun
+        , errors: Nothing
         , allInputsChoices
         , inputChoices
+        , requiredWalletContext
         , transactionsEndpoint
         }
       _ -> state
     PickingInput r@{ errors: Just _ } -> case action of
       PickInput -> PickingInput $ r { errors = Nothing }
       _ -> state
-    PickingInput r@{ allInputsChoices, inputChoices, transactionsEndpoint } -> case action of
+    PickingInput r@{ allInputsChoices, autoRun, inputChoices, requiredWalletContext, transactionsEndpoint } -> case action of
       PickInputFailed error -> PickingInput $ r { errors = Just error }
-      PickInputSucceeded input -> FetchingRequiredWalletContext
-        { errors: Nothing
-        , allInputsChoices
-        , inputChoices
-        , input
-        , transactionsEndpoint
-        }
-      _ -> state
-    FetchingRequiredWalletContext r@{ errors: Just _ } -> case action of
-      FetchRequiredWalletContext -> FetchingRequiredWalletContext $ r { errors = Nothing }
-      _ -> state
-    FetchingRequiredWalletContext r@{ allInputsChoices, transactionsEndpoint, inputChoices, input } -> case action of
-      FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
-      FetchRequiredWalletContextSucceeded requiredWalletContext -> CreatingTx
-        { errors: Nothing
+      PickInputSucceeded input -> CreatingTx
+        { autoRun
+        , errors: Nothing
         , allInputsChoices
         , inputChoices
         , input
@@ -172,24 +227,26 @@ step state action = do
     CreatingTx r@{ errors: Just _ } -> case action of
       CreateTx -> CreatingTx $ r { errors = Nothing }
       _ -> state
-    CreatingTx r@{ allInputsChoices, inputChoices, input } -> case action of
+    CreatingTx r@{ allInputsChoices, autoRun, inputChoices, input } -> case action of
       CreateTxFailed error -> CreatingTx $ r { errors = Just error }
-      CreateTxSucceeded createTxResponse -> SigningTx { errors: Nothing, allInputsChoices, inputChoices, input, createTxResponse }
+      CreateTxSucceeded createTxResponse -> SigningTx
+        { autoRun, errors: Nothing, allInputsChoices, inputChoices, input, createTxResponse }
       _ -> state
     SigningTx r@{ errors: Just _ } -> case action of
       SignTx -> SigningTx $ r { errors = Nothing }
       _ -> state
-    SigningTx r@{ allInputsChoices, inputChoices, input, createTxResponse } -> case action of
+    SigningTx r@{ allInputsChoices, autoRun, inputChoices, input, createTxResponse } -> case action of
       SignTxFailed error -> SigningTx $ r { errors = Just error }
-      SignTxSucceeded txWitnessSet -> SubmittingTx { errors: Nothing, allInputsChoices, inputChoices, input, createTxResponse, txWitnessSet }
+      SignTxSucceeded txWitnessSet -> SubmittingTx
+        { autoRun, errors: Nothing, allInputsChoices, inputChoices, input, createTxResponse, txWitnessSet }
       _ -> state
     SubmittingTx r@{ errors: Just _ } -> case action of
       SubmitTx -> SubmittingTx $ r { errors = Nothing }
       _ -> state
-    SubmittingTx r@{ allInputsChoices, inputChoices, input, createTxResponse, txWitnessSet } -> case action of
+    SubmittingTx r@{ allInputsChoices, autoRun, inputChoices, input, createTxResponse, txWitnessSet } -> case action of
       SubmitTxFailed error -> SubmittingTx $ r { errors = Just error }
       SubmitTxSucceeded ->
-        InputApplied { allInputsChoices, inputChoices, input, txWitnessSet, createTxResponse }
+        InputApplied { allInputsChoices, autoRun, inputChoices, input, txWitnessSet, createTxResponse }
       _ -> state
     InputApplied _ -> state
 
@@ -199,12 +256,21 @@ type Env =
   , runtime :: Runtime
   }
 
-initialState :: AllInputsChoices -> TransactionsEndpoint -> State
-initialState allInputsChoices transactionsEndpoint = ChoosingInputType { errors: Nothing, allInputsChoices, transactionsEndpoint }
+initialState :: V1.Contract -> V1.State -> TransactionsEndpoint -> State
+initialState contract state transactionsEndpoint = PresentingContractDetails do
+  let
+    marloweContext = { contract, state }
+  { marloweContext, transactionsEndpoint }
+
+type MarloweContext =
+  { contract :: V1.Contract
+  , state :: V1.State
+  }
 
 data WalletRequest
   = FetchWalletContextRequest
-      { cardanoMultiplatformLib :: CardanoMultiplatformLib.Lib
+      { marloweContext :: MarloweContext
+      , cardanoMultiplatformLib :: CardanoMultiplatformLib.Lib
       , walletInfo :: WalletInfo Wallet.Api
       }
   | SignTxRequest
@@ -216,7 +282,7 @@ data RuntimeRequest
   = CreateTxRequest
       { allInputsChoices :: AllInputsChoices
       , inputChoices :: InputChoices
-      , input :: V1.Input
+      , input :: Maybe V1.Input
       , requiredWalletContext :: RequiredWalletContext
       , serverURL :: ServerURL
       , transactionsEndpoint :: TransactionsEndpoint
@@ -232,13 +298,17 @@ data Request
   | RuntimeRequest RuntimeRequest
 
 nextRequest :: Env -> State -> Maybe Request
-nextRequest env = do
+nextRequest env state = do
   let
     { cardanoMultiplatformLib, connectedWallet: walletInfo, runtime } = env
     Runtime { serverURL } = runtime
-  case _ of
-    PickingInput { errors: Nothing } ->
-      Just $ WalletRequest $ FetchWalletContextRequest { cardanoMultiplatformLib, walletInfo }
+    AutoRun autoRun = fromMaybe (AutoRun false) $ autoRunFromState state
+  Alternative.guard autoRun
+  case state of
+    PresentingContractDetails { marloweContext } ->
+      Just $ WalletRequest $ FetchWalletContextRequest { marloweContext, cardanoMultiplatformLib, walletInfo }
+    FetchingRequiredWalletContext { marloweContext, errors: Nothing } ->
+      Just $ WalletRequest $ FetchWalletContextRequest { marloweContext, cardanoMultiplatformLib, walletInfo }
     CreatingTx { errors: Nothing, inputChoices, input, allInputsChoices, requiredWalletContext, transactionsEndpoint } -> do
       Just $ RuntimeRequest $ CreateTxRequest
         { allInputsChoices
@@ -260,14 +330,32 @@ nextRequest env = do
 requestToAffAction :: Request -> Aff Action
 requestToAffAction = case _ of
   WalletRequest walletRequest -> case walletRequest of
-    FetchWalletContextRequest { cardanoMultiplatformLib, walletInfo } -> do
+    FetchWalletContextRequest { cardanoMultiplatformLib, marloweContext, walletInfo } -> do
       let
         WalletInfo { wallet } = walletInfo
       possibleWalletAddresses <- (Right <$> walletContext cardanoMultiplatformLib wallet) `catchError` (pure <<< Left)
       case possibleWalletAddresses of
         Left err -> pure $ FetchRequiredWalletContextFailed $ show err
-        Right (WalletContext { changeAddress: Just changeAddress, usedAddresses }) -> do
-          pure $ FetchRequiredWalletContextSucceeded { changeAddress, usedAddresses }
+        Right (WalletContext { changeAddress: Just changeAddress, usedAddresses }) -> liftEffect $ do
+          invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-5) * 60 * 1000))
+          invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
+          let
+            { contract, state } = marloweContext
+            timeInterval = V1.TimeInterval invalidBefore invalidHereafter
+            environment = V1.Environment { timeInterval }
+            allInputsChoices = case nextTimeoutAdvance environment contract of
+              Just advanceContinuation -> Left advanceContinuation
+              Nothing -> do
+                let
+                  deposits = NonEmpty.fromArray $ nextDeposit environment state contract
+                  choices = NonEmpty.fromArray $ nextChoice environment state contract
+                  notify = NonEmpty.head <$> NonEmpty.fromArray (nextNotify environment state contract)
+                Right { deposits, choices, notify }
+
+          pure $ FetchRequiredWalletContextSucceeded
+            { requiredWalletContext: { changeAddress, usedAddresses }
+            , allInputsChoices
+            }
         Right (WalletContext { changeAddress: Nothing }) -> pure $ FetchRequiredWalletContextFailed "Wallet does not have a change address"
     SignTxRequest { walletInfo, tx } -> do
       let
@@ -277,7 +365,9 @@ requestToAffAction = case _ of
         Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
   RuntimeRequest runtimeRequest -> case runtimeRequest of
     CreateTxRequest { input, requiredWalletContext, serverURL, transactionsEndpoint } -> do
-      create [input] requiredWalletContext serverURL transactionsEndpoint >>= case _ of
+      let
+        inputs = foldMap Array.singleton input
+      create inputs requiredWalletContext serverURL transactionsEndpoint >>= case _ of
         Right res -> pure $ CreateTxSucceeded res
         Left err -> pure $ CreateTxFailed $ show err
     SubmitTxRequest { txWitnessSet, createTxResponse, serverURL } -> do

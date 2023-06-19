@@ -41,6 +41,7 @@ type ModalOptionalProps =
   ( footer :: JSX
   , onDismiss :: Effect Unit
   , size :: Size
+  , fullscreen :: Boolean
   )
 
 defaultModalOptionalProps :: { | ModalOptionalProps }
@@ -48,6 +49,7 @@ defaultModalOptionalProps =
   { footer: mempty :: JSX
   , onDismiss: pure unit
   , size: Medium
+  , fullscreen: false
   }
 
 type ModalProps =
@@ -66,7 +68,7 @@ mkModal
 mkModal = do
   component "Modal" \props -> React.do
     let
-      { body, footer, onDismiss, title, size } = defaults defaultModalOptionalProps props
+      { body, footer, fullscreen, onDismiss, title, size } = defaults defaultModalOptionalProps props
     useEffectOnce do
       doc <- (window >>= document) <#> toDocument
       getElementsByTagName "body" doc >>= HTMLCollection.toArray >>= case _ of
@@ -93,11 +95,13 @@ mkModal = do
       -- other handler.
       onModalDialogClicked = handler stopPropagation (const $ pure unit)
 
-      modalClassName = "modal-dialog" <> case size of
-        Small -> " modal-sm"
-        Medium -> " modal-md"
-        Large -> " modal-lg"
-        ExtraLarge -> " modal-xl"
+      modalClassName = "modal-dialog" <> if fullscreen
+        then " modal-fullscreen"
+        else case size of
+          Small -> " modal-sm"
+          Medium -> " modal-md"
+          Large -> " modal-lg"
+          ExtraLarge -> " modal-xl"
 
     pure $
       DOM.div { className: "modal fade show", onClick: onModalClicked, style: css { "display": "block" }, _aria: fromHomogeneous { modal: "true" }, role: "dialog" }

@@ -8,10 +8,25 @@ import Data.Maybe (Maybe(..))
 import Language.Marlowe.Core.V1.Folds (MapStep(..), foldMapContract)
 import Language.Marlowe.Core.V1.Semantics (evalObservation, evalValue)
 import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId(..), Contract(..), Environment(..), Observation(..), Party(..), Payee(..), State, TimeInterval(..), Token, TokenName, Value(..))
+import Language.Marlowe.Core.V1.Semantics.Types as V1
 
 data DepositInput = DepositInput AccountId Party Token BigInt.BigInt (Maybe Contract)
 data ChoiceInput  = ChoiceInput ChoiceId (Array Bound) (Maybe Contract)
 data NotifyInput  = NotifyInput (Maybe Contract)
+
+toIDeposit :: DepositInput -> Maybe V1.InputContent
+toIDeposit (DepositInput accId p tok val (Just _)) = Just $ V1.IDeposit accId p tok val
+toIDeposit _ = Nothing
+
+toIChoice :: ChoiceInput -> BigInt.BigInt -> Maybe V1.InputContent
+toIChoice (ChoiceInput chid _ (Just _)) value = do
+  Just $ V1.IChoice chid value
+toIChoice _ _ = Nothing
+
+toINotify :: NotifyInput -> Maybe V1.InputContent
+toINotify (NotifyInput (Just _)) = Just V1.INotify
+toINotify _ = Nothing
+
 
 -- | Contract expected to be in a quiescent state
 nextDeposit :: Environment -> State -> Contract -> Array DepositInput

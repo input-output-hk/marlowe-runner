@@ -115,7 +115,7 @@ submit witnesses serverUrl transactionEndpoint = do
 
 data ModalAction
   = NewContract
-  | ApplyInputs TransactionsEndpoint V1.Contract V1.State TimeInterval
+  | ApplyInputs TransactionsEndpoint V1.Contract V1.State
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
 
 derive instance Eq ModalAction
@@ -131,6 +131,7 @@ mkForm onFieldValueChange = FormBuilder.evalBuilder' ado
         pure value
     , name: Just queryFieldId
     , placeholder: "Filter contracts..."
+    , sizing: Just FormBuilder.FormControlLg
     }
   in
     { query }
@@ -176,181 +177,166 @@ mkContractList = do
           Array.filter (\(ContractInfo { contractId }) -> contains (Pattern queryValue) (txOutRefToString contractId)) contracts'
 
       isLoadingContracts :: Boolean
-      isLoadingContracts = any (\ci@(ContractInfo { _runtime, endpoints, marloweInfo }) -> isNothing marloweInfo) contracts''
+      isLoadingContracts = any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts''
 
-    pure $ do
-      DOOM.div_
-        [ case possibleModalAction, connectedWallet of
-            Just NewContract, Just cw -> createContractComponent
-              { connectedWallet: cw
-              , onDismiss: resetModalAction
-              , onSuccess: \_ -> do
-                  msgHubProps.add $ Success $ DOOM.text $ fold
-                    [ "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain."
-                    , "Contract status should change to 'Confirmed' at that point."
-                    ]
-                  resetModalAction
-              }
-            Just (ApplyInputs transactionsEndpoint contract st timeInterval), Just cw -> do
-              let
-                onSuccess = \_ -> do
-                  msgHubProps.add $ Success $ DOOM.text $ fold
-                    [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
-                  resetModalAction
-              applyInputsComponent
-                { inModal: true
-                , transactionsEndpoint
-                , timeInterval
-                , contract
-                , state: st
-                , connectedWallet: cw
-                , onSuccess
-                , onDismiss: resetModalAction
-                }
-            Just (Withdrawal withdrawalsEndpoint roles contractId), Just cw -> do
-              let
-                onSuccess = \_ -> do
-                  msgHubProps.add $ Success $ DOOM.text $ fold
-                    [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
-                  resetModalAction
-              withdrawalsComponent
-                { inModal: true
-                , withdrawalsEndpoint
-                , roles
-                , contractId
-                , connectedWallet: cw
-                , onSuccess
-                , onDismiss: resetModalAction
-                }
-            _, _ -> mempty
-        , DOM.div { className: "row position-sticky top-0 bg-white pt-5 shadow-bottom mb-5" } do
-            let
-              disabled = isNothing connectedWallet
-              newContractButton = buttonWithIcon
-                { icon: unsafeIcon "file-earmark-plus h5 mr-2"
-                , label: DOOM.text "New Contract"
-                , extraClassNames: "font-weight-bold"
-                , disabled
-                , onClick: do
-                    readRef possibleModalActionRef >>= case _ of
-                      Nothing -> setModalAction NewContract
-                      _ -> pure unit
-                }
-              fields = UseForm.renderForm form formState
-              body = DOM.div { className: "form-group" } fields
-            -- actions = DOOM.fragment []
-            [ DOM.div { className: "col-9 text-end my-5" } $
-                [ body
-                -- , actions
+    pure $
+      case possibleModalAction, connectedWallet of
+        Just NewContract, Just cw -> createContractComponent
+          { connectedWallet: cw
+          , onDismiss: resetModalAction
+          , onSuccess: \_ -> do
+              msgHubProps.add $ Success $ DOOM.text $ fold
+                [ "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain."
+                , "Contract status should change to 'Confirmed' at that point."
                 ]
-            , DOM.div { className: "col-3 text-end my-5" } $ Array.singleton $
-                if disabled then do
-                  let
-                    tooltipJSX = tooltip {} (DOOM.text "Connect to a wallet to add a contract")
-                  overlayTrigger
-                    { overlay: tooltipJSX
-                    , placement: OverlayTrigger.placement.bottom
-                    }
-                    -- Disabled button doesn't trigger the hook,
-                    -- so we wrap it in a `span`
-                    (DOOM.span_ [ newContractButton ])
-                else
-                  newContractButton
-            ]
-        , DOM.div { className: "row" }
-            [ table { striped: Table.striped.boolean true, hover: true }
-                [ DOM.thead {} do
-                    let
-                      orderingTh = Table.orderingHeader ordering updateOrdering
-                      th label = DOM.th { className: "text-center text-muted" } [ label ]
-                    [ DOM.tr {}
-                        [ do
-                            let
-                              label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                            orderingTh label OrderByCreationDate
-                        , th $ DOOM.text "Contract Id"
-                        , th $ DOOM.text "Actions"
-                        ]
-                    ]
-                , DOM.tbody {} $ map
-                    ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo }) ->
-                        let
-                          ContractHeader { contractId, status } = _runtime.contractHeader
-                          tdCentered = DOM.td { className: "text-center" }
-                        in
-                          DOM.tr {}
-                            [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
-                            , tdCentered
-                                [ DOM.a
-                                    { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
-                                    , target: "_blank"
-                                    , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
-                                    }
-                                    [ text $ txOutRefToString contractId ]
-                                ]
-                            -- , DOM.td { className: "text-center" } $ do
-                            --     let
-                            --       tooltipJSX = tooltip {}
-                            --         ( case marloweInfo of
-                            --             Just (MarloweInfo { currentContract: Just contract, state: Just contractState }) ->
-                            --               [ DOM.div {} [ text $ show contract ], DOOM.hr {}, DOM.div {} [ text $ prettyState contractState ] ]
-                            --             _ -> mempty
-                            --         )
-                            --     overlayTrigger
-                            --       { overlay: tooltipJSX
-                            --       , placement: OverlayTrigger.placement.bottom
-                            --       } $ DOM.span {} [ show status ]
-                            , tdCentered
-                                [ case endpoints.transactions, marloweInfo of
-                                    Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
-                                      { icon: unsafeIcon "fast-forward-fill h2"
-                                      , label: mempty
-                                      , tooltipText: Just "Apply available inputs to the contract"
-                                      , onClick: do
-                                          invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-5) * 60 * 1000))
-                                          invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
-                                          let
-                                            interval = TimeInterval invalidBefore invalidHereafter
-                                          setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState interval
-                                      }
-                                    _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                      { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
-                                      , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
-                                      , label: mempty
-                                      , onClick: mempty
-                                      }
-                                    _, _ -> mempty
-                                , case marloweInfo, possibleWalletContext of
-                                    Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
-                                      let
-                                        rolesFromContract = rolesInContract initialContract
-                                        roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
-                                      case Array.uncons (Array.intersect roleTokens rolesFromContract) of
-                                        Just { head, tail } ->
-                                          linkWithIcon
-                                            { icon: unsafeIcon "cash-coin h2"
-                                            , label: mempty
-                                            , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                            , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
-                                            }
-                                        _ -> mempty
-                                    _, _ -> mempty
-                                ]
-                            ]
-                    )
-                    contracts''
-                ]
-            , if isLoadingContracts then
-                DOM.div
-                  { className: "position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
+              resetModalAction
+          }
+        Just (ApplyInputs transactionsEndpoint contract st), Just cw -> DOM.div { className: "row" } $ DOM.div { className: "col-12" } do
+          let
+            onSuccess = \_ -> do
+              msgHubProps.add $ Success $ DOOM.text $ fold
+                [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
+              resetModalAction
+          applyInputsComponent
+            { inModal: true
+            , transactionsEndpoint
+            , contract
+            , state: st
+            , connectedWallet: cw
+            , onSuccess
+            , onDismiss: resetModalAction
+            }
+        Just (Withdrawal withdrawalsEndpoint roles contractId), Just cw -> DOM.div { className: "row" } $ DOM.div { className: "col-12" } do
+          let
+            onSuccess = \_ -> do
+              msgHubProps.add $ Success $ DOOM.text $ fold
+                [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
+              resetModalAction
+          withdrawalsComponent
+            { inModal: true
+            , withdrawalsEndpoint
+            , roles
+            , contractId
+            , connectedWallet: cw
+            , onSuccess
+            , onDismiss: resetModalAction
+            }
+        Nothing, _ -> DOM.div { className: "container-fluid" } $ DOM.div { className: "row" }
+          [ DOM.div { className: "col-3" } $ DOOM.text "DESCRIPTION"
+          , DOM.div { className: "col-9" } do
+            [ DOM.div { className: "row position-sticky top-0 bg-white pt-5 shadow-bottom mb-5" } do
+              let
+                disabled = isNothing connectedWallet
+                newContractButton = buttonWithIcon
+                  { icon: unsafeIcon "file-earmark-plus h5 mr-2"
+                  , label: DOOM.text "New Contract"
+                  , extraClassNames: "font-weight-bold"
+                  , disabled
+                  , onClick: do
+                      readRef possibleModalActionRef >>= case _ of
+                        Nothing -> setModalAction NewContract
+                        _ -> pure unit
                   }
-                  $ loadingSpinnerLogo
-                      {}
+                fields = UseForm.renderForm form formState
+                body = DOM.div { className: "form-group" } fields
+              -- actions = DOOM.fragment []
+              [ DOM.div { className: "col-9 text-end my-5" } $
+                  [ body
+                  -- , actions
+                  ]
+              , DOM.div { className: "col-3 text-end my-5" } $ Array.singleton $
+                  if disabled then do
+                    let
+                      tooltipJSX = tooltip {} (DOOM.text "Connect to a wallet to add a contract")
+                    overlayTrigger
+                      { overlay: tooltipJSX
+                      , placement: OverlayTrigger.placement.bottom
+                      }
+                      -- Disabled button doesn't trigger the hook,
+                      -- so we wrap it in a `span`
+                      (DOOM.span_ [ newContractButton ])
+                  else
+                    newContractButton
+              ]
+          , DOM.div { className: "row" }
+              [ table { striped: Table.striped.boolean true, hover: true }
+                  [ DOM.thead {} do
+                      let
+                        orderingTh = Table.orderingHeader ordering updateOrdering
+                        th label = DOM.th { className: "text-center text-muted" } [ label ]
+                      [ DOM.tr {}
+                          [ do
+                              let
+                                label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                              orderingTh label OrderByCreationDate
+                          , th $ DOOM.text "Contract Id"
+                          , th $ DOOM.text "Actions"
+                          ]
+                      ]
+                  , DOM.tbody {} $ map
+                      ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo }) ->
+                          let
+                            ContractHeader { contractId, status } = _runtime.contractHeader
+                            tdCentered = DOM.td { className: "text-center" }
+                          in
+                            DOM.tr {}
+                              [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
+                              , tdCentered
+                                  [ DOM.a
+                                      { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
+                                      , target: "_blank"
+                                      , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
+                                      }
+                                      [ text $ txOutRefToString contractId ]
+                                  ]
+                              , tdCentered
+                                  [ case endpoints.transactions, marloweInfo of
+                                      Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
+                                        { icon: unsafeIcon "fast-forward-fill h2"
+                                        , label: mempty
+                                        , tooltipText: Just "Apply available inputs to the contract"
+                                        , onClick: setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState
+                                        }
+                                      _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
+                                        { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
+                                        , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
+                                        , label: mempty
+                                        , onClick: mempty
+                                        }
+                                      _, _ -> mempty
+                                  , case marloweInfo, possibleWalletContext of
+                                      Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
+                                        let
+                                          rolesFromContract = rolesInContract initialContract
+                                          roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
+                                        case Array.uncons (Array.intersect roleTokens rolesFromContract) of
+                                          Just { head, tail } ->
+                                            linkWithIcon
+                                              { icon: unsafeIcon "cash-coin h2"
+                                              , label: mempty
+                                              , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                              , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                              }
+                                          _ -> mempty
+                                      _, _ -> mempty
+                                  ]
+                              ]
+                      )
+                      contracts''
+                  ]
+              , if isLoadingContracts then
+                  DOM.div
+                    { className: "position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
+                    }
+                    $ loadingSpinnerLogo
+                        {}
 
-              else
-                mempty
+                else
+                  mempty
+              ]
             ]
-        ]
+          ]
+        _, _ -> mempty
 
 prettyState :: V1.State -> String
 prettyState = stringify <<< encodeJson

@@ -315,14 +315,34 @@ transactionWitnessSet
      }
 transactionWitnessSet = mkNewtypedFFI (Proxy :: Proxy TransactionWitnessSet)
 
-newtype TransactionWitnessSetObject = TransactionWitnessSetObject (JSObject (free :: EffectMth0 Unit))
+newtype TransactionWitnessSetObject = TransactionWitnessSetObject
+  ( JSObject
+    ( free :: EffectMth0 Unit
+    , to_bytes :: EffectMth0 Uint8Array
+    , to_json :: EffectMth0 JsonString
+    , to_js_value :: EffectMth0 Json -- TransactionWitnessSetJSON
+    -- , set_vkeys :: Vkeywitnesses -> Effect Unit
+    -- , vkeys :: Effect (Maybe Vkeywitnesses)
+    -- , set_native_scripts :: NativeScripts -> Effect Unit
+    -- , native_scripts :: Effect (Maybe NativeScripts)
+    -- , set_bootstraps :: BootstrapWitnesses -> Effect Unit
+    -- , bootstraps :: Effect (Maybe BootstrapWitnesses)
+    -- , set_plutus_v1_scripts :: PlutusV1Scripts -> Effect Unit
+    -- , plutus_v1_scripts :: Effect (Maybe PlutusV1Scripts)
+    -- , set_plutus_data :: PlutusList -> Effect Unit
+    -- , plutus_data :: Effect (Maybe PlutusList)
+    )
+  )
 
 derive instance Newtype TransactionWitnessSetObject _
 
-transactionWitnessObject
+transactionWitnessSetObject
   :: { free :: TransactionWitnessSetObject -> Effect Unit
+     , to_bytes :: TransactionWitnessSetObject -> Effect Uint8Array
+     , to_json :: TransactionWitnessSetObject -> Effect JsonString
+     , to_js_value :: TransactionWitnessSetObject -> Effect Json
      }
-transactionWitnessObject = mkNewtypedFFI (Proxy :: Proxy TransactionWitnessSetObject)
+transactionWitnessSetObject = mkNewtypedFFI (Proxy :: Proxy TransactionWitnessSetObject)
 
 -- export class Value {
 --   free(): void;

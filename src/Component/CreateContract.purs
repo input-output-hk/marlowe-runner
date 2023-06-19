@@ -203,7 +203,7 @@ type RoleProps =
 mkRoleTokensComponent :: MkComponentM (RoleProps -> JSX)
 mkRoleTokensComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-  modal <- liftEffect mkModal
+  -- modal <- liftEffect mkModal
   liftEffect $ component "RoleTokensAssignment" \{ onDismiss , onSuccess, roleNames } -> React.do
     let
       form = mkRolesConfigForm roleNames cardanoMultiplatformLib
@@ -241,20 +241,36 @@ mkRoleTokensComponent = do
                 }
               [ R.text "Submit" ]
           ]
-      modal
+      modal'
         { title: R.text "Role token assignments"
         , onDismiss: onDismiss
         , body: DOM.div { className: "row" }
             [ DOM.div { className: "col-12" } [ formBody ]
             ]
         , footer: formActions
-        , size: Modal.ExtraLarge
+        -- , fullscreen: true
+        -- , size: Modal.FullScreen
         }
+
+--        modal
+--          { title: R.text "Add contract"
+--          , onDismiss
+--          , body: DOM.div { className: "row" }
+--              [ DOM.div { className: "col-12" } [ formBody ]
+--              ]
+--          , footer: formActions
+--          , fullscreen: true
+--          , size: Modal.ExtraLarge
+--          }
+--
+modal' :: { title :: JSX, onDismiss :: Effect Unit, body :: JSX, footer :: JSX } -> JSX
+modal' { title, onDismiss, body, footer } = DOM.div {} [ title, body, footer ]
+
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   runtime <- asks _.runtime
-  modal <- liftEffect mkModal
+  -- modal <- liftEffect mkModal
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
   { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts address
@@ -296,7 +312,7 @@ mkComponent = do
       }
 
 
-    pure $ case submissionState of
+    pure $ DOM.div { className: "container-fluid" } $ DOM.div { className: "row" } $ case submissionState of
       Machine.DefiningContract -> do
         let
           fields = UseForm.renderForm form formState
@@ -319,23 +335,31 @@ mkComponent = do
                   }
                 [ R.text "Submit" ]
             ]
-        modal
-          { title: R.text "Add contract"
-          , onDismiss
-          , body: DOM.div { className: "row" }
-              [ DOM.div { className: "col-12" } [ formBody ]
-              ]
-          , footer: formActions
-          , size: Modal.ExtraLarge
-          }
+        [ DOM.div { className: "col-6" } $ DOOM.text "Description"
+        , DOM.div { className: "col-6" } $
+            modal'
+              { title: R.text "Add contract"
+              , onDismiss
+              , body: DOM.div { className: "row" }
+                  [ DOM.div { className: "col-12" } [ formBody ]
+                  ]
+              , footer: formActions
+              -- , fullscreen: true
+              -- , size: Modal.ExtraLarge
+              }
+        ]
 
       Machine.DefiningRoleTokens { roleNames } -> do
-         let onSuccess' :: RolesConfig -> Effect Unit
-             onSuccess' rolesConfig =
-               let action = Machine.DefineRoleTokensSucceeded rolesConfig
-                in applyAction action
+        let
+          onSuccess' :: RolesConfig -> Effect Unit
+          onSuccess' rolesConfig =
+            let action = Machine.DefineRoleTokensSucceeded rolesConfig
+            in applyAction action
 
-         roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
+        [ DOM.div { className: "col-6" } $ DOOM.text "Description"
+        , DOM.div { className: "col-6" } $
+            roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
+        ]
 
       machineState -> do
         let
@@ -386,13 +410,16 @@ mkComponent = do
                   }
                   [ R.text "Run" ]
               ]
-        modal
+        [ DOM.div { className: "col-6" } $ DOOM.text "Description"
+        , DOM.div { className: "col-6" } $ modal'
           { title: DOOM.text $ stateToTitle submissionState
           , onDismiss
           , body
           , footer: formActions
-          , size: Modal.ExtraLarge
+          -- , size: Modal.ExtraLarge
+          -- , fullscreen: true
           }
+        ]
 
 stateToTitle :: Machine.State -> String
 stateToTitle state = case state of

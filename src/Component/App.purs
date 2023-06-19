@@ -99,9 +99,7 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Just Eternl -- Nami -- Nothing
-
--- debugWallet = Nothing
+debugWallet = Just Nami -- Eternl -- Nami -- Nothing
 
 data DisplayOption = Default | About
 
@@ -304,11 +302,11 @@ mkApp = do
                 , inModal: true
                 }
             jsx
-        , DOM.div { className: "container-xl" } do
+        , do
             let
-              -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
               contractArray = Array.fromFoldable contracts
             subcomponents.contractListComponent { contracts: contractArray, connectedWallet: possibleWalletInfo }
+              -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
 
         --          [ tabs { fill: true, justify: true, defaultActiveKey: "contracts" }
         --              [ renderTab

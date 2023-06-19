@@ -18,6 +18,10 @@ $link-color: #511CF7;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
 }
 
+.large-switch {
+  font-size: 20px;
+}
+
 .shadow-bottom {
   box-shadow: 0 4px 2px -2px rgba(0, 0, 0, 0.1);
 }
@@ -26,13 +30,8 @@ $link-color: #511CF7;
   box-shadow: 0 -4px 2px -2px rgba(0, 0, 0, 0.1);
 }
 
-
 .font-weight-bold {
   font-weight: 600 !important;
-}
-
-.large-switch {
-  font-size: 20px;
 }
 
 .text-truncate {
@@ -59,7 +58,7 @@ $link-color: #511CF7;
 
 .danger-color {
   color: $danger;
-} 
+}
 
 .loading {
   animation: pulse 1s infinite;
@@ -92,10 +91,10 @@ $link-color: #511CF7;
   overflow: hidden;
   height: 100%;
 }
-.form-control {
-  height: 46px;
-}
 
+// .form-control {
+//   height: 46px;
+// }
 
 $utilities: map-merge(
   $utilities, (
@@ -103,6 +102,26 @@ $utilities: map-merge(
       property: text-decoration,
       state: hover,
       values: none underline line-through,
+    ),
+    // * We use original color classes like `text-mute`, `text-reset`.
+    // * We add on hover versions of the above plus version for primary color.
+    // * We add `text-color-primary` without hover as well.
+    "color": map-merge(
+      map-get($utilities, "color"),
+      (values: map-merge(
+          map-get(map-get($utilities, "color"), "values"),
+          ("primary": $primary),
+        ),
+      ),
+    ),
+    "color-hover": (
+      property: color,
+      class: text,
+      state: hover,
+      values: map-merge(
+        map-get(map-get($utilities, "color"), "values"),
+        ("primary": $primary)
+      ),
     ),
     "background-color": (
       property: background-color,

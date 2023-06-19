@@ -6,8 +6,9 @@ import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib.Lib as Lib
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import CardanoMultiplatformLib.Types (cborHexToCbor)
+import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..))
 import Component.ApplyInputs.Machine as Machine
-import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
+import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance, toIChoice, toIDeposit)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo(..))
@@ -15,6 +16,7 @@ import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Language.Marlowe.Core.V1 (compareMarloweJsonKeys)
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
+import Contrib.ReactBootstrap.FormBuilder as FormBuilder
 import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
@@ -31,6 +33,7 @@ import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Newtype (un)
+import Data.Nullable as Argonaut
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
@@ -39,8 +42,9 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
+import JS.Unsafe.Stringify (unsafeStringify)
 import JsYaml as JsYaml
-import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input, Party(..), State, TimeInterval(..), Token(..), Value(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), State, TimeInterval(..), Token(..), Value(..)) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Input(..), InputContent(..))
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse(PostTransactionsResponse), PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
@@ -99,12 +103,10 @@ submit witnesses serverUrl contractEndpoint = do
   put' serverUrl contractEndpoint req
 
 type DepositFormComponentProps =
-  { deposits :: NonEmptyArray DepositInput
+  { depositInputs :: NonEmptyArray DepositInput
   , connectedWallet :: WalletInfo Wallet.Api
   , onDismiss :: Effect Unit
-  , onSuccess :: TransactionEndpoint -> Effect Unit
-  , timeInterval :: V1.TimeInterval
-  , transactionsEndpoint :: TransactionsEndpoint
+  , onSuccess :: V1.Input -> Effect Unit
   }
 
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
@@ -114,7 +116,7 @@ mkDepositFormComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ deposits, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ depositInputs, connectedWallet, onDismiss, onSuccess } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     let
       choices = RadioButtonFieldChoices do
@@ -124,13 +126,13 @@ mkDepositFormComponent = do
               label = show value
             radioFieldChoice (show idx) (DOOM.text label)
         { switch: true
-        , choices: ArrayAL.fromNonEmptyArray $ mapWithIndex toChoice deposits
+        , choices: ArrayAL.fromNonEmptyArray $ mapWithIndex toChoice depositInputs
         }
 
       validator :: Batteries.Validator Effect _ _ _
       validator = do
         let
-          value2Deposit = Map.fromFoldable $ mapWithIndexFlipped deposits \idx deposit -> show idx /\ deposit
+          value2Deposit = Map.fromFoldable $ mapWithIndexFlipped depositInputs \idx deposit -> show idx /\ deposit
         liftFnMaybe (\v -> [ "Invalid choice: " <> show v ]) \possibleIdx -> do
           idx <- possibleIdx
           Map.lookup idx value2Deposit
@@ -139,43 +141,11 @@ mkDepositFormComponent = do
         choiceField { choices, validator }
 
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
-      onSubmit = _.result >>> case _, possibleWalletContext of
-        Just (V (Right deposit) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
-          let
-            DepositInput account party token value cont = deposit
-            inputs = Array.singleton $ NormalInput (IDeposit party party token value)
-
-            applyInputsContext = ApplyInputsContext
-              { inputs
-              , wallet: { changeAddress, usedAddresses }
-              , timeInterval
-              }
-          do
-            launchAff_ $ do
-              applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
-                Right { resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
-                  let
-                    { tx } = postContractsResponse
-                    TextEnvelope { cborHex: txCborHex } = tx
-                  let
-                    WalletInfo { wallet: walletApi } = connectedWallet
-                  Wallet.signTx walletApi txCborHex true >>= case _ of
-                    Right witnessSet -> do
-                      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
-                        Right _ -> do
-                          liftEffect $ onSuccess transactionEndpoint
-                        Left err -> do
-                          traceM "Error while submitting the transaction"
-                          traceM err
-                    Left err -> do
-                      traceM "Failed to sign transaction"
-                      traceM err
-
-                Left err ->
-                  traceM $ "Error: " <> show err
-        _, _ -> do
-          -- Rather improbable path because we disable submit button if the form is invalid
-          pure unit
+      onSubmit = _.result >>> case _ of
+        Just (V (Right deposit) /\ _) -> case toIDeposit deposit of
+          Just ideposit -> onSuccess $ NormalInput ideposit
+          Nothing -> pure unit
+        _ -> pure unit
 
     { formState, onSubmit: onSubmit', result } <- useForm
       { spec: form
@@ -210,9 +180,7 @@ type ChoiceFormComponentProps =
   { choiceInputs :: NonEmptyArray ChoiceInput
   , connectedWallet :: WalletInfo Wallet.Api
   , onDismiss :: Effect Unit
-  , onSuccess :: TransactionEndpoint -> Effect Unit
-  , timeInterval :: V1.TimeInterval
-  , transactionsEndpoint :: TransactionsEndpoint
+  , onSuccess :: V1.Input -> Effect Unit
   }
 
 mkChoiceFormComponent :: MkComponentM (ChoiceFormComponentProps -> JSX)
@@ -222,7 +190,7 @@ mkChoiceFormComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ choiceInputs, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ choiceInputs, connectedWallet, onDismiss, onSuccess } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     -- type ChoiceFieldProps validatorM a =
     --   { choices :: ChoiceFieldChoices
@@ -255,46 +223,11 @@ mkChoiceFormComponent = do
           { choice, value }
 
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
-      onSubmit = _.result >>> case _, possibleWalletContext of
-        Just (V (Right { choice, value }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
-          let
-            ChoiceInput choiceId _ _ = choice
-            inputs = Array.singleton $ NormalInput (IChoice choiceId $ BigInt.fromInt value)
-            applyInputsContext = ApplyInputsContext
-              { inputs
-              , wallet: { changeAddress, usedAddresses }
-              , timeInterval
-              }
-          do
-            launchAff_ $ do
-              applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
-                -- Right res -> do
-                --   traceM "APPLY SUCCESS"
-                --   traceM res
-                Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
-                  let
-                    { tx } = postContractsResponse
-                    TextEnvelope { cborHex: txCborHex } = tx
-                  traceM "Successfully created a transaction"
-                  let
-                    WalletInfo { wallet: walletApi } = connectedWallet
-                  Wallet.signTx walletApi txCborHex true >>= case _ of
-                    Right witnessSet -> do
-                      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
-                        Right _ -> do
-                          liftEffect $ onSuccess transactionEndpoint
-                        Left err -> do
-                          traceM "Error while submitting the transaction"
-                          traceM err
-                    Left err -> do
-                      traceM "Failed to sign transaction"
-                      traceM err
-
-                Left err ->
-                  traceM $ "Error: " <> show err
-        _, _ -> do
-          -- Rather improbable path because we disable submit button if the form is invalid
-          pure unit
+      onSubmit = _.result >>> case _ of
+        Just (V (Right { choice, value }) /\ _) -> case toIChoice choice (BigInt.fromInt value) of
+          Just ichoice -> onSuccess $ NormalInput ichoice
+          Nothing -> pure unit
+        _ -> pure unit
 
     { formState, onSubmit: onSubmit', result } <- useForm
       { spec: form
@@ -334,12 +267,10 @@ mkChoiceFormComponent = do
       }
 
 type NotifyFormComponentProps =
-  { notifyInputs :: NonEmptyArray NotifyInput
+  { notifyInput :: NotifyInput
   , connectedWallet :: WalletInfo Wallet.Api
   , onDismiss :: Effect Unit
-  , onSuccess :: TransactionEndpoint -> Effect Unit
-  , timeInterval :: V1.TimeInterval
-  , transactionsEndpoint :: TransactionsEndpoint
+  , onSuccess :: Effect Unit
   }
 
 mkNotifyFormComponent :: MkComponentM (NotifyFormComponentProps -> JSX)
@@ -349,61 +280,15 @@ mkNotifyFormComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ notifyInputs, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
+  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ notifyInput, connectedWallet, onDismiss, onSuccess } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
-    let
-      onSubmit :: EventHandler
-      onSubmit = handler_ $ case possibleWalletContext of
-        Just { changeAddress: Just changeAddress, usedAddresses } -> do
-          let
-            inputs = Array.singleton $ NormalInput INotify
-            applyInputsContext = ApplyInputsContext
-              { inputs
-              , wallet: { changeAddress, usedAddresses }
-              , timeInterval
-              }
-          do
-            -- FIXME: move aff flow into `useAff` on the component level
-            traceM "ON SUBMIT CLICKED"
-            launchAff_ $ do
-              applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
-                -- Right res -> do
-                --   traceM "APPLY SUCCESS"
-                --   traceM res
-                Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
-                  let
-                    { contractId, tx } = postContractsResponse
-                    TextEnvelope { cborHex: txCborHex } = tx
-                    lib = Lib.props cardanoMultiplatformLib
-                    txCbor = cborHexToCbor txCborHex
-                  traceM "Successfully created a transaction"
-                  let
-                    WalletInfo { wallet: walletApi } = connectedWallet
-                  Wallet.signTx walletApi txCborHex true >>= case _ of
-                    Right witnessSet -> do
-                      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
-                        Right _ -> do
-                          liftEffect $ onSuccess transactionEndpoint
-                        Left err -> do
-                          traceM "Error while submitting the transaction"
-                          traceM err
-                    Left err -> do
-                      traceM "Failed to sign transaction"
-                      traceM err
-
-                Left err ->
-                  traceM $ "Error: " <> show err
-        _ -> do
-          -- Rather improbable path because we disable submit button if the form is invalid
-          pure unit
-
     pure $ modal do
       let
         body = DOOM.text ""
         actions = fragment
           [ DOM.button
               { className: "btn btn-primary"
-              , onClick: onSubmit
+              , onClick: handler_ onSuccess
               , disabled: false
               }
               [ R.text "Submit" ]
@@ -416,75 +301,23 @@ mkNotifyFormComponent = do
       }
 
 type AdvanceFormComponentProps =
-  { connectedWallet :: WalletInfo Wallet.Api
-  , contract :: V1.Contract
+  { contract :: V1.Contract
   , onDismiss :: Effect Unit
-  , onSuccess :: TransactionEndpoint -> Effect Unit
-  , timeInterval :: V1.TimeInterval
-  , transactionsEndpoint :: TransactionsEndpoint
+  , onSuccess :: Effect Unit
   }
 
 mkAdvanceFormComponent :: MkComponentM (AdvanceFormComponentProps -> JSX)
 mkAdvanceFormComponent = do
   modal <- liftEffect mkModal
-  Runtime runtime <- asks _.runtime
-  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-  walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ contract, connectedWallet, onDismiss, onSuccess, timeInterval, transactionsEndpoint } -> React.do
-    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
-    let
-      onSubmit :: EventHandler
-      onSubmit = handler_ $ case possibleWalletContext of
-        Just { changeAddress: Just changeAddress, usedAddresses } -> do
-          let
-            inputs = []
-            applyInputsContext = ApplyInputsContext
-              { inputs
-              , wallet: { changeAddress, usedAddresses }
-              , timeInterval
-              }
-          do
-            -- FIXME: move aff flow into `useAff` on the component level
-            launchAff_ $ do
-              applyInputs applyInputsContext runtime.serverURL transactionsEndpoint >>= case _ of
-                -- Right res -> do
-                --   traceM "APPLY SUCCESS"
-                --   traceM res
-                Right res@{ resource: PostTransactionsResponse postContractsResponse, links: { transaction: transactionEndpoint } } -> do
-                  let
-                    { contractId, tx } = postContractsResponse
-                    TextEnvelope { cborHex: txCborHex } = tx
-                    lib = Lib.props cardanoMultiplatformLib
-                    txCbor = cborHexToCbor txCborHex
-                  traceM "Successfully created a transaction"
-                  let
-                    WalletInfo { wallet: walletApi } = connectedWallet
-                  Wallet.signTx walletApi txCborHex true >>= case _ of
-                    Right witnessSet -> do
-                      submit witnessSet runtime.serverURL transactionEndpoint >>= case _ of
-                        Right _ -> do
-                          liftEffect $ onSuccess transactionEndpoint
-                        Left err -> do
-                          traceM "Error while submitting the transaction"
-                          traceM err
-                    Left err -> do
-                      traceM "Failed to sign transaction"
-                      traceM err
-
-                Left err ->
-                  traceM $ "Error: " <> show err
-        _ -> do
-          -- Rather improbable path because we disable submit button if the form is invalid
-          pure unit
-
+  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ contract, onDismiss, onSuccess } -> React.do
     pure $ modal do
       let
         body = DOOM.text ""
         actions = fragment
           [ DOM.button
               { className: "btn btn-primary"
-              , onClick: onSubmit
+              , onClick: handler_ onSuccess
               , disabled: false
               }
               [ R.text "Submit" ]
@@ -517,42 +350,172 @@ type Props =
   , transactionsEndpoint :: TransactionsEndpoint
   , contract :: V1.Contract
   , state :: V1.State
-  , timeInterval :: V1.TimeInterval
   }
 
 sortMarloweKeys :: String -> String -> JsYaml.JsOrdering
 sortMarloweKeys a b = JsYaml.toJsOrdering $ compareMarloweJsonKeys a b
 
-newtype AutoRun = AutoRun Boolean
-
--- type AllInputsChoices = Either
---   V1.Contract
---   { deposits :: Maybe (NonEmptyArray DepositInput)
---   , choices :: Maybe (NonEmptyArray ChoiceInput)
---   , notifies :: Maybe NotifyInput
---   }
-
-
-machineProps (AutoRun autoRun) contract state environment transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime = do
+machineProps contract state transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime = do
   let
     env = { connectedWallet, cardanoMultiplatformLib, runtime }
-    allInputsChoices = case nextTimeoutAdvance environment contract of
-      Just advanceContinuation -> Left advanceContinuation
-      Nothing -> do
-        let
-          deposits = NonEmpty.fromArray $ nextDeposit environment state contract
-          choices = NonEmpty.fromArray $ nextChoice environment state contract
-          notifies = NonEmpty.head <$> NonEmpty.fromArray (nextNotify environment state contract)
-        Right { deposits, choices, notifies }
+    -- allInputsChoices = case nextTimeoutAdvance environment contract of
+    --   Just advanceContinuation -> Left advanceContinuation
+    --   Nothing -> do
+    --     let
+    --       deposits = NonEmpty.fromArray $ nextDeposit environment state contract
+    --       choices = NonEmpty.fromArray $ nextChoice environment state contract
+    --       notify = NonEmpty.head <$> NonEmpty.fromArray (nextNotify environment state contract)
+    --     Right { deposits, choices, notify }
 
-  { initialState: Machine.initialState allInputsChoices transactionsEndpoint
+  { initialState: Machine.initialState contract state transactionsEndpoint
   , step: Machine.step
-  , driver: if autoRun
-      then Machine.driver env
-      else const Nothing
+  , driver: Machine.driver env
   , output: identity
   }
 
+type ContractDetailsProps =
+  { marloweContext :: Machine.MarloweContext
+  , onDismiss :: Effect Unit
+  , onSuccess :: AutoRun -> Effect Unit
+  }
+
+mkContractDetailsComponent :: MkComponentM (ContractDetailsProps -> JSX)
+mkContractDetailsComponent = do
+  let
+    autoRunForm = FormBuilder.evalBuilder' $ AutoRun <$> FormBuilder.booleanField
+      { label: DOOM.text "Auto run"
+      , helpText: fragment
+        [ DOOM.text "Whether to run some of the steps automatically."
+        , DOOM.br {}
+        , DOOM.text "In non-auto mode, we provide technical details about the requests and responses"
+        , DOOM.br {}
+        , DOOM.text "which deal with during the contract execution."
+        ]
+      , initial: true
+      , touched: true
+      }
+  modal <- liftEffect mkModal
+  liftEffect $ component "ApplyInputs.ContractDetailsComponent" \{ marloweContext: { contract, state }, onSuccess, onDismiss } -> React.do
+    { formState, onSubmit: onSubmit' } <- useForm
+      { spec: autoRunForm
+      , onSubmit: _.result >>> case _ of
+          Just (V (Right autoRun) /\ _) -> onSuccess autoRun
+          _ -> pure unit
+      , validationDebounce: Seconds 0.5
+      }
+
+    let
+      fields = UseForm.renderForm autoRunForm formState
+      body = DOM.div { className: "container" } $
+        [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys } ]
+        <>  fields
+      footer = fragment
+        [ DOM.button
+            { className: "btn btn-secondary"
+            , onClick: handler_ onDismiss
+            , disabled: false
+            }
+            [ R.text "Cancel" ]
+        , DOM.button
+            { className: "btn btn-primary"
+            , onClick: onSubmit'
+            , disabled: false
+            }
+            [ R.text "Submit" ]
+        ]
+    pure $ modal
+      { title: R.text "Apply Inputs | Contract Details"
+      , body
+      , footer
+      , onDismiss
+      , size: Modal.ExtraLarge
+      }
+
+-- In here we want to summarize the initial interaction with the wallet
+fetchingRequiredWalletContextDetails modal onNext possibleWalletResponse = do
+  let
+    body = DOM.div { className: "row" }
+      [ DOM.div { className: "col-6" }
+
+        -- | Let's describe that we are
+          [ DOM.p {} $ DOOM.text "We are fetching the required wallet context."
+          , DOM.p {} $ DOOM.text "marlowe-runtime requires information about wallet addresses so it can pick UTxO to pay for the initial transaction."
+          , DOM.p {} $ DOOM.text $
+              "To gain the address set from the wallet we use CIP-30 `getUsedAddresses` method and reencoding them from lower "
+                <> "level cardano CBOR hex into Bech32 (`addr_test...`)."
+          ]
+      , DOM.div { className: "col-6" } $ case possibleWalletResponse of
+          Nothing ->
+            -- FIXME: loader
+            DOM.p {} $ DOOM.text "No response yet."
+          Just walletResponse -> fragment
+            [ DOM.p {} $ DOOM.text "Wallet response:"
+            , DOM.p {} $ DOOM.text $ unsafeStringify walletResponse
+            ]
+      ]
+    footer = fragment
+      [ DOM.button
+          { className: "btn btn-primary"
+          , onClick: handler_ onNext
+          , disabled: false
+          }
+          [ R.text "Next" ]
+      ]
+  modal
+    { title: R.text "Apply Inputs | Fetching Wallet Context"
+    , body
+    , footer
+    , onDismiss: pure unit
+    , size: Modal.ExtraLarge
+    }
+
+-- Now we want to to describe the interaction with the API where runtimeRequest is
+-- a { headers: Map String String, body: JSON }.
+-- We really want to provide the detailed informatin (headers and payoload)
+creatingTxDetails modal onNext runtimeRequest possibleRuntimeResponse = do
+  let
+    body = DOM.div { className: "row" }
+      [ DOM.div { className: "col-6" }
+        [ DOM.p {} $ DOOM.text "We are creating the initial transaction."
+        , DOM.p {} $ DOOM.text "We are sending the following request headers to the API:"
+        , DOM.p {} $ DOOM.text $ unsafeStringify runtimeRequest
+        ]
+      , DOM.div { className: "col-6" } $ case possibleRuntimeResponse of
+          Nothing -> -- FIXME: loader
+            DOM.p {} $ DOOM.text "No response yet."
+          Just runtimeResponse -> fragment
+            [ DOM.p {} $ DOOM.text "API response:"
+            , DOM.p {} $ DOOM.text $ unsafeStringify runtimeResponse
+            ]
+      ]
+    footer = fragment
+      [ DOM.button
+          { className: "btn btn-primary"
+          , onClick: handler_ onNext
+          , disabled: false
+          }
+          [ R.text "Next" ]
+      ]
+  modal
+    { title: R.text "Apply Inputs | Creating Transaction"
+    , body
+    , footer
+    , onDismiss: pure unit
+    , size: Modal.ExtraLarge
+    }
+
+
+data PreviewMode
+  = DetailedFlow { showPrevStep :: Boolean }
+  | SimplifiedFlow
+
+setShowPrevStep :: PreviewMode -> Boolean -> PreviewMode
+setShowPrevStep (DetailedFlow _) showPrevStep = DetailedFlow { showPrevStep }
+setShowPrevStep SimplifiedFlow _ = SimplifiedFlow
+
+shouldShowPrevStep :: PreviewMode -> Boolean
+shouldShowPrevStep (DetailedFlow { showPrevStep }) = showPrevStep
+shouldShowPrevStep SimplifiedFlow = false
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
@@ -560,107 +523,274 @@ mkComponent = do
   modal <- liftEffect mkModal
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
+  contractDetailsComponent <- mkContractDetailsComponent
   depositFormComponent <- mkDepositFormComponent
   choiceFormComponent <- mkChoiceFormComponent
   notifyFormComponent <- mkNotifyFormComponent
   advanceFormComponent <- mkAdvanceFormComponent
 
-  let
-    initialAutoRun = AutoRun false
-
-  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, timeInterval, transactionsEndpoint } -> React.do
+  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, transactionsEndpoint } -> React.do
+    walletRef <- React.useRef connectedWallet
+    previewFlow /\ setPreviewFlow <- React.useState' $ DetailedFlow { showPrevStep: true }
     let
-      environment = V1.Environment { timeInterval }
+      WalletInfo { name: walletName } = connectedWallet
+    React.useEffect walletName do
+      React.writeRef walletRef connectedWallet
+      pure $ pure unit
 
     machine <- do
       let
-        props = machineProps initialAutoRun contract state environment transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime
+        props = machineProps contract state transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime
       useMooreMachine props
 
-    step /\ setStep <- useState' (Creating SelectingInputType)
-    let
-
-      possibleDeposits = do
+    pure $ case machine.state of
+      Machine.PresentingContractDetails { marloweContext } -> do
         let
-          dps = nextDeposit environment state contract
-        NonEmpty.fromArray $ dps
+          onStepSuccess (AutoRun autoRun) = do
+            currWallet <- React.readRef walletRef
+            machine.applyAction $ Machine.FetchRequiredWalletContext { autoRun: AutoRun true, marloweContext, transactionsEndpoint }
+            if autoRun
+              then setPreviewFlow SimplifiedFlow
+              else setPreviewFlow $ DetailedFlow { showPrevStep: true }
 
-      possibleChoiceInputs = do
+        contractDetailsComponent { marloweContext, onSuccess: onStepSuccess, onDismiss }
+      Machine.FetchingRequiredWalletContext _ -> case previewFlow of
+        DetailedFlow _ -> fetchingRequiredWalletContextDetails modal (pure unit) Nothing
+        SimplifiedFlow -> DOOM.text "Auto fetching... (progress bar?)"
+
+      Machine.ChoosingInputType {allInputsChoices, requiredWalletContext} -> case previewFlow of
+        DetailedFlow { showPrevStep: true } ->
+          fetchingRequiredWalletContextDetails modal (setPreviewFlow $ DetailedFlow { showPrevStep: false }) $ Just requiredWalletContext
+        _ -> do
+          let
+            body = DOM.div { className: "row" }
+              [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
+              ]
+
+            footer = DOM.div { className: "row" }
+              [ DOM.div { className: "col-3 text-center" } $
+                  DOM.button
+                    { className: "btn btn-primary"
+                    , disabled: not $ Machine.canDeposit allInputsChoices
+                    , onClick: handler_ $ case allInputsChoices of
+                        Right { deposits: Just deposits } ->
+                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.DepositInputs deposits)
+                        _ -> pure unit
+                    }
+                    [ R.text "Deposit" ]
+              , DOM.div { className: "col-3 text-center" } $
+                  DOM.button
+                    { className: "btn btn-primary"
+                    , disabled: not $ Machine.canChoose allInputsChoices
+                    , onClick: handler_ $ case allInputsChoices of
+                        Right { choices: Just choices } ->
+                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.ChoiceInputs choices)
+                        _ -> pure unit
+                    }
+                    [ R.text "Choice" ]
+              , DOM.div { className: "col-3 text-center" } $
+                  DOM.button
+                    { className: "btn btn-primary"
+                    , disabled: not $ Machine.canNotify allInputsChoices
+                    , onClick: handler_ $ case allInputsChoices of
+                        Right { notify: Just notify } ->
+                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.SpecificNotifyInput notify)
+                        _ -> pure unit
+                    }
+                    [ R.text "Notify" ]
+              , DOM.div { className: "col-3 text-center" } $
+                  DOM.button
+                    { className: "btn btn-primary"
+                    , disabled: not $ Machine.canAdvance allInputsChoices
+                    , onClick: handler_ $ case allInputsChoices of
+                        Left advanceContinuation ->
+                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.AdvanceContract advanceContinuation)
+                        _ -> pure unit
+                    }
+                    [ R.text "Advance" ]
+              ]
+
+          if inModal then modal
+            { title: R.text "Select input type"
+            , onDismiss
+            , body
+            , footer
+            , size: Modal.ExtraLarge
+            }
+          else
+            body
+      Machine.PickingInput { inputChoices } -> do
         let
-          cis = nextChoice environment state contract
-        NonEmpty.fromArray $ cis
+          applyPickInputSucceeded input = do
+            setPreviewFlow $ DetailedFlow { showPrevStep: true }
+            machine.applyAction <<< Machine.PickInputSucceeded $ input
+        case inputChoices of
+          DepositInputs depositInputs ->
+            depositFormComponent { depositInputs, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just}
+          ChoiceInputs choiceInputs ->
+            choiceFormComponent { choiceInputs, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just}
+          SpecificNotifyInput notifyInput ->
+            notifyFormComponent { notifyInput, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
+          AdvanceContract cont ->
+            advanceFormComponent { contract: cont, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
+      Machine.CreatingTx { allInputsChoices, requiredWalletContext } -> case previewFlow of
+        DetailedFlow _ -> do
+          let
+            req = allInputsChoices
+          creatingTxDetails modal (pure unit) Argonaut.null Nothing
+        SimplifiedFlow -> DOOM.text "Auto creating tx... (progress bar?)"
+      Machine.SigningTx { createTxResponse } -> case previewFlow of
+        DetailedFlow { showPrevStep: true } ->
+          creatingTxDetails modal (setPreviewFlow $ DetailedFlow { showPrevStep: false }) Argonaut.null $ Just createTxResponse
+        DetailedFlow _ -> DOOM.text "Signing tx..."
+          -- signingTxDetails modal (pure unit) Argonaut.null Nothing
+        SimplifiedFlow -> DOOM.text "Auto signing tx... (progress bar?)"
 
-      possibleNotifyInputs = do
-        let
-          cis = nextNotify environment state contract
-        NonEmpty.fromArray $ cis
+      -- case previewFlow of
+      --   DetailedFlow { showPrevStep: true } ->
+      --     creatingTxDetails modal (setPreviewFlow $ DetailedFlow { showPrevStep: false }) $ Just requiredWalletContext
+      --   _ -> do
 
-      possibleNextTimeoutAdvance = nextTimeoutAdvance environment contract
+      _ -> DOOM.text "Not implemented"
+    --     let
+    --       body = DOM.div { className: "row" }
+    --         [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
+    --         ]
 
-    pure $ case step of
-      Creating SelectingInputType -> do
-        let
-          body = DOM.div { className: "row" }
-            [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
-            ]
+    --       footer = DOM.div { className: "row" }
+    --         [ DOM.div { className: "col-3 text-center" } $
+    --             DOM.button
+    --               { className: "btn btn-primary"
+    --               , disabled: isNothing possibleDeposits || isJust possibleNextTimeoutAdvance
+    --               , onClick: handler_ $ case possibleDeposits of
+    --                   Just deposits -> setStep (Creating $ PerformingDeposit deposits)
+    --                   Nothing -> pure unit
+    --               }
+    --               [ R.text "Deposit" ]
+    --         , DOM.div { className: "col-3 text-center" } $
+    --             DOM.button
+    --               { className: "btn btn-primary"
+    --               , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
+    --               , onClick: handler_ $ case possibleChoiceInputs of
+    --                   Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
+    --                   Nothing -> pure unit
+    --               }
+    --               [ R.text "Choice" ]
+    --         , DOM.div { className: "col-3 text-center" } $
+    --             DOM.button
+    --               { className: "btn btn-primary"
+    --               , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
+    --               , onClick: handler_ $ case possibleNotifyInputs of
+    --                   Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
+    --                   Nothing -> pure unit
+    --               }
+    --               [ R.text "Notify" ]
+    --         , DOM.div { className: "col-3 text-center" } $
+    --             DOM.button
+    --               { className: "btn btn-primary"
+    --               , disabled: isNothing possibleNextTimeoutAdvance
+    --               , onClick: handler_ $ case possibleNextTimeoutAdvance of
+    --                   Just cont -> setStep (Creating $ PerformingAdvance cont)
+    --                   Nothing -> pure unit
+    --               }
+    --               [ R.text "Advance" ]
+    --         ]
 
-          footer = DOM.div { className: "row" }
-            [ DOM.div { className: "col-3 text-center" } $
-                DOM.button
-                  { className: "btn btn-primary"
-                  , disabled: isNothing possibleDeposits || isJust possibleNextTimeoutAdvance
-                  , onClick: handler_ $ case possibleDeposits of
-                      Just deposits -> setStep (Creating $ PerformingDeposit deposits)
-                      Nothing -> pure unit
-                  }
-                  [ R.text "Deposit" ]
-            , DOM.div { className: "col-3 text-center" } $
-                DOM.button
-                  { className: "btn btn-primary"
-                  , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
-                  , onClick: handler_ $ case possibleChoiceInputs of
-                      Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
-                      Nothing -> pure unit
-                  }
-                  [ R.text "Choice" ]
-            , DOM.div { className: "col-3 text-center" } $
-                DOM.button
-                  { className: "btn btn-primary"
-                  , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
-                  , onClick: handler_ $ case possibleNotifyInputs of
-                      Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
-                      Nothing -> pure unit
-                  }
-                  [ R.text "Notify" ]
-            , DOM.div { className: "col-3 text-center" } $
-                DOM.button
-                  { className: "btn btn-primary"
-                  , disabled: isNothing possibleNextTimeoutAdvance
-                  , onClick: handler_ $ case possibleNextTimeoutAdvance of
-                      Just cont -> setStep (Creating $ PerformingAdvance cont)
-                      Nothing -> pure unit
-                  }
-                  [ R.text "Advance" ]
-            ]
+    --     if inModal then modal
+    --       { title: R.text "Select input type"
+    --       , onDismiss
+    --       , body
+    --       , footer
+    --       , size: Modal.ExtraLarge
+    --       }
+    --     else
+    --       body
 
-        if inModal then modal
-          { title: R.text "Select input type"
-          , onDismiss
-          , body
-          , footer
-          , size: Modal.ExtraLarge
-          }
-        else
-          body
-      Creating (PerformingDeposit deposits) -> do
-        depositFormComponent { deposits, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-      Creating (PerformingNotify notifyInputs) -> do
-        notifyFormComponent { notifyInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-      Creating (PerformingChoice choiceInputs) -> do
-        choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-      Creating (PerformingAdvance cont) -> do
-        advanceFormComponent { contract: cont, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-      _ -> DOM.div { className: "row" } [ R.text "TEST" ]
+
+    -- step /\ setStep <- useState' (Creating SelectingInputType)
+    -- let
+
+    --   possibleDeposits = do
+    --     let
+    --       dps = nextDeposit environment state contract
+    --     NonEmpty.fromArray $ dps
+
+    --   possibleChoiceInputs = do
+    --     let
+    --       cis = nextChoice environment state contract
+    --     NonEmpty.fromArray $ cis
+
+    --   possibleNotifyInputs = do
+    --     let
+    --       cis = nextNotify environment state contract
+    --     NonEmpty.fromArray $ cis
+
+    --   possibleNextTimeoutAdvance = nextTimeoutAdvance environment contract
+
+    -- pure $ case step of
+    --   Creating SelectingInputType -> do
+    --     let
+    --       body = DOM.div { className: "row" }
+    --         [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
+    --         ]
+
+    --       footer = DOM.div { className: "row" }
+    --         [ DOM.div { className: "col-3 text-center" } $
+    --             DOM.button
+    --               { className: "btn btn-primary"
+    --               , disabled: isNothing possibleDeposits || isJust possibleNextTimeoutAdvance
+    --               , onClick: handler_ $ case possibleDeposits of
+    --                   Just deposits -> setStep (Creating $ PerformingDeposit deposits)
+    --                   Nothing -> pure unit
+    --               }
+    --               [ R.text "Deposit" ]
+    --         , DOM.div { className: "col-3 text-center" } $
+    --             DOM.button
+    --               { className: "btn btn-primary"
+    --               , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
+    --               , onClick: handler_ $ case possibleChoiceInputs of
+    --                   Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
+    --                   Nothing -> pure unit
+    --               }
+    --               [ R.text "Choice" ]
+    --         , DOM.div { className: "col-3 text-center" } $
+    --             DOM.button
+    --               { className: "btn btn-primary"
+    --               , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
+    --               , onClick: handler_ $ case possibleNotifyInputs of
+    --                   Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
+    --                   Nothing -> pure unit
+    --               }
+    --               [ R.text "Notify" ]
+    --         , DOM.div { className: "col-3 text-center" } $
+    --             DOM.button
+    --               { className: "btn btn-primary"
+    --               , disabled: isNothing possibleNextTimeoutAdvance
+    --               , onClick: handler_ $ case possibleNextTimeoutAdvance of
+    --                   Just cont -> setStep (Creating $ PerformingAdvance cont)
+    --                   Nothing -> pure unit
+    --               }
+    --               [ R.text "Advance" ]
+    --         ]
+
+    --     if inModal then modal
+    --       { title: R.text "Select input type"
+    --       , onDismiss
+    --       , body
+    --       , footer
+    --       , size: Modal.ExtraLarge
+    --       }
+    --     else
+    --       body
+    --   Creating (PerformingDeposit deposits) -> do
+    --     depositFormComponent { deposits, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+    --   Creating (PerformingNotify notifyInputs) -> do
+    --     notifyFormComponent { notifyInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+    --   Creating (PerformingChoice choiceInputs) -> do
+    --     choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+    --   Creating (PerformingAdvance cont) -> do
+    --     advanceFormComponent { contract: cont, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+    --   _ -> DOM.div { className: "row" } [ R.text "TEST" ]
 
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"

@@ -18,7 +18,7 @@ footer =
                     { className: "text-muted d-flex justify-content-around"
                     , children:
                         [ DOM.a
-                            { className: "btn btn-link text-decoration-underline-hover text-decoration-none font-weight-bold"
+                            { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
                             , href: "/about"
                             , target: "_blank"
                             , children:
@@ -27,7 +27,7 @@ footer =
                                 ]
                             }
                         , DOM.a
-                            { className: "btn btn-link text-decoration-underline-hover text-decoration-none font-weight-bold"
+                            { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
                             , href: "http://marlowescan.com"
                             , target: "_blank"
                             , children:
@@ -36,7 +36,7 @@ footer =
                                 ]
                             }
                         , DOM.a
-                            { className: "btn btn-link text-decoration-underline-hover text-decoration-none font-weight-bold"
+                            { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
                             , href: "https://docs.marlowe.iohk.io"
                             , target: "_blank"
                             , children:
@@ -45,7 +45,7 @@ footer =
                                 ]
                             }
                         , DOM.a
-                            { className: "btn btn-link text-decoration-underline-hover text-decoration-none font-weight-bold"
+                            { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
                             , href: "https://github.com/input-output-hk/marlowe-cardano"
                             , target: "_blank"
                             , children:
@@ -54,7 +54,7 @@ footer =
                                 ]
                             }
                         , DOM.a
-                            { className: "btn btn-link text-decoration-underline-hover text-decoration-none font-weight-bold"
+                            { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
                             , href: "https://play.marlowe.iohk.io"
                             , target: "_blank"
                             , children:
