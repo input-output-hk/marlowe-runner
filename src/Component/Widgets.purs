@@ -11,9 +11,10 @@ import React.Basic.DOM.Events (preventDefault)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler)
 import ReactBootstrap (overlayTrigger, tooltip)
-import ReactBootstrap.Types as OverlayTrigger
 import ReactBootstrap.Icons (Icon)
 import ReactBootstrap.Icons as Icons
+import ReactBootstrap.Types (Placement, placement)
+import ReactBootstrap.Types as OverlayTrigger
 
 spinner :: Maybe JSX -> JSX
 spinner possibleBody = DOM.div
@@ -29,6 +30,7 @@ type LinkOptionalPropsRow =
   , disabled :: Boolean
   , showBorders :: Boolean
   , tooltipText :: Maybe String
+  , tooltipPlacement :: Maybe Placement
   )
 
 defaultLinkOptionalProps :: { | LinkOptionalPropsRow }
@@ -37,6 +39,7 @@ defaultLinkOptionalProps =
   , disabled: false
   , showBorders: false
   , tooltipText: Nothing
+  , tooltipPlacement: Nothing
   }
 
 type LinkProps =
@@ -84,7 +87,7 @@ linkWithIcon
   -> JSX
 linkWithIcon provided = do
   let
-    { icon, label, extraClassNames, onClick, disabled, showBorders, tooltipText } =
+    { icon, label, extraClassNames, onClick, disabled, showBorders, tooltipText, tooltipPlacement } =
       defaults defaultLinkOptionalProps provided
     borderClasses =
       if showBorders then " border border-1 bg-light-hover"
@@ -104,12 +107,13 @@ linkWithIcon provided = do
   case tooltipText of
     Just text -> do
       let
-        tooltipJSX = tooltip {} (DOOM.text text)
+        placement = fromMaybe OverlayTrigger.placement.left tooltipPlacement
+        tooltipJSX = tooltip { placement } (DOOM.text text)
       DOM.div
         { className: "d-inline-block" }
         [ overlayTrigger
             { overlay: tooltipJSX
-            , placement: OverlayTrigger.placement.right
+            , placement
             }
             button
         ]

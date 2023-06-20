@@ -4,12 +4,16 @@ import Prelude
 
 import React.Basic (JSX)
 import React.Basic.DOM as DOM
-import Web.DOM.MutationRecord (target)
 
-footer :: JSX
-footer =
+newtype Fixed = Fixed Boolean
+
+footer :: Fixed -> JSX
+footer (Fixed fixed) = do
+  let
+    possibleFixedClass =
+        if fixed then "footer " else ""
   DOM.footer
-    { className: "footer mt-auto py-3 bg-light shadow-top"
+    { className: possibleFixedClass <> "mt-auto py-2 bg-light shadow-top"
     , children:
         [ DOM.div
             { className: "container"

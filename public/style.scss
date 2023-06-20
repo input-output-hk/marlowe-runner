@@ -30,10 +30,6 @@ $link-color: #511CF7;
   box-shadow: 0 -4px 2px -2px rgba(0, 0, 0, 0.1);
 }
 
-.font-weight-bold {
-  font-weight: 600 !important;
-}
-
 .text-truncate {
   white-space: nowrap;
   overflow: hidden;
@@ -70,6 +66,14 @@ $link-color: #511CF7;
 
 .loading {
   animation: pulse 1s infinite;
+}
+
+.pt-navbar-placeholder {
+  margin-top: 59px !important;
+}
+
+.pb-footer-placeholder {
+  margin-bottom: 71px !important;
 }
 
 @keyframes pulse {

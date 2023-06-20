@@ -398,16 +398,6 @@ create inputs walletAddresses serverUrl transactionsEndpoint = do
   let
     { changeAddress, usedAddresses } = walletAddresses
 
-    -- newtype PostTransactionsRequest = PostTransactionsRequest
-    --   { inputs :: Array V1.Input
-    --   , invalidBefore :: DateTime
-    --   , invalidHereafter :: DateTime
-    --   , metadata :: Metadata
-    --   , tags :: Tags
-    --   , changeAddress :: Bech32
-    --   , addresses :: Array Bech32
-    --   , collateralUTxOs :: Array TxOutRef
-    --   }
     req = PostTransactionsRequest
       { metadata: mempty
       , invalidBefore: toDateTime nowInstant

@@ -7,6 +7,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject, ValueOb
 import CardanoMultiplatformLib.Transaction as Value
 import CardanoMultiplatformLib.Types (Cbor, cborHexToCbor)
 import Component.ApplyInputs as ApplyInputs
+import Component.BodyLayout as BodyLayout
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
 import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
@@ -68,6 +69,7 @@ import ReactBootstrap.Icons (unsafeIcon)
 import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Table (striped) as Table
 import ReactBootstrap.Table (table)
+import ReactBootstrap.Types (placement)
 import ReactBootstrap.Types as OverlayTrigger
 import Utils.React.Basic.Hooks (useMaybeValue', useStateRef')
 import Wallet as Wallet
@@ -221,17 +223,15 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Nothing, _ -> DOM.div { className: "container-fluid" } $ DOM.div { className: "row vh-100" }
-          [ DOM.div { className: "col-3 background-color-primary p-5" } do
-              DOM.div { className: "container" } do
-                DOM.div { className: "row mt-5 p-3" } do
-                  [ DOM.div { className: "col-12 p-3" } $ DOM.p { className: "font-weight-bold white-color h3" } $ DOOM.text "Marlowe Contract List"
-                  , DOM.div { className: "col-12 p-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that you have created or interacted with on the Cardano Blockchain's {pre-prod} network."
-                  , DOM.div { className: "col-12 p-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
-                  , DOM.div { className: "col-12 p-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
-                  ]
-          , DOM.div { className: "col-9" } $ DOM.div { className: "container-fluid" } do
-              [ DOM.div { className: "row position-sticky bg-white shadow-bottom mt-5 pt-5" } do
+        Nothing, _ -> BodyLayout.component
+          { title: DOM.h3 { className: "h3 pb-3 fw-bold" } $ DOOM.text "Marlowe Contract List"
+          , description: DOOM.div_
+                [ DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that you have created or interacted with on the Cardano Blockchain's {pre-prod} network."
+                , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
+                , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
+                ]
+          , content: BodyLayout.SimpleContent $ React.fragment
+              [ DOM.div { className: "row" } do
                   let
                     disabled = isNothing connectedWallet
                     newContractButton = buttonWithIcon
@@ -246,24 +246,26 @@ mkContractList = do
                       }
                     fields = UseForm.renderForm form formState
                     body = DOM.div { className: "form-group" } fields
-                  -- actions = DOOM.fragment []
-                  [ DOM.div { className: "col-9 text-end my-3" } $
+                    spacing = "m-4"
+                  [ DOM.div { className: "col-7 text-end" } $ DOM.div { className: spacing }
                       [ body
                       -- , actions
                       ]
-                  , DOM.div { className: "col-3 text-end my-3" } $ Array.singleton $
+                  , DOM.div { className: "col-5 text-end" } $ Array.singleton $
                       if disabled then do
                         let
-                          tooltipJSX = tooltip {} (DOOM.text "Connect to a wallet to add a contract")
+                          tooltipJSX = tooltip
+                            { placement: placement.left }
+                            (DOOM.text "Connect to a wallet to add a contract")
                         overlayTrigger
                           { overlay: tooltipJSX
                           , placement: OverlayTrigger.placement.bottom
                           }
                           -- Disabled button doesn't trigger the hook,
                           -- so we wrap it in a `span`
-                          (DOOM.span_ [ newContractButton ])
+                          (DOM.div { className: spacing } [ newContractButton ])
                       else
-                        newContractButton
+                        DOM.div { className: spacing } [ newContractButton ]
                   ]
               , DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
                   [ table { striped: Table.striped.boolean true, hover: true }
@@ -302,11 +304,13 @@ mkContractList = do
                                             { icon: unsafeIcon "fast-forward-fill h2"
                                             , label: mempty
                                             , tooltipText: Just "Apply available inputs to the contract"
+                                            , tooltipPlacement: Just placement.left
                                             , onClick: setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState
                                             }
                                           _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
                                             { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
                                             , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
+                                            , tooltipPlacement: Just placement.left
                                             , label: mempty
                                             , onClick: mempty
                                             }
@@ -342,7 +346,7 @@ mkContractList = do
                       mempty
                   ]
               ]
-          ]
+            }
         _, _ -> mempty
 
 prettyState :: V1.State -> String

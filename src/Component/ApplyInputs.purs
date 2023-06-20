@@ -6,8 +6,10 @@ import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..))
 import Component.ApplyInputs.Machine as Machine
+import Component.BodyLayout (BodyContent(..))
 import Component.BodyLayout as BodyLayout
 import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, toIChoice, toIDeposit)
+import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo(..))
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
@@ -159,8 +161,10 @@ mkDepositFormComponent = do
           ]
       { title: R.text "Perform deposit"
       , description: DOOM.text "We are creating the initial transaction."
-      , body
-      , footer: actions
+      , content: ContentWithFooter
+        { body
+        , footer: actions
+        }
       }
 
 type ChoiceFormComponentProps =
@@ -247,8 +251,10 @@ mkChoiceFormComponent = do
           ]
       { title: R.text "Perform choice"
       , description: DOOM.text "Perform choice description"
-      , body
-      , footer: actions
+      , content: ContentWithFooter
+        { body
+        , footer: actions
+        }
       }
 
 type NotifyFormComponentProps =
@@ -279,8 +285,10 @@ mkNotifyFormComponent = do
           ]
       { title: R.text "Perform notify"
       , description: DOOM.text "Perform notify description"
-      , body
-      , footer: actions
+      , content: ContentWithFooter
+        { body
+        , footer: actions
+        }
       }
 
 type AdvanceFormComponentProps =
@@ -305,8 +313,10 @@ mkAdvanceFormComponent = do
           ]
       { title: R.text "Advance Contract"
       , description: DOOM.text "Advance Contract description"
-      , body
-      , footer: actions
+      , content: ContentWithFooter
+        { body
+        , footer: actions
+        }
       }
 
 data CreateInputStep
@@ -331,9 +341,6 @@ type Props =
   , contract :: V1.Contract
   , state :: V1.State
   }
-
-sortMarloweKeys :: String -> String -> JsYaml.JsOrdering
-sortMarloweKeys a b = JsYaml.toJsOrdering $ compareMarloweJsonKeys a b
 
 machineProps contract state transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime = do
   let
@@ -386,7 +393,7 @@ mkContractDetailsComponent = do
     let
       fields = UseForm.renderForm autoRunForm formState
       body = DOM.div { className: "container" } $
-        [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys } ]
+        [ DOM.div { className: "col-12" } $ marloweYaml contract ]
         <>  fields
       footer = fragment
         [ DOM.button
@@ -405,8 +412,10 @@ mkContractDetailsComponent = do
     pure $ BodyLayout.component
       { title: R.text "Apply Inputs | Contract Details"
       , description: DOOM.text "Contract Details"
-      , body
-      , footer
+      , content: ContentWithFooter
+        { body
+        , footer
+        }
       }
 
 -- In here we want to summarize the initial interaction with the wallet
@@ -443,8 +452,10 @@ fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
   BodyLayout.component
     { title: R.text "Apply Inputs | Fetching Wallet Context"
     , description: DOOM.text "Fetching Wallet Context description"
-    , body
-    , footer
+    , content: ContentWithFooter
+      { body
+      , footer
+      }
     }
 
 -- Now we want to to describe the interaction with the API where runtimeRequest is
@@ -477,8 +488,10 @@ creatingTxDetails onNext runtimeRequest possibleRuntimeResponse = do
   DOM.div { className: "row" } $ BodyLayout.component
     { title: R.text "Apply Inputs | Creating Transaction"
     , description: DOOM.text "We are creating the initial transaction."
-    , body
-    , footer
+    , content: ContentWithFooter
+      { body
+      , footer
+      }
     }
 
 
@@ -589,8 +602,10 @@ mkComponent = do
           BodyLayout.component
             { title: R.text "Select input type"
             , description: DOOM.text "We are creating the initial transaction."
-            , body
-            , footer
+            , content: ContentWithFooter
+              { body
+              , footer
+              }
             }
       Machine.PickingInput { inputChoices } -> do
         let

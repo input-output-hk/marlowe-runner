@@ -5,13 +5,16 @@ import Prelude
 import CardanoMultiplatformLib (bech32FromString, bech32ToString)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Types (Bech32)
+import Component.BodyLayout (BodyContent(..))
 import Component.BodyLayout as BodyLayout
 import Component.CreateContract.Machine as Machine
+import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo)
 import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.ReactBootstrap.FormBuilder (booleanField) as FormBuilder
+import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
@@ -233,6 +236,7 @@ mkRoleTokensComponent = do
               { label: DOOM.text "Cancel"
               , onClick: onDismiss
               , showBorders: true
+              , extraClassNames: "me-3"
               }
           , DOM.button
               do
@@ -249,10 +253,12 @@ mkRoleTokensComponent = do
       BodyLayout.component
         { title: R.text "Role token assignments"
         , description: R.text "Assign addresses to role tokens"
-        , body: DOM.div { className: "row" }
-            [ DOM.div { className: "col-12" } [ formBody ]
-            ]
-        , footer: formActions
+        , content: ContentWithFooter
+          { body: DOM.div { className: "row" }
+              [ DOM.div { className: "col-12" } [ formBody ]
+              ]
+          , footer: formActions
+          }
         }
 
 mkComponent :: MkComponentM (Props -> JSX)
@@ -310,8 +316,7 @@ mkComponent = do
         _ -> pure unit
       pure (pure unit)
 
-
-    pure $ DOM.div { className: "container-fluid" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" } $ case submissionState of
+    pure $ case submissionState of
       Machine.DefiningContract -> do
         let
           fields = UseForm.renderForm form formState
@@ -321,6 +326,7 @@ mkComponent = do
                 { label: DOOM.text "Cancel"
                 , onClick: onDismiss
                 , showBorders: true
+                , extraClassNames: "me-3"
                 }
             , DOM.button
                 do
@@ -337,8 +343,10 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , body: formBody
-          , footer: formActions
+          , content: ContentWithFooter
+            { body: formBody
+            , footer: formActions
+            }
           }
 
       Machine.DefiningRoleTokens { roleNames } -> do
@@ -351,14 +359,34 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , body: roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
-          , footer: DOOM.fragment
+          , content: ContentWithFooter
+            { body: roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
+            , footer: DOOM.fragment
               [ link
                   { label: DOOM.text "Cancel"
                   , onClick: onDismiss
                   , showBorders: true
+                  , extraClassNames: "me-3"
                   }
               ]
+            }
+          }
+      Machine.ContractCreated { contract, createTxResponse } -> do
+        let
+          { links: { contract: contractEndpoint }} = createTxResponse
+        BodyLayout.component
+          { title: stateToTitle submissionState
+          , description: stateToDetailedDescription submissionState
+          , content: ContentWithFooter
+            { body: marloweYaml contract
+            , footer: DOOM.fragment
+              [ DOM.button
+                { className: "btn btn-primary"
+                , onClick: handler_ (onSuccess contractEndpoint)
+                }
+                [ R.text "Ok" ]
+              ]
+            }
           }
 
       machineState -> do
@@ -384,7 +412,7 @@ mkComponent = do
               , case currentRun of
                   Just (Manual true) -> do
                     DOM.div { className: "d-flex justify-content-center" } $ spinner Nothing
-                  _ -> mempty -- stateToDetailedDescription submissionState
+                  _ -> DOOM.text "REQUEST / RESPONSE"
               ]
 
           formActions = case possibleRequest of
@@ -394,6 +422,7 @@ mkComponent = do
                   { label: DOOM.text "Cancel"
                   , onClick: onDismiss
                   , showBorders: true
+                  , extraClassNames: "me-3"
                   }
               , DOM.button
                   { className: "btn btn-primary"
@@ -413,8 +442,10 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , body
-          , footer: formActions
+          , content: ContentWithFooter
+            { body
+            , footer: formActions
+            }
           }
 
 stateToTitle :: Machine.State -> JSX
