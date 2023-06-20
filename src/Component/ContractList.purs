@@ -2,33 +2,29 @@ module Component.ContractList where
 
 import Prelude
 
-import CardanoMultiplatformLib (CborHex, runGarbageCollector, valueFromCbor)
-import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject, ValueObject(..))
-import CardanoMultiplatformLib.Transaction as Value
-import CardanoMultiplatformLib.Types (Cbor, cborHexToCbor)
+import CardanoMultiplatformLib (CborHex)
+import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
 import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
-import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
+import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
-import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Fetch (FetchError)
 import Contrib.React.Svg (loadingSpinnerLogo)
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (encodeJson, stringify)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
-import Data.Either (Either(..))
+import Data.Either (Either)
 import Data.Foldable (any, fold, foldMap)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
-import Data.Int as Int
 import Data.List (concat)
 import Data.List as List
 import Data.Map as Map
@@ -37,37 +33,32 @@ import Data.Newtype (un)
 import Data.Set as Set
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
-import Data.Time.Duration (Milliseconds(..), Seconds(..))
-import Data.Tuple (fst, snd)
+import Data.Time.Duration (Seconds(..))
+import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
-import Debug (traceM)
 import Effect (Effect)
-import Effect.Aff (Aff, launchAff, launchAff_)
+import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Language.Marlowe.Core.V1.Semantics.Types (Contract, TimeInterval(..))
+import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Runtime.Web (Runtime)
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), PutTransactionRequest(..), Runtime(..), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalEndpoint(..), WithdrawalsEndpoint(..), toTextEnvelope, txOutRefToString, txOutRefToUrlEncodedString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), PutTransactionRequest(..), Runtime(..), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
-import Promise (then_)
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (div_, span_, text, hr) as DOOM
+import React.Basic.DOM (div_, text) as DOOM
 import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, handler, handler_)
-import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useEffect, useState, useState', (/\))
+import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useState, useState', (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.Aff (useAff)
 import React.Basic.Hooks.UseForm (useForm)
 import React.Basic.Hooks.UseForm as UseForm
 import ReactBootstrap (overlayTrigger, tooltip)
 import ReactBootstrap.FormBuilder (BootstrapForm, textInput)
 import ReactBootstrap.FormBuilder as FormBuilder
 import ReactBootstrap.Icons (unsafeIcon)
-import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Table (striped) as Table
 import ReactBootstrap.Table (table)
 import ReactBootstrap.Types (placement)
@@ -75,7 +66,6 @@ import ReactBootstrap.Types as OverlayTrigger
 import Utils.React.Basic.Hooks (useMaybeValue', useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
-import Web.HTML.HTMLMediaElement (load)
 
 type ContractId = TxOutRef
 
@@ -307,10 +297,6 @@ mkContractList = do
                                                 setModalAction $ ContractDetails currentContract currentState
                                               _ -> pure unit
                                             disabled = isNothing marloweInfo
-                                            -- { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
-                                            -- , target: "_blank"
-                                            -- , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
-                                            -- }
                                           { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
                                           , onClick: handler_ onClick
                                           -- , disabled

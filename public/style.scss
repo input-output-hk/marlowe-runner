@@ -49,6 +49,24 @@ $link-color: #511CF7;
   padding: 0 !important;
 }
 
+.child-pre-px-0 > pre {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.child-pre-py-0 > pre {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.child-pre-bg-white > pre {
+  background-color: #fff !important;
+}
+
+.child-pre-bg-transparent > pre {
+  background-color: transparent !important;
+}
+
 .primary-color {
   color: $primary;
 }
