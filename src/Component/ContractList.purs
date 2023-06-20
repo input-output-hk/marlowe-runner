@@ -222,7 +222,14 @@ mkContractList = do
             , onDismiss: resetModalAction
             }
         Nothing, _ -> DOM.div { className: "container-fluid" } $ DOM.div { className: "row vh-100" }
-          [ DOM.div { className: "col-3 background-color-primary" } $ DOOM.text "DESCRIPTION"
+          [ DOM.div { className: "col-3 background-color-primary p-5" } do
+              DOM.div { className: "container" } do
+                DOM.div { className: "row mt-5 p-3" } do
+                  [ DOM.div { className: "col-12 p-3" } $ DOM.p { className: "font-weight-bold white-color h3" } $ DOOM.text "Marlowe Contract List"
+                  , DOM.div { className: "col-12 p-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that you have created or interacted with on the Cardano Blockchain's {pre-prod} network."
+                  , DOM.div { className: "col-12 p-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
+                  , DOM.div { className: "col-12 p-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
+                  ]
           , DOM.div { className: "col-9" } $ DOM.div { className: "container-fluid" } do
               [ DOM.div { className: "row position-sticky bg-white shadow-bottom mt-5 pt-5" } do
                   let
