@@ -4,11 +4,12 @@ import Prelude
 
 import Component.BodyLayout (BodyContent(..))
 import Component.BodyLayout as BodyLayout
-import Component.MarloweYaml (marloweYaml)
+import Component.MarloweYaml (marloweYaml, marloweStateYaml)
 import Component.Types (MkComponentM)
 import Contrib.React.MarloweGraph (marloweGraph)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Language.Marlowe.Core.V1.Semantics.Types (_marloweState)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import React.Basic as DOOM
 import React.Basic.DOM (css)
@@ -19,6 +20,8 @@ import React.Basic.Hooks (JSX, component, (/\))
 import React.Basic.Hooks as React
 import ReactBootstrap.Icons (unsafeIcon)
 import ReactBootstrap.Icons as Icons
+import ReactBootstrap.Nav (nav)
+import ReactBootstrap.Nav as Nav
 import ReactBootstrap.Tab (tab)
 import ReactBootstrap.Tabs (tabs)
 import ReactBootstrap.Tabs as Tabs
@@ -31,6 +34,7 @@ data ContractView = SourceCode | Graph { compressed :: Boolean }
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   liftEffect $ component "ContractDetails" \{ contract, state, onClose } -> React.do
+    contractView /\ setContractView <- React.useState' SourceCode
     -- normalizeContract /\ setNormalizeContract <- React.useState' false
 
     let
@@ -62,12 +66,37 @@ mkComponent = do
                 { eventKey: eventKey "graph"
                 , title: DOOM.span_
                     [ Icons.toJSX $ unsafeIcon "diagram-2"
-                    , DOOM.text " Graph"
+                    , DOOM.text " Source graph"
                     ]
                 }
                 [ DOM.div { className: "w-100", style: sixtyVH } [ marloweGraph { contract } ]]
+              , renderTab
+                { eventKey: eventKey "state"
+                , title: DOOM.span_
+                    [ Icons.toJSX $ unsafeIcon "coin"
+                    , DOOM.text " Contract state"
+                    ]
+                }
+                [ DOM.div { className: "w-100", style: sixtyVH } [ marloweStateYaml state ]]
               ]
           ]
+      -- body = nav
+      --   { variant: Nav.variant.pills }
+      --   [ Nav.link
+      --     { eventKey: eventKey "source"}
+      --     [ DOOM.span_
+      --         [ Icons.toJSX $ unsafeIcon "filetype-yml"
+      --         , DOOM.text " Source code"
+      --         ]
+      --     ]
+      --   , Nav.link
+      --     { eventKey: eventKey "graph"}
+      --     [ DOOM.span_
+      --         [ Icons.toJSX $ unsafeIcon "diagram-2"
+      --         , DOOM.text " Source graph"
+      --         ]
+      --     ]
+      --   ]
       footer = DOOM.fragment
         [ DOM.button
           { className: "btn btn-primary"
@@ -84,4 +113,24 @@ mkComponent = do
       , content
       }
 
-
+-- <ul class="nav nav-pills">
+--   <li class="nav-item">
+--     <a class="nav-link active" aria-current="page" href="#">Active</a>
+--   </li>
+--   <li class="nav-item dropdown">
+--     <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Dropdown</a>
+--     <ul class="dropdown-menu">
+--       <li><a class="dropdown-item" href="#">Action</a></li>
+--       <li><a class="dropdown-item" href="#">Another action</a></li>
+--       <li><a class="dropdown-item" href="#">Something else here</a></li>
+--       <li><hr class="dropdown-divider"></li>
+--       <li><a class="dropdown-item" href="#">Separated link</a></li>
+--     </ul>
+--   </li>
+--   <li class="nav-item">
+--     <a class="nav-link" href="#">Link</a>
+--   </li>
+--   <li class="nav-item">
+--     <a class="nav-link disabled">Disabled</a>
+--   </li>
+-- </ul>

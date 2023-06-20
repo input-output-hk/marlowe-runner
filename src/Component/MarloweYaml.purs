@@ -19,3 +19,7 @@ marloweYaml contract =
     [ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys } ]
 
 
+marloweStateYaml :: V1.State -> JSX
+marloweStateYaml state =
+  DOM.div { className: "child-pre-sixty-vh child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent" }
+    [ yamlSyntaxHighlighter state { sortKeys: mkFn2 sortMarloweKeys } ]
