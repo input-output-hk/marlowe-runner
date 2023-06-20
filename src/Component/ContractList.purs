@@ -222,10 +222,11 @@ mkContractList = do
           contractDetails { contract, onClose, state }
 
         Nothing, _ -> BodyLayout.component
-          { title: "Marlowe Contract List"
+          { title: "Your Marlowe Contracts"
           , description: DOOM.div_
-                [ DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that you have created or interacted with on the Cardano Blockchain's {pre-prod} network."
-                , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
+                [ DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that your wallet is involved in on the Cardano Blockchain's `preview` network."
+                , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Your involvement means that one of your wallet addresses is a part of the contract (some contracts are non fully public) or that you have a token (so called \"role token\") which gives you permission to act as a party in some contract."
+                -- , DOM.div "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
                 , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
                 ]
           , content: BodyLayout.SimpleContent $ React.fragment

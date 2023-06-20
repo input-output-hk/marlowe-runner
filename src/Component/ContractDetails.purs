@@ -108,7 +108,7 @@ mkComponent = do
       content = ContentWithFooter { body, footer }
 
     pure $ BodyLayout.component
-      { title: DOOM.text "Contract details"
+      { title: "Contract details"
       , description: DOOM.text "View the details of a contract"
       , content
       }

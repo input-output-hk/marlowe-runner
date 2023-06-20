@@ -1,8 +1,6 @@
 import * as React from "react"
 import { ReactFlow, Node, Edge, Background, BackgroundVariant, Handle, Position } from "reactflow";
 
-// import 'reactflow/dist/style.css'
-
 type Address = string
 type TokeName = string
 type CurrencySymbol = string
