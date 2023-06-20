@@ -49,17 +49,15 @@ mkLandingPage = do
   connectWallet <- mkConnectWallet
   liftEffect $ component "LandingPage" \{ setWalletInfo } -> React.do
     possibleErrors /\ setErrors <- useState' Nothing
-    pure $ DOM.div { className: "mt-6" } $
-      [ DOM.div { className: "fixed-top" }
-          [ DOM.nav { className: "navbar mb-lg-3 navbar-expand-sm navbar-light bg-light shadow-bottom" } $
-              DOM.div { className: "container-xl" }
-                [ DOM.a { href: "#", className: "navbar-brand" }
-                    [ svgImg { src: marloweLogoUrl } ]
-                ]
-          ]
-      , DOM.div { className: "container" }
+    pure $ DOM.div {} $
+      [ DOM.nav { className: "navbar navbar-expand-sm navbar-light bg-light shadow-bottom fix-top" } $
+          DOM.div { className: "container-fluid" }
+            [ DOM.a { href: "#", className: "navbar-brand" }
+                [ svgImg { src: marloweLogoUrl } ]
+            ]
+      , DOM.div { className: "container-fluid" }
           $ DOM.div { className: "row justify-content-center" }
-          $ DOM.div { className: "col-lg-6 col-12" }
+          $ DOM.div { className: "col-lg-3 col-12" }
               [ case possibleErrors of
                   -- FIXME: Should we present errors on the connectWallet level?
                   Just NoWallets -> DOOM.text "NO WALLETS?"

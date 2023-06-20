@@ -221,120 +221,120 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Nothing, _ -> DOM.div { className: "container-fluid" } $ DOM.div { className: "row" }
-          [ DOM.div { className: "col-3" } $ DOOM.text "DESCRIPTION"
-          , DOM.div { className: "col-9" } do
-            [ DOM.div { className: "row position-sticky top-0 bg-white pt-5 shadow-bottom mb-5" } do
-              let
-                disabled = isNothing connectedWallet
-                newContractButton = buttonWithIcon
-                  { icon: unsafeIcon "file-earmark-plus h5 mr-2"
-                  , label: DOOM.text "New Contract"
-                  , extraClassNames: "font-weight-bold"
-                  , disabled
-                  , onClick: do
-                      readRef possibleModalActionRef >>= case _ of
-                        Nothing -> setModalAction NewContract
-                        _ -> pure unit
-                  }
-                fields = UseForm.renderForm form formState
-                body = DOM.div { className: "form-group" } fields
-              -- actions = DOOM.fragment []
-              [ DOM.div { className: "col-9 text-end my-5" } $
-                  [ body
-                  -- , actions
-                  ]
-              , DOM.div { className: "col-3 text-end my-5" } $ Array.singleton $
-                  if disabled then do
-                    let
-                      tooltipJSX = tooltip {} (DOOM.text "Connect to a wallet to add a contract")
-                    overlayTrigger
-                      { overlay: tooltipJSX
-                      , placement: OverlayTrigger.placement.bottom
+        Nothing, _ -> DOM.div { className: "container-fluid" } $ DOM.div { className: "row vh-100" }
+          [ DOM.div { className: "col-3 background-color-primary" } $ DOOM.text "DESCRIPTION"
+          , DOM.div { className: "col-9" } $ DOM.div { className: "container-fluid" } do
+              [ DOM.div { className: "row position-sticky bg-white shadow-bottom mt-5 pt-5" } do
+                  let
+                    disabled = isNothing connectedWallet
+                    newContractButton = buttonWithIcon
+                      { icon: unsafeIcon "file-earmark-plus h5 mr-2"
+                      , label: DOOM.text "New Contract"
+                      , extraClassNames: "font-weight-bold"
+                      , disabled
+                      , onClick: do
+                          readRef possibleModalActionRef >>= case _ of
+                            Nothing -> setModalAction NewContract
+                            _ -> pure unit
                       }
-                      -- Disabled button doesn't trigger the hook,
-                      -- so we wrap it in a `span`
-                      (DOOM.span_ [ newContractButton ])
-                  else
-                    newContractButton
-              ]
-          , DOM.div { className: "row" }
-              [ table { striped: Table.striped.boolean true, hover: true }
-                  [ DOM.thead {} do
-                      let
-                        orderingTh = Table.orderingHeader ordering updateOrdering
-                        th label = DOM.th { className: "text-center text-muted" } [ label ]
-                      [ DOM.tr {}
-                          [ do
-                              let
-                                label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                              orderingTh label OrderByCreationDate
-                          , th $ DOOM.text "Contract Id"
-                          , th $ DOOM.text "Actions"
-                          ]
+                    fields = UseForm.renderForm form formState
+                    body = DOM.div { className: "form-group" } fields
+                  -- actions = DOOM.fragment []
+                  [ DOM.div { className: "col-9 text-end my-3" } $
+                      [ body
+                      -- , actions
                       ]
-                  , DOM.tbody {} $ map
-                      ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo }) ->
-                          let
-                            ContractHeader { contractId, status } = _runtime.contractHeader
-                            tdCentered = DOM.td { className: "text-center" }
-                          in
-                            DOM.tr {}
-                              [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
-                              , tdCentered
-                                  [ DOM.a
-                                      { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
-                                      , target: "_blank"
-                                      , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
-                                      }
-                                      [ text $ txOutRefToString contractId ]
-                                  ]
-                              , tdCentered
-                                  [ case endpoints.transactions, marloweInfo of
-                                      Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
-                                        { icon: unsafeIcon "fast-forward-fill h2"
-                                        , label: mempty
-                                        , tooltipText: Just "Apply available inputs to the contract"
-                                        , onClick: setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState
-                                        }
-                                      _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                        { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
-                                        , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
-                                        , label: mempty
-                                        , onClick: mempty
-                                        }
-                                      _, _ -> mempty
-                                  , case marloweInfo, possibleWalletContext of
-                                      Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
-                                        let
-                                          rolesFromContract = rolesInContract initialContract
-                                          roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
-                                        case Array.uncons (Array.intersect roleTokens rolesFromContract) of
-                                          Just { head, tail } ->
-                                            linkWithIcon
-                                              { icon: unsafeIcon "cash-coin h2"
-                                              , label: mempty
-                                              , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                              , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
-                                              }
-                                          _ -> mempty
-                                      _, _ -> mempty
-                                  ]
-                              ]
-                      )
-                      contracts''
+                  , DOM.div { className: "col-3 text-end my-3" } $ Array.singleton $
+                      if disabled then do
+                        let
+                          tooltipJSX = tooltip {} (DOOM.text "Connect to a wallet to add a contract")
+                        overlayTrigger
+                          { overlay: tooltipJSX
+                          , placement: OverlayTrigger.placement.bottom
+                          }
+                          -- Disabled button doesn't trigger the hook,
+                          -- so we wrap it in a `span`
+                          (DOOM.span_ [ newContractButton ])
+                      else
+                        newContractButton
                   ]
-              , if isLoadingContracts then
-                  DOM.div
-                    { className: "position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
-                    }
-                    $ loadingSpinnerLogo
-                        {}
+              , DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
+                  [ table { striped: Table.striped.boolean true, hover: true }
+                      [ DOM.thead {} do
+                          let
+                            orderingTh = Table.orderingHeader ordering updateOrdering
+                            th label = DOM.th { className: "text-center text-muted" } [ label ]
+                          [ DOM.tr {}
+                              [ do
+                                  let
+                                    label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                                  orderingTh label OrderByCreationDate
+                              , th $ DOOM.text "Contract Id"
+                              , th $ DOOM.text "Actions"
+                              ]
+                          ]
+                      , DOM.tbody {} $ map
+                          ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo }) ->
+                              let
+                                ContractHeader { contractId, status } = _runtime.contractHeader
+                                tdCentered = DOM.td { className: "text-center" }
+                              in
+                                DOM.tr {}
+                                  [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
+                                  , tdCentered
+                                      [ DOM.a
+                                          { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
+                                          , target: "_blank"
+                                          , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
+                                          }
+                                          [ text $ txOutRefToString contractId ]
+                                      ]
+                                  , tdCentered
+                                      [ case endpoints.transactions, marloweInfo of
+                                          Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
+                                            { icon: unsafeIcon "fast-forward-fill h2"
+                                            , label: mempty
+                                            , tooltipText: Just "Apply available inputs to the contract"
+                                            , onClick: setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState
+                                            }
+                                          _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
+                                            { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
+                                            , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
+                                            , label: mempty
+                                            , onClick: mempty
+                                            }
+                                          _, _ -> mempty
+                                      , case marloweInfo, possibleWalletContext of
+                                          Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
+                                            let
+                                              rolesFromContract = rolesInContract initialContract
+                                              roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
+                                            case Array.uncons (Array.intersect roleTokens rolesFromContract) of
+                                              Just { head, tail } ->
+                                                linkWithIcon
+                                                  { icon: unsafeIcon "cash-coin h2 warning-color"
+                                                  , label: mempty
+                                                  , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                                  , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                                  }
+                                              _ -> mempty
+                                          _, _ -> mempty
+                                      ]
+                                  ]
+                          )
+                          contracts''
+                      ]
+                  , if isLoadingContracts then
+                      DOM.div
+                        { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
+                        }
+                        $ loadingSpinnerLogo
+                            {}
 
-                else
-                  mempty
+                    else
+                      mempty
+                  ]
               ]
-            ]
           ]
         _, _ -> mempty
 
