@@ -8,6 +8,7 @@ import CardanoMultiplatformLib.Transaction as Value
 import CardanoMultiplatformLib.Types (Cbor, cborHexToCbor)
 import Component.ApplyInputs as ApplyInputs
 import Component.BodyLayout as BodyLayout
+import Component.ContractDetails as ContractDetails
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
 import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo(..))
@@ -56,7 +57,7 @@ import React.Basic.DOM (div_, span_, text, hr) as DOOM
 import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (EventHandler, handler)
+import React.Basic.Events (EventHandler, handler, handler_)
 import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useEffect, useState, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
@@ -117,6 +118,7 @@ submit witnesses serverUrl transactionEndpoint = do
 
 data ModalAction
   = NewContract
+  | ContractDetails V1.Contract V1.State
   | ApplyInputs TransactionsEndpoint V1.Contract V1.State
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
 
@@ -148,6 +150,7 @@ mkContractList = do
   createContractComponent <- CreateContract.mkComponent
   applyInputsComponent <- ApplyInputs.mkComponent
   withdrawalsComponent <- Withdrawals.mkComponent
+  contractDetails <- ContractDetails.mkComponent
 
   liftEffect $ component "ContractList" \{ connectedWallet, contracts } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -223,6 +226,11 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
+        Just (ContractDetails contract state), _ -> do
+          let
+            onClose = resetModalAction
+          contractDetails { contract, onClose, state }
+
         Nothing, _ -> BodyLayout.component
           { title: DOM.h3 { className: "h3 pb-3 fw-bold" } $ DOOM.text "Marlowe Contract List"
           , description: DOOM.div_
@@ -292,11 +300,22 @@ mkContractList = do
                                   [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
                                   , tdCentered
                                       [ DOM.a
+                                        do
+                                          let
+                                            onClick = case marloweInfo of
+                                              Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> do
+                                                setModalAction $ ContractDetails currentContract currentState
+                                              _ -> pure unit
+                                            disabled = isNothing marloweInfo
+                                            -- { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
+                                            -- , target: "_blank"
+                                            -- , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
+                                            -- }
                                           { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
-                                          , target: "_blank"
-                                          , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
+                                          , onClick: handler_ onClick
+                                          -- , disabled
                                           }
-                                          [ text $ txOutRefToString contractId ]
+                                        [ text $ txOutRefToString contractId ]
                                       ]
                                   , tdCentered
                                       [ case endpoints.transactions, marloweInfo of

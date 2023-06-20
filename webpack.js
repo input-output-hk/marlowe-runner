@@ -74,7 +74,7 @@ export default function(_env, argv) {
           ],
         },
         {
-          test: /\.(scss)$/,
+          test: /\.(scss|css)$/,
           use: [
           {
             // inject CSS to page

@@ -553,8 +553,7 @@ mkComponent = do
         _ -> do
           let
             body = DOM.div { className: "row" }
-              [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
-              ]
+              [ DOM.div { className: "col-12" } $ marloweYaml contract ]
 
             footer = DOM.div { className: "row" }
               [ DOM.div { className: "col-3 text-center" } $
