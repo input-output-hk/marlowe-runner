@@ -18,7 +18,7 @@ data BodyContent
     }
 
 -- | At the end it could be stateful because we can make the sidebar collapsible.
-component :: { title :: JSX, description :: JSX, content :: BodyContent } -> JSX
+component :: { title :: String, description :: JSX, content :: BodyContent } -> JSX
 component { title, description, content } =
   DOM.div { className: "container-fluid overflow-hidden" } $ do
     let
@@ -28,7 +28,7 @@ component { title, description, content } =
     DOM.div { className: "row" }
       [ DOM.div { className: "col-3 p-4 background-color-primary white-color overflow-auto vh-100" }
           [ navBarPlaceholder
-          , title
+          , DOM.h3 { className: "h3 pb-3 fw-bold" } $ DOOM.text title
           , description
           , footerPlaceholder
           ]

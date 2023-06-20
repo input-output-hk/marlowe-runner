@@ -14,12 +14,11 @@ import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.ReactBootstrap.FormBuilder (booleanField) as FormBuilder
-import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
 import Control.Promise as Promise
-import Data.Argonaut (decodeJson, encodeJson, parseJson, stringify, stringifyWithIndent)
+import Data.Argonaut (decodeJson, encodeJson, parseJson, stringifyWithIndent)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (lmap)
@@ -251,7 +250,7 @@ mkRoleTokensComponent = do
               [ R.text "Submit" ]
           ]
       BodyLayout.component
-        { title: R.text "Role token assignments"
+        { title: "Role token assignments"
         , description: R.text "Assign addresses to role tokens"
         , content: ContentWithFooter
           { body: DOM.div { className: "row" }
@@ -448,8 +447,8 @@ mkComponent = do
             }
           }
 
-stateToTitle :: Machine.State -> JSX
-stateToTitle state = DOOM.text case state of
+stateToTitle :: Machine.State -> String
+stateToTitle state = case state of
   Machine.DefiningContract -> "Defining contract"
   Machine.DefiningRoleTokens {} -> "Defining role tokens"
   Machine.FetchingRequiredWalletContext {} -> "Fetching required wallet context"

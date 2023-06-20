@@ -222,7 +222,7 @@ mkContractList = do
           contractDetails { contract, onClose, state }
 
         Nothing, _ -> BodyLayout.component
-          { title: DOM.h3 { className: "h3 pb-3 fw-bold" } $ DOOM.text "Marlowe Contract List"
+          { title: "Marlowe Contract List"
           , description: DOOM.div_
                 [ DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that you have created or interacted with on the Cardano Blockchain's {pre-prod} network."
                 , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
