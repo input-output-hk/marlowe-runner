@@ -57,7 +57,7 @@ mkComponent = do
                     , DOOM.text " Source code"
                     ]
                 }
-                [ DOM.div { className: "child-pre-sixty-vh child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent" } [ marloweYaml contract ]]
+                [ marloweYaml contract ]
               , renderTab
                 { eventKey: eventKey "graph"
                 , title: DOOM.span_
