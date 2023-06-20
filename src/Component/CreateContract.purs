@@ -34,6 +34,7 @@ import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (un)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
+import Data.String (Pattern(..), split, trim)
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
 import Data.Tuple (snd)
@@ -46,8 +47,9 @@ import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
-import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..))
+import Marlowe.Runtime.Web.Types (ContractEndpoint, Metadata(..), PostContractsError, RoleTokenConfig(..), RolesConfig(..), Tags(..))
 import Partial.Unsafe (unsafeCrashWith)
+import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (css)
@@ -78,7 +80,7 @@ type Props =
 
 newtype AutoRun = AutoRun Boolean
 
-type Result = V1.Contract /\ AutoRun
+type Result = V1.Contract /\ Tags /\ AutoRun
 
 contractFieldId = FieldId "contract-json"
 
@@ -100,6 +102,22 @@ mkContractForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuild
     , rows: 15
     , name: Just contractFieldId
     }
+
+  tags <- FormBuilder.textInput
+    { helpText: Just $ DOOM.div_
+        [ DOOM.text "Tags"
+        ]
+    , initial: ""
+    , label: Just $ DOOM.text "Tags"
+    , touched: false
+    , validator: liftFn case _ of
+        Nothing -> Tags mempty
+        Just tags ->
+          (Tags $ Map.singleton runLiteTag
+             (Metadata $ Map.fromFoldableWithIndex
+               $ map (encodeJson <<< trim) $ split (Pattern ",") tags))
+    }
+
   autoRun <- AutoRun <$> do
     -- FIXME: This should be documented I left this as an example of more hard core lifting of validator
     -- let
@@ -114,7 +132,7 @@ mkContractForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuild
       , initial: initialAutoRun
       }
   in
-    contract /\ autoRun
+    contract /\ tags /\ autoRun
 
 mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> BootstrapForm Effect Query RolesConfig
 mkRolesConfigForm roleNames cardanoMultiplatformLib = FormBuilder.evalBuilder' $ Mint <<< Map.fromFoldable <$> for roleNames \roleName -> ado
@@ -260,6 +278,9 @@ mkRoleTokensComponent = do
           }
         }
 
+runLiteTag :: String
+runLiteTag = "run-lite"
+
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   runtime <- asks _.runtime
@@ -283,7 +304,7 @@ mkComponent = do
     let
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
-        Just (V (Right (contract /\ autoRun)) /\ _) -> do
+        Just (V (Right (contract /\ tags /\ autoRun)) /\ _) -> do
           let
             props = machineProps autoRun connectedWallet cardanoMultiplatformLib runtime
           applyAction' <- resetStateMachine (Just props)
@@ -292,7 +313,7 @@ mkComponent = do
               setCurrentRun $ Just $ Automatic
             AutoRun false -> do
               setCurrentRun $ Just $ Manual false
-          applyAction' $ Machine.TriggerSubmission contract
+          applyAction' $ Machine.TriggerSubmission contract tags
         _ -> pure unit
 
     { formState, onSubmit: onSubmit', result } <- useForm

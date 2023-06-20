@@ -22,7 +22,7 @@ import Effect.Aff.Class (liftAff)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsError, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), ResourceWithLinks, RolesConfig, Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), toTextEnvelope)
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsError, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), ResourceWithLinks, RolesConfig, Runtime(Runtime), ServerURL, Tags(..), TextEnvelope(TextEnvelope), toTextEnvelope)
 import React.Basic (JSX)
 import React.Basic.DOM as DOM
 import React.Basic.DOM.Simplified.Generated as S
@@ -35,6 +35,7 @@ type ClientError' = ClientError PostContractsError
 
 data ContractData = ContractData
   { contract :: V1.Contract
+  , tags :: Tags
   , rolesConfig :: Maybe RolesConfig
   , walletAddresses ::
       { changeAddress :: Bech32
@@ -53,16 +54,19 @@ data State
   = DefiningContract
   | DefiningRoleTokens
       { contract :: V1.Contract
+      , tags :: Tags
       , roleNames :: NonEmptyArray V1.TokenName
       , errors :: Maybe String
       }
   | FetchingRequiredWalletContext
       { contract :: V1.Contract
+      , tags :: Tags
       , rolesConfig :: Maybe RolesConfig
       , errors :: Maybe String
       }
   | CreatingTx
       { contract :: V1.Contract
+      , tags :: Tags
       , rolesConfig :: Maybe RolesConfig
       , errors :: Maybe String
       , reqWalletContext :: RequiredWalletContext
@@ -87,7 +91,7 @@ data State
       }
 
 data Action
-  = TriggerSubmission V1.Contract
+  = TriggerSubmission V1.Contract Tags
   | DefineRoleTokens
   | DefineRoleTokensFailed String
   | DefineRoleTokensSucceeded RolesConfig
@@ -116,22 +120,22 @@ step :: State -> Action -> State
 step state action = do
   case state of
     DefiningContract -> case action of
-      TriggerSubmission contract -> case Array.uncons (rolesInContract contract) of
-        Nothing -> FetchingRequiredWalletContext { contract, rolesConfig: Nothing, errors: Nothing }
+      TriggerSubmission contract tags -> case Array.uncons (rolesInContract contract) of
+        Nothing -> FetchingRequiredWalletContext { contract, tags, rolesConfig: Nothing, errors: Nothing }
         Just { head, tail } ->
-          DefiningRoleTokens { contract, roleNames: Array.NonEmpty.cons' head tail, errors: Nothing }
+          DefiningRoleTokens { contract, tags, roleNames: Array.NonEmpty.cons' head tail, errors: Nothing }
       _ -> state
-    DefiningRoleTokens { contract, roleNames, errors: Just _ } -> case action of
-      DefineRoleTokens -> DefiningRoleTokens { contract, roleNames, errors: Nothing }
+    DefiningRoleTokens { contract, tags, roleNames, errors: Just _ } -> case action of
+      DefineRoleTokens -> DefiningRoleTokens { contract, tags, roleNames, errors: Nothing }
       _ -> state
-    DefiningRoleTokens { contract, roleNames, errors: Nothing } -> case action of
-      DefineRoleTokensFailed error -> DefiningRoleTokens { contract, roleNames, errors: Just error }
-      DefineRoleTokensSucceeded rolesConfig -> FetchingRequiredWalletContext { contract, rolesConfig: Just rolesConfig, errors: Nothing }
+    DefiningRoleTokens { contract, tags, roleNames, errors: Nothing } -> case action of
+      DefineRoleTokensFailed error -> DefiningRoleTokens { contract, tags, roleNames, errors: Just error }
+      DefineRoleTokensSucceeded rolesConfig -> FetchingRequiredWalletContext { contract, tags, rolesConfig: Just rolesConfig, errors: Nothing }
       _ -> state
     FetchingRequiredWalletContext r@{ errors: Just _ } -> case action of
       FetchRequiredWalletContext -> FetchingRequiredWalletContext $ r{ errors = Nothing }
       _ -> state
-    FetchingRequiredWalletContext r@{ contract, rolesConfig } -> case action of
+    FetchingRequiredWalletContext r -> case action of
       FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
       FetchRequiredWalletContextSucceeded reqWalletContext -> CreatingTx $ Record.insert (Proxy :: Proxy "reqWalletContext") reqWalletContext r
       _ -> state
@@ -161,7 +165,7 @@ step state action = do
 
 -- | This is an initial action which we should trigger
 -- | when we want to start the contract creation process.
-triggerSubmission :: V1.Contract -> Action
+triggerSubmission :: V1.Contract -> Tags -> Action
 triggerSubmission = TriggerSubmission
 
 initialState :: State
@@ -180,6 +184,7 @@ data WalletRequest
 data RuntimeRequest
   = CreateTxRequest
       { contract :: V1.Contract
+      , tags :: Tags
       , rolesConfig :: Maybe RolesConfig
       , reqWalletContext :: RequiredWalletContext
       , runtime :: Runtime
@@ -202,8 +207,8 @@ nextRequest env = do
   case _ of
     FetchingRequiredWalletContext { errors: Nothing } ->
       Just $ WalletRequest $ FetchWalletContextRequest { cardanoMultiplatformLib, walletInfo }
-    CreatingTx { contract, reqWalletContext, errors: Nothing, rolesConfig } ->
-      Just $ RuntimeRequest $ CreateTxRequest { contract, reqWalletContext, runtime, rolesConfig }
+    CreatingTx { contract, tags, reqWalletContext, errors: Nothing, rolesConfig } ->
+      Just $ RuntimeRequest $ CreateTxRequest { contract, tags, reqWalletContext, runtime, rolesConfig }
     SigningTx { createTxResponse: { resource: PostContractsResponseContent response }, errors: Nothing } -> do
       let
         { tx } = response
@@ -232,11 +237,12 @@ requestToAffAction = case _ of
         Left err -> pure $ SignTxFailed $ unsafeStringify err
         Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
   RuntimeRequest runtimeRequest -> case runtimeRequest of
-    CreateTxRequest { contract, reqWalletContext, runtime, rolesConfig } -> do
+    CreateTxRequest { contract, tags, reqWalletContext, runtime, rolesConfig } -> do
       let
         Runtime { serverURL, root } = runtime
         contractData = ContractData
           { contract
+          , tags
           , rolesConfig
           , walletAddresses: reqWalletContext
           }
@@ -264,12 +270,12 @@ create
   -> Aff (Either ClientError' { resource :: PostContractsResponseContent, links :: { contract :: ContractEndpoint } })
 create contractData serverUrl contractsEndpoint = do
   let
-    ContractData { contract, rolesConfig, walletAddresses: { changeAddress, usedAddresses } } = contractData
+    ContractData { contract, tags, rolesConfig, walletAddresses: { changeAddress, usedAddresses } } = contractData
     req = PostContractsRequest
       { metadata: mempty
       -- , version :: MarloweVersion
       , roles: rolesConfig
-      , tags: mempty -- TODO: use instead of metadata
+      , tags
       , contract
       , minUTxODeposit: V1.Lovelace (BigInt.fromInt 2_000_000)
       , changeAddress: changeAddress

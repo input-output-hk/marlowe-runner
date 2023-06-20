@@ -295,7 +295,6 @@ instance Monoid Tags where
 instance EncodeJson Tags where
   encodeJson = encodeJson
     <<< Object.fromFoldable
-    <<< map (show *** identity)
     <<< (Map.toUnfoldable :: _ -> Array _)
     <<< un Tags
 
