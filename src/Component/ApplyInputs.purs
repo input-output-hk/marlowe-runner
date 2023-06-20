@@ -450,7 +450,7 @@ fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
       ]
 
   BodyLayout.component
-    { title: R.text "Apply Inputs | Fetching Wallet Context"
+    { title: "Apply Inputs | Fetching Wallet Context"
     , description: DOOM.text "Fetching Wallet Context description"
     , content: ContentWithFooter
       { body
@@ -486,7 +486,7 @@ creatingTxDetails onNext runtimeRequest possibleRuntimeResponse = do
           [ R.text "Next" ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: R.text "Apply Inputs | Creating Transaction"
+    { title: "Apply Inputs | Creating Transaction"
     , description: DOOM.text "We are creating the initial transaction."
     , content: ContentWithFooter
       { body
@@ -599,7 +599,7 @@ mkComponent = do
               ]
 
           BodyLayout.component
-            { title: R.text "Select input type"
+            { title: "Select input type"
             , description: DOOM.text "We are creating the initial transaction."
             , content: ContentWithFooter
               { body
