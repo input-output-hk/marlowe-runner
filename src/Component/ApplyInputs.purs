@@ -159,7 +159,7 @@ mkDepositFormComponent = do
                 }
               [ R.text "Submit" ]
           ]
-      { title: R.text "Perform deposit"
+      { title: "Perform deposit"
       , description: DOOM.text "We are creating the initial transaction."
       , content: ContentWithFooter
         { body
@@ -249,7 +249,7 @@ mkChoiceFormComponent = do
                 }
               [ R.text "Submit" ]
           ]
-      { title: R.text "Perform choice"
+      { title: "Perform choice"
       , description: DOOM.text "Perform choice description"
       , content: ContentWithFooter
         { body
@@ -283,7 +283,7 @@ mkNotifyFormComponent = do
               }
               [ R.text "Submit" ]
           ]
-      { title: R.text "Perform notify"
+      { title: "Perform notify"
       , description: DOOM.text "Perform notify description"
       , content: ContentWithFooter
         { body
@@ -311,7 +311,7 @@ mkAdvanceFormComponent = do
               }
               [ R.text "Submit" ]
           ]
-      { title: R.text "Advance Contract"
+      { title: "Advance contract"
       , description: DOOM.text "Advance Contract description"
       , content: ContentWithFooter
         { body
@@ -410,7 +410,7 @@ mkContractDetailsComponent = do
             [ R.text "Submit" ]
         ]
     pure $ BodyLayout.component
-      { title: R.text "Apply Inputs | Contract Details"
+      { title: "Apply Inputs"
       , description: DOOM.text "Contract Details"
       , content: ContentWithFooter
         { body
