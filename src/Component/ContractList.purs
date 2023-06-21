@@ -7,6 +7,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
 import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
+import Component.CreateContract (runLiteTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
 import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
@@ -18,20 +19,20 @@ import Component.Withdrawals as Withdrawals
 import Contrib.Fetch (FetchError)
 import Contrib.React.Svg (loadingSpinnerLogo)
 import Control.Monad.Reader.Class (asks)
-import Data.Argonaut (encodeJson, stringify)
+import Data.Argonaut (encodeJson, stringify, toString)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Either (Either)
-import Data.Foldable (any, fold, foldMap)
+import Data.Foldable (any, fold, foldMap, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
-import Data.List (concat)
+import Data.List (List(..), catMaybes, concat, filter, intercalate)
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (un)
 import Data.Set as Set
-import Data.String (contains)
+import Data.String (contains, length)
 import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration (Seconds(..))
 import Data.Tuple (snd)
@@ -42,7 +43,7 @@ import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), PutTransactionRequest(..), Runtime(..), ServerURL, TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata(..), PutTransactionRequest(..), Runtime(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import React.Basic (fragment) as DOOM
@@ -169,7 +170,15 @@ mkContractList = do
       contracts'' = case possibleQueryValue of
         Nothing -> contracts'
         Just queryValue ->
-          Array.filter (\(ContractInfo { contractId }) -> contains (Pattern queryValue) (txOutRefToString contractId)) contracts'
+          Array.filter (\(ContractInfo { contractId, tags: Tags metadata }) ->
+              let tagList = case Map.lookup runLiteTag metadata of
+                              Just (Metadata tag) ->
+                                filter ((_>2) <<< length) -- ignoring short tags
+                                  $ catMaybes $ map toString $ Map.values tag
+                              Nothing -> Nil
+                  pattern = Pattern queryValue
+               in contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
+             ) contracts'
 
       isLoadingContracts :: Boolean
       isLoadingContracts = any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts''
@@ -278,11 +287,12 @@ mkContractList = do
                                     label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
                                   orderingTh label OrderByCreationDate
                               , th $ DOOM.text "Contract Id"
+                              , th $ DOOM.text "Tags"
                               , th $ DOOM.text "Actions"
                               ]
                           ]
                       , DOM.tbody {} $ map
-                          ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo }) ->
+                          ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo, tags: Tags metadata }) ->
                               let
                                 ContractHeader { contractId, status } = _runtime.contractHeader
                                 tdCentered = DOM.td { className: "text-center" }
@@ -303,6 +313,13 @@ mkContractList = do
                                           -- , disabled
                                           }
                                         [ text $ txOutRefToString contractId ]
+                                      ]
+                                  , tdCentered
+                                      [ case Map.lookup runLiteTag metadata of
+                                          Just (Metadata tag) ->
+                                            let values = catMaybes $ map toString $ Map.values tag
+                                             in DOOM.text $ intercalate ", " values
+                                          Nothing -> mempty
                                       ]
                                   , tdCentered
                                       [ case endpoints.transactions, marloweInfo of

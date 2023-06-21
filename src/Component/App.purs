@@ -339,7 +339,7 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
     walletChanged = prevWalletContext /= walletContext
     usedAddresses = fromMaybe [] $ _.usedAddresses <<< un WalletContext <$> walletContext
 
-    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block }), links: endpoints }, contractState, transactions } -> do
+    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block, tags }), links: endpoints }, contractState, transactions } -> do
       let
         marloweInfo = do
           Runtime.ContractState contractState' <- contractState
@@ -365,6 +365,7 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
             { contractId
             , endpoints
             , marloweInfo
+            , tags
             , _runtime: { contractHeader, transactions }
             }
   AppContractInfoMap { walletContext, map }

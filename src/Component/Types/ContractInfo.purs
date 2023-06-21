@@ -11,6 +11,7 @@ import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested ((/\))
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
+import Marlowe.Runtime.Web.Types (Tags)
 import Marlowe.Runtime.Web.Types as Runtime
 
 data UserContractRole
@@ -39,6 +40,7 @@ derive instance Eq MarloweInfo
 newtype ContractInfo = ContractInfo
   { contractId :: Runtime.ContractId
   , marloweInfo :: Maybe MarloweInfo
+  , tags :: Tags
   , endpoints ::
       { contract :: Runtime.ContractEndpoint
       , transactions :: Maybe Runtime.TransactionsEndpoint
