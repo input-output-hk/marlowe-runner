@@ -246,7 +246,6 @@ requestToAffAction = case _ of
           , rolesConfig
           , walletAddresses: reqWalletContext
           }
-      traceM "WTF?"
       liftAff $ create contractData serverURL root >>= case _ of
         Right res -> pure $ CreateTxSucceeded res
         Left err -> pure $ CreateTxFailed $ show err

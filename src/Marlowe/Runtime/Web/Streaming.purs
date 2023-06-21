@@ -28,9 +28,9 @@ import Prelude
 import Contrib.Data.Map (New(..), Old(..), additions, deletions, fromFoldableBy, updates) as Map
 import Contrib.Effect as Effect
 import Control.Alt ((<|>))
-import Control.Alternative as Alternative
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Rec.Class (forever)
+import Control.Parallel (parSequence)
 import Data.Filterable (filter)
 import Data.Foldable (foldMap)
 import Data.Map (Map)
@@ -42,7 +42,7 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Effect (Effect)
-import Effect.Aff (Aff, Fiber, Milliseconds, delay, forkAff)
+import Effect.Aff (Aff, Milliseconds, delay)
 import Effect.Aff.AVar as AVar
 import Effect.Class (liftEffect)
 import Effect.Ref as Ref
@@ -74,6 +74,7 @@ newtype ContractStream = ContractStream
   { emitter :: Subscription.Emitter ContractEvent
   , getLiveState :: Effect ContractMap
   , getState :: Aff ContractMap
+  , start :: Aff Unit
   }
 
 newtype MaxPages = MaxPages Int
@@ -98,39 +99,41 @@ contracts (PollingInterval pollingInterval) (RequestInterval requestInterval) fi
   let
     range = Nothing
 
-  _ :: Fiber Unit <- forkAff $ forever do
-    liftEffect $ Ref.write 0 pageNumberRef
-    void $ AVar.tryTake contractsAVar
-    previousContracts <- liftEffect $ Ref.read contractsRef
-    nextContracts :: Map ContractId GetContractsResponse <-
-      map contractsById $ Effect.liftEither =<< foldMapMContractPages @String serverUrl api range \pageContracts -> do
-        let
-          pageContracts' = filter filterContracts pageContracts
-        liftEffect do
+  let
+    start = forever do
+      liftEffect $ Ref.write 0 pageNumberRef
+      void $ AVar.tryTake contractsAVar
+      previousContracts <- liftEffect $ Ref.read contractsRef
+      nextContracts :: Map ContractId GetContractsResponse <-
+        map contractsById $ Effect.liftEither =<< foldMapMContractPages @String serverUrl api range \pageContracts -> do
           let
-            cs :: Map ContractId GetContractsResponse
-            cs = contractsById pageContracts'
-          Ref.modify_ (Map.union cs) contractsRef
-          for_ (Map.additions (Map.Old previousContracts) (Map.New cs)) $ Subscription.notify listener <<< Addition
-          for_ (Map.updates (Map.Old previousContracts) (Map.New cs)) $ Subscription.notify listener <<< Update
-        pageNumber <- liftEffect $ Ref.modify (add 1) pageNumberRef
-        delay requestInterval
-        pure
-          { result: pageContracts'
-          , stopFetching: case possibleMaxPages of
-              Nothing -> false
-              Just (MaxPages maxPages) -> pageNumber >= maxPages
-          }
-    liftEffect do
-      Ref.write nextContracts contractsRef
-      for_ (Map.deletions (Map.Old previousContracts) (Map.New nextContracts)) $ Subscription.notify listener <<< Deletion
-    AVar.put nextContracts contractsAVar
-    delay pollingInterval
+            pageContracts' = filter filterContracts pageContracts
+          liftEffect do
+            let
+              cs :: Map ContractId GetContractsResponse
+              cs = contractsById pageContracts'
+            Ref.modify_ (Map.union cs) contractsRef
+            for_ (Map.additions (Map.Old previousContracts) (Map.New cs)) $ Subscription.notify listener <<< Addition
+            for_ (Map.updates (Map.Old previousContracts) (Map.New cs)) $ Subscription.notify listener <<< Update
+          pageNumber <- liftEffect $ Ref.modify (add 1) pageNumberRef
+          delay requestInterval
+          pure
+            { result: pageContracts'
+            , stopFetching: case possibleMaxPages of
+                Nothing -> false
+                Just (MaxPages maxPages) -> pageNumber >= maxPages
+            }
+      liftEffect do
+        Ref.write nextContracts contractsRef
+        for_ (Map.deletions (Map.Old previousContracts) (Map.New nextContracts)) $ Subscription.notify listener <<< Deletion
+      AVar.put nextContracts contractsAVar
+      delay pollingInterval
 
   pure $ ContractStream
     { emitter
     , getLiveState: Ref.read contractsRef
     , getState: AVar.read contractsAVar
+    , start
     }
 
 -- | The input set of endpoints which should be used for quering transactions.
@@ -141,12 +144,13 @@ type ContractTransactionsMap = Map ContractId (Array TxHeaderWithEndpoint)
 
 type ContractTransactionsEvent
   = ContractId
-  /\ { new :: Array TxHeaderWithEndpoint, old :: Array TxHeaderWithEndpoint }
+  /\ { new :: Array TxHeaderWithEndpoint, old :: Maybe (Array TxHeaderWithEndpoint) }
 
 newtype ContractTransactionsStream = ContractTransactionsStream
   { emitter :: Subscription.Emitter ContractTransactionsEvent
   , getLiveState :: Effect ContractTransactionsMap
   , getState :: Aff ContractTransactionsMap
+  , start :: Aff Unit
   }
 
 -- | FIXME: take closer at error handling woudn't this component break in the case of network error?
@@ -162,22 +166,24 @@ contractsTransactions (PollingInterval pollingInterval) requestInterval getEndpo
 
   { emitter, listener } <- liftEffect Subscription.create
 
-  _ <- forkAff $ forever do
-    void $ AVar.tryTake stateAVar
-    previousState <- liftEffect $ Ref.read stateRef
-    endpoints <- getEndpoints
-    { contractsTransactions: newState, notify } <- fetchContractsTransactions endpoints previousState listener requestInterval serverUrl
+  let
+    start = forever do
+      void $ AVar.tryTake stateAVar
+      previousState <- liftEffect $ Ref.read stateRef
+      endpoints <- getEndpoints
+      { contractsTransactions: newState, notify } <- fetchContractsTransactions endpoints previousState listener requestInterval serverUrl
 
-    liftEffect do
-      Ref.write newState stateRef
-      notify
-    AVar.put newState stateAVar
+      liftEffect do
+        Ref.write newState stateRef
+        notify
+      AVar.put newState stateAVar
+      delay pollingInterval
 
-    delay pollingInterval
   pure $ ContractTransactionsStream
     { emitter
     , getLiveState: Ref.read stateRef
     , getState: AVar.read stateAVar
+    , start
     }
 
 fetchContractsTransactions
@@ -195,19 +201,20 @@ fetchContractsTransactions endpoints prevContractTransactionMap listener (Reques
     let
       action = do
         let
-          getTransactions = getPages' @String serverUrl transactionEndpoint Nothing >>= Effect.liftEither <#> foldMap _.page
+          getTransactions = do
+            pages <- getPages' @String serverUrl transactionEndpoint Nothing >>= Effect.liftEither
+            pure $ foldMap _.page pages
         (txHeaders :: Array { resource :: TxHeader, links :: { transaction :: TransactionEndpoint } }) <- getTransactions
         delay requestInterval
         let
-          prevTransactions = fromMaybe [] $ Map.lookup contractId prevContractTransactionMap
+          prevTransactions = Map.lookup contractId prevContractTransactionMap
           newTransactions = txHeaders <#> \{ resource, links: { transaction: transactionEndpoint' }} ->
             resource /\ transactionEndpoint'
           change =
-            if map fst newTransactions == map fst prevTransactions then
+            if Just (map fst newTransactions) == (map fst <$> prevTransactions) then
               Nothing
             else
               Just { old: prevTransactions, new: newTransactions }
-
         pure $ Just $ change /\ contractId /\ newTransactions
     action `catchError` \_ -> do
       pure Nothing
@@ -230,12 +237,13 @@ type ContractEndpointsSource = Map ContractId ContractEndpoint
 -- | The resuling set of txs per contract.
 type ContractStateMap = Map ContractId ContractState
 
-type ContractStateEvent = ContractId /\ { new :: ContractState, old :: ContractState }
+type ContractStateEvent = ContractId /\ { new :: ContractState, old :: Maybe ContractState }
 
 newtype ContractStateStream = ContractStateStream
   { emitter :: Subscription.Emitter ContractStateEvent
   , getLiveState :: Effect ContractStateMap
   , getState :: Aff ContractStateMap
+  , start :: Aff Unit
   }
 
 -- | FIXME: the same as above - take closer at error handling woudn't this component break in the case of network error?
@@ -251,22 +259,24 @@ contractsStates (PollingInterval pollingInterval) requestInterval getEndpoints s
 
   { emitter, listener } <- liftEffect Subscription.create
 
-  _ <- forkAff $ forever do
-    void $ AVar.tryTake stateAVar
-    previousState <- liftEffect $ Ref.read stateRef
-    endpoints <- getEndpoints
-    { contractsStates: newState, notify } <- fetchContractsStates endpoints previousState listener requestInterval serverUrl
+  let
+    start = forever do
+      void $ AVar.tryTake stateAVar
+      previousState <- liftEffect $ Ref.read stateRef
+      endpoints <- getEndpoints
+      { contractsStates: newState, notify } <- fetchContractsStates endpoints previousState listener requestInterval serverUrl
 
-    liftEffect do
-      Ref.write newState stateRef
-      notify
-    AVar.put newState stateAVar
+      liftEffect do
+        Ref.write newState stateRef
+        notify
+      AVar.put newState stateAVar
 
-    delay pollingInterval
+      delay pollingInterval
   pure $ ContractStateStream
     { emitter
     , getLiveState: Ref.read stateRef
     , getState: AVar.read stateAVar
+    , start
     }
 
 fetchContractsStates
@@ -289,11 +299,9 @@ fetchContractsStates endpoints prevContractStateMap listener (RequestInterval re
         delay requestInterval
         let
           oldContractState = Map.lookup contractId prevContractStateMap
-          change = do
-            oldContractState' <- oldContractState
-            Alternative.guard $ newContractState /= oldContractState'
-            pure { old: oldContractState', new: newContractState }
-
+          change = if oldContractState /= Just newContractState
+            then Nothing
+            else pure { old: oldContractState, new: newContractState }
         pure $ Just $ change /\ contractId /\ newContractState
     action `catchError` \_ -> do
       pure Nothing
@@ -332,6 +340,7 @@ newtype ContractWithTransactionsStream = ContractWithTransactionsStream
   { emitter :: Subscription.Emitter ContractWithTransactionsEvent
   , getLiveState :: Effect ContractWithTransactionsMap
   , getState :: Aff ContractWithTransactionsMap
+  , start :: Aff Unit
   }
 
 contractsWithTransactions :: ContractStream -> ContractStateStream -> ContractTransactionsStream -> ContractWithTransactionsStream
@@ -363,7 +372,13 @@ contractsWithTransactions (ContractStream contractStream) (ContractStateStream c
       <|> (ContractTransactionsEvent <$> contractTransactionsStream.emitter)
       <|> (ContractStateEvent <$> contractStateStream.emitter)
 
-  ContractWithTransactionsStream { emitter, getLiveState, getState }
+    start = map (const unit) $ parSequence
+      [ void $ contractStateStream.start
+      , void $ contractTransactionsStream.start
+      , void $ contractStream.start
+      ]
+
+  ContractWithTransactionsStream { emitter, getLiveState, getState, start }
 
 mkContractsWithTransactions :: PollingInterval -> RequestInterval -> (GetContractsResponse -> Boolean) -> Maybe MaxPages -> ServerURL -> Aff ContractWithTransactionsStream
 mkContractsWithTransactions pollingInterval requestInterval filterContracts possibleMaxPages serverUrl = do

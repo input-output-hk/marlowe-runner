@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Array.ArrayAL as ArrayAL
 import Data.Either (Either(..))
+import Data.Foldable (foldMap)
 import Data.FormURLEncoded.Query (FieldId(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
@@ -19,14 +20,15 @@ import React.Basic.Hooks.UseForm (InputState)
 import React.Basic.Hooks.UseForm as UseForm
 import ReactBootstrap.Form as Form
 import ReactBootstrap.Form.Check as Check
-import ReactBootstrap.FormBuilder (ChoiceFieldChoices(..), FormBuilderM, FormBuilderT', FormElement, fieldValidity, formBuilderT, genId, radioFieldChoice, renderChoiceField, renderPossibleHelpText)
+import ReactBootstrap.FormBuilder (ChoiceFieldChoices(..), FieldLayout, FormBuilderM, FormBuilderT', FormElement, fieldValidity, formBuilderT, genId, radioFieldChoice, renderChoiceField, renderPossibleHelpText)
+import ReactBootstrap.FormBuilder as FormBuilder
 
 
 type BooleanFieldPropsRow r =
   ( switch :: Opt Boolean
   , label :: JSX
   , helpText :: Opt JSX
-  , inline :: Opt Boolean
+  , layout :: Opt FieldLayout
   , name :: Opt FieldId
   , initial :: Opt Boolean
   , touched :: Opt Boolean
@@ -44,7 +46,6 @@ genFieldId props = do
     Just name -> pure name
     Nothing  -> FieldId <$> genId
 
-
 booleanField
   :: forall builderM props validatorM
    . Monad validatorM
@@ -59,7 +60,6 @@ booleanField props = do
   formBuilderT do
     name <- genFieldId props'
     let
-      radioChoice = radioFieldChoice "on" props'.label
       -- | Value is artificial in this case because
       -- | the plain precense
       validator = liftFnEither case _ of
@@ -78,7 +78,7 @@ booleanField props = do
         (booleanAsValue initial)
         ( renderBooleanField
             { disabled: false
-            , inline: fromOpt false props'.inline
+            , layout: fromOpt (FormBuilder.MultiColumn FormBuilder.col3spacings) props'.layout
             , name
             , label: props'.label
             , possibleHelpText: NoProblem.toMaybe props'.helpText
@@ -94,10 +94,9 @@ booleanField props = do
           Nothing -> false
       form >>> UseForm.liftValidator emptyAsFalse
 
-
 renderBooleanField
   :: { disabled :: Boolean
-     , inline :: Boolean
+     , layout :: FieldLayout
      , label :: JSX
      , name :: FieldId
      , possibleHelpText :: Maybe JSX
@@ -105,18 +104,20 @@ renderBooleanField
      }
   -> InputState String
   -> Array FormElement
-renderBooleanField { disabled, inline, label, possibleHelpText, name, switch } { value: selectedValue, errors, onChange, touched } = do
+renderBooleanField { disabled, label, layout, possibleHelpText, name, switch } { value: selectedValue, errors, onChange, touched } = do
   let
     nameStr = un FieldId name
+    { labelColClass, inputColClass } = case layout of
+      FormBuilder.MultiColumn spacing -> FormBuilder.labelSpacingsToClasses spacing
+      FormBuilder.Inline -> { labelColClass: "", inputColClass: "" }
     label' =
-      if inline then S.label {} [ label ]
-      else S.label { className: "col-sm-3 col-form-label-sm", htmlFor: nameStr } [ label ]
+      if FormBuilder.isInline layout then S.label {} [ label ]
+      else S.label { className: "col-form-label-sm " <> labelColClass, htmlFor: nameStr } [ label ]
 
     body = do
       let
-        className =
-          if not inline then "form-check col-sm-9"
-          else "form-check"
+        paddingModifier = if FormBuilder.isInline layout then " ps-0" else " ps-12px"
+        className = "form-check " <> inputColClass <> paddingModifier
         checked = "on" == selectedValue
         { isValid, isInvalid } = fieldValidity touched "on" errors
         helpText = renderPossibleHelpText possibleHelpText
@@ -142,5 +143,5 @@ renderBooleanField { disabled, inline, label, possibleHelpText, name, switch } {
         ]
 
   pure $
-    if inline then S.div { className: "col-12 flex-fill" } [ label', body ]
+    if FormBuilder.isInline layout then S.div { className: "col-12 flex-fill" } [ label', body ]
     else S.div { className: "row mb-2" } [ label', body ]

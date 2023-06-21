@@ -60,6 +60,7 @@
   , "numbers"
   , "ordered-collections"
   , "orders"
+  , "parallel"
   , "parsing"
   , "partial"
   , "polyform"

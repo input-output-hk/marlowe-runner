@@ -2,7 +2,7 @@ module Component.ContractDetails where
 
 import Prelude
 
-import Component.BodyLayout (BodyContent(..))
+import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.MarloweYaml (marloweYaml, marloweStateYaml)
 import Component.Types (MkComponentM)
@@ -53,7 +53,7 @@ mkComponent = do
       body = React.fragment
           [ tabs { fill: true, justify: true, defaultActiveKey: "source", variant: Tabs.variant.pills } do
               let
-                renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
+                renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto"} children
               [ renderTab
                 { eventKey: eventKey "source"
                 , title: DOOM.span_
@@ -69,15 +69,15 @@ mkComponent = do
                     , DOOM.text " Source graph"
                     ]
                 }
-                [ DOM.div { className: "w-100", style: sixtyVH } [ marloweGraph { contract } ]]
+                [ marloweGraph { contract } ]
               , renderTab
                 { eventKey: eventKey "state"
                 , title: DOOM.span_
-                    [ Icons.toJSX $ unsafeIcon "coin"
+                    [ Icons.toJSX $ unsafeIcon "bank"
                     , DOOM.text " Contract state"
                     ]
                 }
-                [ DOM.div { className: "w-100", style: sixtyVH } [ marloweStateYaml state ]]
+                [ marloweStateYaml state ]
               ]
           ]
       -- body = nav
@@ -105,7 +105,7 @@ mkComponent = do
           [ DOOM.text "Ok" ]
         ]
 
-      content = ContentWithFooter { body, footer }
+      content = wrappedContentWithFooter body footer
 
     pure $ BodyLayout.component
       { title: "Contract details"

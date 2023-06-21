@@ -163,7 +163,7 @@ in upstream
       , "validation", "web-html"
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
-      "e872f63d8d69dd62baf7c97e63b083eade6fb88d"
+    "b20a4abbc3875e5346c2d72e869bc6ddc1b519a7"
   with datetime-iso =
       mkPackage
         [ "aff"

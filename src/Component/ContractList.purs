@@ -18,6 +18,7 @@ import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Fetch (FetchError)
 import Contrib.React.Svg (loadingSpinnerLogo)
+import Control.Alt ((<|>))
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (encodeJson, stringify, toString)
 import Data.Array as Array
@@ -89,7 +90,7 @@ type SubmissionError = String
 type ContractListState = { modalAction :: Maybe ModalAction }
 
 type Props =
-  { contracts :: Array ContractInfo
+  { possibleContracts :: Maybe (Array ContractInfo) -- `Maybe` indicates if the contracts where fetched already
   , connectedWallet :: Maybe (WalletInfo Wallet.Api)
   }
 
@@ -131,19 +132,22 @@ mkForm onFieldValueChange = FormBuilder.evalBuilder' ado
   in
     { query }
 
+
+actionIconSizing :: String
+actionIconSizing = " h4"
+
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
   Runtime runtime <- asks _.runtime
   walletInfoCtx <- asks _.walletInfoCtx
-  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
   createContractComponent <- CreateContract.mkComponent
   applyInputsComponent <- ApplyInputs.mkComponent
   withdrawalsComponent <- Withdrawals.mkComponent
   contractDetails <- ContractDetails.mkComponent
 
-  liftEffect $ component "ContractList" \{ connectedWallet, contracts } -> React.do
+  liftEffect $ component "ContractList" \{ connectedWallet, possibleContracts } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
 
     possibleModalAction /\ setModalAction /\ resetModalAction <- useMaybeValue'
@@ -158,30 +162,40 @@ mkContractList = do
       , validationDebounce: Seconds 0.5
       }
     let
-      contracts' = do
+      possibleContracts' = do
+        contracts <- possibleContracts
         let
           -- Quick and dirty hack to display just submited contracts as first
           someFutureBlockNumber = Runtime.BlockNumber 9058430
           sortedContracts = case ordering.orderBy of
             OrderByCreationDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.createdAt)) contracts
             OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contracts
-        if ordering.orderAsc then sortedContracts
-        else Array.reverse sortedContracts
-      contracts'' = case possibleQueryValue of
-        Nothing -> contracts'
-        Just queryValue ->
-          Array.filter (\(ContractInfo { contractId, tags: Tags metadata }) ->
-              let tagList = case Map.lookup runLiteTag metadata of
-                              Just (Metadata tag) ->
-                                filter ((_>2) <<< length) -- ignoring short tags
-                                  $ catMaybes $ map toString $ Map.values tag
-                              Nothing -> Nil
-                  pattern = Pattern queryValue
-               in contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
-             ) contracts'
+        pure $ if ordering.orderAsc
+          then sortedContracts
+          else Array.reverse sortedContracts
+      possibleContracts'' = do
+        let
+          filtered = do
+            queryValue <- possibleQueryValue
+            contracts <- possibleContracts'
+            pure $ contracts # Array.filter \(ContractInfo { contractId, tags: Tags metadata }) -> do
+              let
+                tagList = case Map.lookup runLiteTag metadata of
+                  Just (Metadata tag) ->
+                    filter ((_>2) <<< length) -- ignoring short tags
+                      $ catMaybes $ map toString $ Map.values tag
+                  Nothing -> Nil
+                pattern = Pattern queryValue
+              contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
+        filtered <|> possibleContracts'
+--         pure $ if ordering.orderAsc
+--           then sortedContracts
+--           else Array.reverse sortedContracts
 
       isLoadingContracts :: Boolean
-      isLoadingContracts = any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts''
+      isLoadingContracts = case possibleContracts'' of
+        Nothing -> true
+        Just contracts -> any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts
 
     pure $
       case possibleModalAction, connectedWallet of
@@ -195,7 +209,7 @@ mkContractList = do
                 ]
               resetModalAction
           }
-        Just (ApplyInputs transactionsEndpoint contract st), Just cw -> DOM.div { className: "row" } $ DOM.div { className: "col-12" } do
+        Just (ApplyInputs transactionsEndpoint contract st), Just cw -> do
           let
             onSuccess = \_ -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
@@ -210,7 +224,7 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Just (Withdrawal withdrawalsEndpoint roles contractId), Just cw -> DOM.div { className: "row" } $ DOM.div { className: "col-12" } do
+        Just (Withdrawal withdrawalsEndpoint roles contractId), Just cw -> do
           let
             onSuccess = \_ -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
@@ -238,8 +252,16 @@ mkContractList = do
                 -- , DOM.div "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
                 , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
                 ]
-          , content: BodyLayout.SimpleContent $ React.fragment
-              [ DOM.div { className: "row" } do
+          , content: React.fragment
+              [ if isLoadingContracts then
+                    DOM.div
+                      { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
+                      }
+                      $ loadingSpinnerLogo
+                          {}
+                  else
+                    mempty
+              , DOM.div { className: "row" } do
                   let
                     disabled = isNothing connectedWallet
                     newContractButton = buttonWithIcon
@@ -275,45 +297,48 @@ mkContractList = do
                       else
                         DOM.div { className: spacing } [ newContractButton ]
                   ]
-              , DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
-                  [ table { striped: Table.striped.boolean true, hover: true }
-                      [ DOM.thead {} do
-                          let
-                            orderingTh = Table.orderingHeader ordering updateOrdering
-                            th label = DOM.th { className: "text-center text-muted" } [ label ]
-                          [ DOM.tr {}
-                              [ do
-                                  let
-                                    label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                                  orderingTh label OrderByCreationDate
-                              , th $ DOOM.text "Contract Id"
-                              , th $ DOOM.text "Tags"
-                              , th $ DOOM.text "Actions"
-                              ]
-                          ]
-                      , DOM.tbody {} $ map
-                          ( \ci@(ContractInfo { _runtime, endpoints, marloweInfo, tags: Tags metadata }) ->
-                              let
-                                ContractHeader { contractId, status } = _runtime.contractHeader
-                                tdCentered = DOM.td { className: "text-center" }
-                              in
-                                DOM.tr {}
-                                  [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
-                                  , tdCentered
-                                      [ DOM.a
-                                        do
-                                          let
-                                            onClick = case marloweInfo of
-                                              Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> do
-                                                setModalAction $ ContractDetails currentContract currentState
-                                              _ -> pure unit
-                                            disabled = isNothing marloweInfo
-                                          { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
-                                          , onClick: handler_ onClick
-                                          -- , disabled
-                                          }
-                                        [ text $ txOutRefToString contractId ]
-                                      ]
+              , case possibleContracts'' of
+                  Nothing -> mempty
+                  Just contracts -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
+
+
+                    [ table { striped: Table.striped.boolean true, hover: true }
+                        [ DOM.thead {} do
+                            let
+                              orderingTh = Table.orderingHeader ordering updateOrdering
+                              th label = DOM.th { className: "text-center text-muted" } [ label ]
+                            [ DOM.tr {}
+                                [ do
+                                    let
+                                      label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                                    orderingTh label OrderByCreationDate
+                                , th $ DOOM.text "Contract Id"
+                                , th $ DOOM.text "Tags"
+                                , th $ DOOM.text "Actions"
+                                ]
+                            ]
+                        , DOM.tbody {} $ contracts <#> \ci@(ContractInfo { _runtime, endpoints, marloweInfo, tags: Tags metadata }) ->
+                            let
+                              ContractHeader { contractId, status } = _runtime.contractHeader
+                              tdCentered = DOM.td { className: "text-center" }
+                            in
+                              DOM.tr {}
+                                [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
+                                , tdCentered
+                                    [ DOM.a
+                                      do
+                                        let
+                                          onClick = case marloweInfo of
+                                            Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> do
+                                              setModalAction $ ContractDetails currentContract currentState
+                                            _ -> pure unit
+                                          disabled = isNothing marloweInfo
+                                        { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
+                                        , onClick: handler_ onClick
+                                        -- , disabled
+                                        }
+                                      [ text $ txOutRefToString contractId ]
+                                    ]
                                   , tdCentered
                                       [ case Map.lookup runLiteTag metadata of
                                           Just (Metadata tag) ->
@@ -321,54 +346,44 @@ mkContractList = do
                                              in DOOM.text $ intercalate ", " values
                                           Nothing -> mempty
                                       ]
-                                  , tdCentered
-                                      [ case endpoints.transactions, marloweInfo of
+                                , tdCentered
+                                    [ do
+                                        case endpoints.transactions, marloweInfo of
                                           Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
-                                            { icon: unsafeIcon "fast-forward-fill h2"
+                                            { icon: unsafeIcon $ "fast-forward-fill" <> actionIconSizing
                                             , label: mempty
                                             , tooltipText: Just "Apply available inputs to the contract"
                                             , tooltipPlacement: Just placement.left
                                             , onClick: setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState
                                             }
                                           _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                            { icon: unsafeIcon "file-earmark-check-fill h2 success-color"
+                                            { icon: unsafeIcon $ "file-earmark-check-fill success-color" <> actionIconSizing
                                             , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
                                             , tooltipPlacement: Just placement.left
                                             , label: mempty
                                             , onClick: mempty
                                             }
                                           _, _ -> mempty
-                                      , case marloweInfo, possibleWalletContext of
-                                          Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
-                                            let
-                                              rolesFromContract = rolesInContract initialContract
-                                              roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
-                                            case Array.uncons (Array.intersect roleTokens rolesFromContract) of
-                                              Just { head, tail } ->
-                                                linkWithIcon
-                                                  { icon: unsafeIcon "cash-coin h2 warning-color"
-                                                  , label: mempty
-                                                  , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                                  , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
-                                                  }
-                                              _ -> mempty
-                                          _, _ -> mempty
-                                      ]
-                                  ]
-                          )
-                          contracts''
-                      ]
-                  , if isLoadingContracts then
-                      DOM.div
-                        { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
-                        }
-                        $ loadingSpinnerLogo
-                            {}
-
-                    else
-                      mempty
-                  ]
-              ]
+                                    , case marloweInfo, possibleWalletContext of
+                                        Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
+                                          let
+                                            rolesFromContract = rolesInContract initialContract
+                                            roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
+                                          case Array.uncons (Array.intersect roleTokens rolesFromContract) of
+                                            Just { head, tail } ->
+                                              linkWithIcon
+                                                { icon: unsafeIcon $ "cash-coin warning-color" <> actionIconSizing
+                                                , label: mempty
+                                                , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                                , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                                }
+                                            _ -> mempty
+                                        _, _ -> mempty
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
             }
         _, _ -> mempty
 

@@ -5,7 +5,7 @@ import Prelude
 import CardanoMultiplatformLib (bech32FromString, bech32ToString)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Types (Bech32)
-import Component.BodyLayout (BodyContent(..))
+import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.CreateContract.Machine as Machine
 import Component.MarloweYaml (marloweYaml)
@@ -270,12 +270,9 @@ mkRoleTokensComponent = do
       BodyLayout.component
         { title: "Role token assignments"
         , description: R.text "Assign addresses to role tokens"
-        , content: ContentWithFooter
-          { body: DOM.div { className: "row" }
-              [ DOM.div { className: "col-12" } [ formBody ]
-              ]
-          , footer: formActions
-          }
+        , content: wrappedContentWithFooter
+            formBody
+            formActions
         }
 
 runLiteTag :: String
@@ -363,10 +360,9 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: ContentWithFooter
-            { body: formBody
-            , footer: formActions
-            }
+          , content: wrappedContentWithFooter
+              formBody
+              formActions
           }
 
       Machine.DefiningRoleTokens { roleNames } -> do
@@ -379,17 +375,14 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: ContentWithFooter
-            { body: roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
-            , footer: DOOM.fragment
-              [ link
+          , content: wrappedContentWithFooter
+              do roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
+              do link
                   { label: DOOM.text "Cancel"
                   , onClick: onDismiss
                   , showBorders: true
                   , extraClassNames: "me-3"
                   }
-              ]
-            }
           }
       Machine.ContractCreated { contract, createTxResponse } -> do
         let
@@ -397,16 +390,13 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: ContentWithFooter
-            { body: marloweYaml contract
-            , footer: DOOM.fragment
-              [ DOM.button
-                { className: "btn btn-primary"
-                , onClick: handler_ (onSuccess contractEndpoint)
-                }
-                [ R.text "Ok" ]
-              ]
-            }
+          , content: wrappedContentWithFooter
+              do marloweYaml contract
+              do DOM.button
+                  { className: "btn btn-primary"
+                  , onClick: handler_ (onSuccess contractEndpoint)
+                  }
+                  [ R.text "Ok" ]
           }
 
       machineState -> do
@@ -462,10 +452,7 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: ContentWithFooter
-            { body
-            , footer: formActions
-            }
+          , content: wrappedContentWithFooter body formActions
           }
 
 stateToTitle :: Machine.State -> String

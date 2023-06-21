@@ -17,7 +17,7 @@ import Component.Widgets (link, linkWithIcon)
 import Contrib.Data.Map (New(..), Old(..), additions, deletions) as Map
 import Contrib.Halogen.Subscription (MinInterval(..))
 import Contrib.Halogen.Subscription (bindEffect, foldMapThrottle) as Subscription
-import Contrib.React.Svg (SvgUrl(..), svgImg)
+import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader.Class (asks)
 import Data.Array as Array
@@ -36,7 +36,7 @@ import Data.Traversable (for, traverse)
 import Data.Tuple.Nested ((/\))
 import Debug (traceM)
 import Effect (Effect)
-import Effect.Aff (Aff)
+import Effect.Aff (Aff, error, killFiber, launchAff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Effect.Now (now)
@@ -47,7 +47,7 @@ import React.Basic (JSX)
 import React.Basic as ReactContext
 import React.Basic.DOM (div, img, span_, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (component, provider, readRef, useEffect, useState')
+import React.Basic.Hooks (component, provider, readRef, useEffect, useEffectOnce, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import ReactBootstrap.Icons (unsafeIcon)
@@ -153,6 +153,11 @@ mkApp = do
     possibleWalletContext /\ setWalletContext <- useState' Nothing
     possibleWalletContextRef <- useStateRef' possibleWalletContext
 
+    useEffectOnce do
+      -- FIXME: We should restart fetchers on exception
+      fiber <- launchAff $ contractStream.start
+      pure $ launchAff_ $ killFiber (error "Unmounting component") fiber
+
     useLoopAff walletInfoName (Milliseconds 20_000.0) do
       pwi <- liftEffect $ readRef possibleWalletInfoRef
       pwc <- liftEffect $ readRef possibleWalletContextRef
@@ -175,7 +180,15 @@ mkApp = do
     displayOption /\ setDisplayOption <- useState' Default
 
     -- We are ignoring contract events for now and we update the whole contractInfo set.
-    upstreamVersion <- useEmitter' initialVersion (Subscription.bindEffect (const $ now) throttledEmitter)
+    let
+      debugEmitter value = do
+        traceM "RECEIVED NOTIFICATION"
+        traceM value
+        n <- now
+        traceM initialVersion
+        traceM n
+        pure n
+    upstreamVersion <- useEmitter' initialVersion (Subscription.bindEffect debugEmitter throttledEmitter)
     upstreamVersionRef <- useStateRef' upstreamVersion
 
     -- Let's use versioning so we avoid large comparison.
@@ -183,6 +196,7 @@ mkApp = do
     idRef <- useStateRef version contractMap
 
     useEffect (upstreamVersion /\ possibleWalletContext) do
+      traceM "RUNNING NOTIFIER"
       updates <- contractStream.getLiveState
       old <- readRef idRef
       newVersion <- readRef upstreamVersionRef
@@ -199,6 +213,9 @@ mkApp = do
       when (deletionsNumber > 0 || additionsNumber > 0) do
         msgHubProps.add $ Info $ DOOM.text $
           "New contracts: " <> show additionsNumber <> ", deleted contracts: " <> show deletionsNumber
+
+      traceM "setting new version"
+      traceM newVersion
 
       setContractMap (newVersion /\ new)
       pure $ pure unit
@@ -304,7 +321,13 @@ mkApp = do
         , do
             let
               contractArray = Array.fromFoldable contracts
-            subcomponents.contractListComponent { contracts: contractArray, connectedWallet: possibleWalletInfo }
+            subcomponents.contractListComponent
+              { possibleContracts: do
+                if version == initialVersion
+                then Nothing
+                else Just contractArray
+              , connectedWallet: possibleWalletInfo
+              }
         -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
 
         --          [ tabs { fill: true, justify: true, defaultActiveKey: "contracts" }

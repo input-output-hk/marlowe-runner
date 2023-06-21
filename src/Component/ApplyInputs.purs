@@ -6,16 +6,18 @@ import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..))
 import Component.ApplyInputs.Machine as Machine
-import Component.BodyLayout (BodyContent(..))
+import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, toIChoice, toIDeposit)
-import Component.MarloweYaml (marloweYaml)
+import Component.MarloweYaml (marloweStateYaml, marloweYaml)
 import Component.Types (MkComponentM, WalletInfo(..))
+import Component.Widgets (link)
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Language.Marlowe.Core.V1 (compareMarloweJsonKeys)
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
-import Contrib.ReactBootstrap.FormBuilder (booleanField) as FormBuilder
+import Contrib.React.MarloweGraph (marloweGraph)
+import Contrib.ReactBootstrap.FormBuilder as FB
 import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
@@ -57,7 +59,13 @@ import React.Basic.Hooks as React
 import React.Basic.Hooks.UseForm (useForm)
 import React.Basic.Hooks.UseForm as UseForm
 import ReactBootstrap.FormBuilder (ChoiceFieldChoices(SelectFieldChoices, RadioButtonFieldChoices), choiceField, intInput, radioFieldChoice, selectFieldChoice)
-import ReactBootstrap.FormBuilder (evalBuilder') as FormBuilder
+import ReactBootstrap.FormBuilder as FB
+import ReactBootstrap.Icons (unsafeIcon)
+import ReactBootstrap.Icons as Icons
+import ReactBootstrap.Tab (tab)
+import ReactBootstrap.Tabs (tabs)
+import ReactBootstrap.Tabs as Tabs
+import ReactBootstrap.Types (eventKey)
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 
@@ -127,7 +135,7 @@ mkDepositFormComponent = do
           idx <- possibleIdx
           Map.lookup idx value2Deposit
 
-      form = FormBuilder.evalBuilder' $
+      form = FB.evalBuilder' $
         choiceField { choices, validator }
 
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
@@ -161,10 +169,7 @@ mkDepositFormComponent = do
           ]
       { title: "Perform deposit"
       , description: DOOM.text "We are creating the initial transaction."
-      , content: ContentWithFooter
-        { body
-        , footer: actions
-        }
+      , content: wrappedContentWithFooter body actions
       }
 
 type ChoiceFormComponentProps =
@@ -206,7 +211,7 @@ mkChoiceFormComponent = do
           liftEffect $ setPartialFormResult $ Just deposit
           pure deposit
 
-      form = FormBuilder.evalBuilder' $ ado
+      form = FB.evalBuilder' $ ado
         choice <- choiceField { choices, validator, touched: true, initial: "0" }
         value <- intInput {}
         in
@@ -251,10 +256,7 @@ mkChoiceFormComponent = do
           ]
       { title: "Perform choice"
       , description: DOOM.text "Perform choice description"
-      , content: ContentWithFooter
-        { body
-        , footer: actions
-        }
+      , content: wrappedContentWithFooter body actions
       }
 
 type NotifyFormComponentProps =
@@ -285,10 +287,7 @@ mkNotifyFormComponent = do
           ]
       { title: "Perform notify"
       , description: DOOM.text "Perform notify description"
-      , content: ContentWithFooter
-        { body
-        , footer: actions
-        }
+      , content: wrappedContentWithFooter body actions
       }
 
 type AdvanceFormComponentProps =
@@ -313,10 +312,7 @@ mkAdvanceFormComponent = do
           ]
       { title: "Advance contract"
       , description: DOOM.text "Advance Contract description"
-      , content: ContentWithFooter
-        { body
-        , footer: actions
-        }
+      , content: wrappedContentWithFooter body actions
       }
 
 data CreateInputStep
@@ -369,8 +365,9 @@ type ContractDetailsProps =
 mkContractDetailsComponent :: MkComponentM (ContractDetailsProps -> JSX)
 mkContractDetailsComponent = do
   let
-    autoRunForm = FormBuilder.evalBuilder' $ AutoRun <$> FormBuilder.booleanField
+    autoRunForm = FB.evalBuilder' $ AutoRun <$> FB.booleanField
       { label: DOOM.text "Auto run"
+      , layout: FB.MultiColumn { sm: FB.Col3Label, md: FB.Col2Label, lg: FB.Col2Label }
       , helpText: fragment
         [ DOOM.text "Whether to run some of the steps automatically."
         , DOOM.br {}
@@ -391,17 +388,48 @@ mkContractDetailsComponent = do
       }
 
     let
+      contractSection =
+        tabs { fill: true, justify: true, defaultActiveKey: "source", variant: Tabs.variant.pills } do
+          let
+            renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto"} children
+          [ renderTab
+            { eventKey: eventKey "source"
+            , title: DOOM.span_
+                [ Icons.toJSX $ unsafeIcon "filetype-yml"
+                , DOOM.text " Source code"
+                ]
+            }
+            [ marloweYaml contract ]
+          , renderTab
+            { eventKey: eventKey "graph"
+            , title: DOOM.span_
+                [ Icons.toJSX $ unsafeIcon "diagram-2"
+                , DOOM.text " Source graph"
+                ]
+            }
+            [ marloweGraph { contract } ]
+          , renderTab
+            { eventKey: eventKey "state"
+            , title: DOOM.span_
+                [ Icons.toJSX $ unsafeIcon "bank"
+                , DOOM.text " Contract state"
+                ]
+            }
+            [ marloweStateYaml state ]
+          ]
       fields = UseForm.renderForm autoRunForm formState
-      body = DOM.div { className: "container" } $
-        [ DOM.div { className: "col-12" } $ marloweYaml contract ]
+      body = fragment $
+        [ contractSection
+        , DOOM.hr {}
+        ]
         <>  fields
       footer = fragment
-        [ DOM.button
-            { className: "btn btn-secondary"
-            , onClick: handler_ onDismiss
-            , disabled: false
+        [ link
+            { label: DOOM.text "Cancel"
+            , onClick: onDismiss
+            , showBorders: true
+            , extraClassNames: "me-3"
             }
-            [ R.text "Cancel" ]
         , DOM.button
             { className: "btn btn-primary"
             , onClick: onSubmit'
@@ -410,12 +438,9 @@ mkContractDetailsComponent = do
             [ R.text "Submit" ]
         ]
     pure $ BodyLayout.component
-      { title: "Apply Inputs"
+      { title: "Apply Input"
       , description: DOOM.text "Contract Details"
-      , content: ContentWithFooter
-        { body
-        , footer
-        }
+      , content: wrappedContentWithFooter body footer
       }
 
 -- In here we want to summarize the initial interaction with the wallet
@@ -423,7 +448,6 @@ fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
-
         -- | Let's describe that we are
           [ DOM.p {} $ DOOM.text "We are fetching the required wallet context."
           , DOM.p {} $ DOOM.text "marlowe-runtime requires information about wallet addresses so it can pick UTxO to pay for the initial transaction."
@@ -452,10 +476,7 @@ fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
   BodyLayout.component
     { title: "Apply Inputs | Fetching Wallet Context"
     , description: DOOM.text "Fetching Wallet Context description"
-    , content: ContentWithFooter
-      { body
-      , footer
-      }
+    , content: wrappedContentWithFooter body footer
     }
 
 -- Now we want to to describe the interaction with the API where runtimeRequest is
@@ -488,10 +509,7 @@ creatingTxDetails onNext runtimeRequest possibleRuntimeResponse = do
   DOM.div { className: "row" } $ BodyLayout.component
     { title: "Apply Inputs | Creating Transaction"
     , description: DOOM.text "We are creating the initial transaction."
-    , content: ContentWithFooter
-      { body
-      , footer
-      }
+    , content: wrappedContentWithFooter body footer
     }
 
 
@@ -601,10 +619,7 @@ mkComponent = do
           BodyLayout.component
             { title: "Select input type"
             , description: DOOM.text "We are creating the initial transaction."
-            , content: ContentWithFooter
-              { body
-              , footer
-              }
+            , content: wrappedContentWithFooter body footer
             }
       Machine.PickingInput { inputChoices } -> do
         let
