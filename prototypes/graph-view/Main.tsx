@@ -1,10 +1,8 @@
 import * as React from "react"
-// import { createRoot } from "react-dom/client"
+import { createRoot } from "react-dom/client"
 import { ReactFlow, Node, Edge, Background, BackgroundVariant, Handle, Position } from "reactflow"
 
 import 'reactflow/dist/style.css'
-
-// const root = createRoot(document.getElementById("app") as HTMLElement)
 
 type Address = string
 type TokeName = string
@@ -76,7 +74,7 @@ const X_OFFSET = 200
 const Y_OFFSET = 40
 const NODE_HEIGHT = 30
 
-const myNodeStyle: React.CSSProperties = {
+const contractNodeStyle: React.CSSProperties = {
   display: "flex",
   flexFlow: "column",
   justifyContent: "center",
@@ -90,7 +88,7 @@ const myNodeStyle: React.CSSProperties = {
   fontFamily: "monospace",
 }
 
-type ContractNodeData
+type ContractNodeType
   = "close"
   | { pay: Value, token: Token, to: Payee, from_account: AccountId }
   | { if: Observation }
@@ -98,53 +96,59 @@ type ContractNodeData
   | { let: ValueId, be: Value }
   | { assert: Observation }
 
-const ContractNode = ({ data }: { data: ContractNodeData }): JSX.Element => {
-  if (data === "close")
-    return <div style={myNodeStyle}>
+type ContractNodeData = {
+  type: ContractNodeType,
+  disabled: boolean,
+}
+
+const ContractNode = ({ data: { type, disabled } }: { data: ContractNodeData }): JSX.Element => {
+  const style_: React.CSSProperties = { ...contractNodeStyle, opacity: disabled ? "30%" : "100%" }
+  if (type === "close")
+    return <div style={style_}>
       Close
       <Handle type="target" position={Position.Left} />
     </div>
 
-  if ("if" in data)
-    return <div style={myNodeStyle}>
+  if ("if" in type)
+    return <div style={style_}>
       If (...)
       <Handle type="target" position={Position.Left} id="continuation" />
       <Handle type="source" position={Position.Right} style={{ top: "8px" }} id="then" />
       <Handle type="source" position={Position.Right} style={{ top: "24px" }} id="else" />
     </div>
 
-  if ("pay" in data)
-    return <div style={myNodeStyle}>
+  if ("pay" in type)
+    return <div style={style_}>
       Pay (...)
       <Handle type="target" position={Position.Left} id="continuation" />
       <Handle type="source" position={Position.Right} id="then" />
     </div>
 
-  if ("let" in data)
-    return <div style={myNodeStyle}>
+  if ("let" in type)
+    return <div style={style_}>
       Let (...)
       <Handle type="target" position={Position.Left} id="continuation" />
       <Handle type="source" position={Position.Right} id="then" />
     </div>
 
-  if ("assert" in data)
-    return <div style={myNodeStyle}>
+  if ("assert" in type)
+    return <div style={style_}>
       Assert (...)
       <Handle type="target" position={Position.Left} id="continuation" />
       <Handle type="source" position={Position.Right} id="then" />
     </div>
 
-  if ("when" in data) {
-    const height = (data.when.length + 1) * Y_OFFSET - (Y_OFFSET - NODE_HEIGHT)
+  if ("when" in type) {
+    const height = (type.when.length + 1) * Y_OFFSET - (Y_OFFSET - NODE_HEIGHT)
     const { alignItems: _, ...style } = {
-      ...myNodeStyle,
+      ...style_,
       height: `${height}px`,
       justifyContent: "space-around",
       paddingLeft: "5px",
     }
     return <div style={style}>
       <div>When</div>
-      {data.when.map((x, i) => {
+      {type.when.map((x, i) => {
         if ("merkleized_then" in x) {
           if ("deposits" in x.case)
             return <div key={i}>
@@ -182,32 +186,35 @@ const ContractNode = ({ data }: { data: ContractNodeData }): JSX.Element => {
     </div>
   }
 
-  return <div style={myNodeStyle}>Not implemented!</div>
+  return <div style={style_}>Not implemented!</div>
 }
 
 const nodeTypes = {
   ContractNode,
 }
 
-const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number): { nodes: Node<ContractNodeData>[], edges: Edge<null>[], max_y: number } => {
+type ContractPathHistory = ReadonlyArray<number | null>
+
+const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<null>[], max_y: number } => {
   if (contract === "close")
     return {
-      nodes: [{ id, position: { x, y }, data: "close", type: "ContractNode" }],
+      nodes: [{ id, position: { x, y }, data: { type: "close", disabled: false }, type: "ContractNode" }],
       edges: [],
       max_y: y,
     }
 
   if ("if" in contract) {
-    const { else: else_, then, ...data } = contract
+    const [index, ...indices] = path
+    const { else: else_, then, ...type } = contract
     const then_id = `1-${id}`
     const else_id = `2-${id}`
-    const { max_y: then_max_y, nodes: then_nodes, edges: then_edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y)
-    const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET)
+    const { max_y: then_max_y, nodes: then_nodes, edges: then_edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, indices)
+    const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET, indices)
     return {
       nodes: [
-        ...then_nodes,
-        ...else_nodes,
-        { id, position: { x, y }, data, type: "ContractNode" },
+        ...then_nodes.map(node => index === 0 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
+        ...else_nodes.map(node => index === 1 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
+        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
       ],
       edges: [
         ...then_edges,
@@ -220,13 +227,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 
   if ("pay" in contract) {
-    const { then, ...data } = contract
+    const { then, ...type } = contract
     const then_id = `1-${id}`
-    const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y)
+    const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
@@ -237,13 +244,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 
   if ("let" in contract) {
-    const { then, ...data } = contract
+    const { then, ...type } = contract
     const then_id = `1-${id}`
-    const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y)
+    const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
@@ -254,13 +261,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 
   if ("assert" in contract) {
-    const { then, ...data } = contract
+    const { then, ...type } = contract
     const then_id = `1-${id}`
-    const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y)
+    const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
@@ -271,14 +278,15 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 
   if ("when" in contract) {
-    const { timeout_continuation, ...data } = contract
-    const { nodes, edges, max_y } = data.when.reduce<{ nodes: Node<ContractNodeData>[], edges: Edge<null>[], max_y: number }>((acc, on, i) => {
+    const [index, ...indices] = path
+    const { timeout_continuation, ...type } = contract
+    const { nodes, edges, max_y } = type.when.reduce<{ nodes: Node<ContractNodeData>[], edges: Edge<null>[], max_y: number }>((acc, on, i) => {
       if ("then" in on) {
         const then_id = `${i}-${id}`
-        const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET)
+        const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, indices)
         return {
           nodes: [
-            ...nodes,
+            ...nodes.map(node => index === i || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
             ...acc.nodes,
           ],
           edges: [
@@ -292,16 +300,16 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       return acc
     }, {
       nodes: [
-        { id, position: { x, y }, data, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
       ],
       edges: [],
       max_y: y - Y_OFFSET
     })
-    const timeout_then_id = `${data.when.length}-${id}`
-    const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET)
+    const timeout_then_id = `${type.when.length}-${id}`
+    const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, indices)
     return {
       nodes: [
-        ...timeout_graph.nodes,
+        ...timeout_graph.nodes.map(node => index === null || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
         ...nodes,
       ],
       edges: [
@@ -320,8 +328,8 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 }
 
-export const MarloweGraphView = ({ contract }: { contract: Contract }): JSX.Element => {
-  const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0)
+export const MarloweGraphView = ({ contract, path }: { contract: Contract, path?: ContractPathHistory }): JSX.Element => {
+  const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0, path || [])
   return <div style={{ width: "95vw", height: "95vh" }}>
     <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}>
       <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
@@ -329,76 +337,61 @@ export const MarloweGraphView = ({ contract }: { contract: Contract }): JSX.Elem
   </div>
 }
 
-// const contract: Contract = {
-//   when: [
-//     {
-//       case: {
-//         deposits: 500,
-//         party: { role_token: "Party A" },
-//         of_token: { currency_symbol: "", token_name: "" },
-//         into_account: { role_token: "Party B" }
-//       },
-//       then: { if: true, then: "close", else: "close" }
-//     },
-//     {
-//       case: { notify_if: false },
-//       then: { assert: true, then: "close" }
-//     },
-//     {
-//       case: {
-//         for_choice:
-//         {
-//           choice_name: "The way",
-//           choice_owner: { role_token: "Party C" }
-//         },
-//         choose_between: [
-//           { from: 1, to: 3 },
-//           { from: 5, to: 8 }
-//         ]
-//       },
-//       merkleized_then: "huey-dewey-louie"
-//     },
-//     {
-//       case: { notify_if: true },
-//       then: { let: "x", be: 13, then: "close" }
-//     }
-//   ],
-//   timout: 1985,
-//   timeout_continuation: {
-//     if: true,
-//     then: {
-//       if: false,
-//       then: "close",
-//       else: {
-//         pay: 1234,
-//         token: { currency_symbol: "", token_name: "" },
-//         to: { party: { role_token: "Owner" } },
-//         from_account: { role_token: "Participant" },
-//         then: "close",
-//       }
-//     },
-//     else: { let: "x", be: 13, then: { assert: true, then: "close" } },
-//   }
-// }
+const contract: Contract = {
+  when: [
+    {
+      case: {
+        deposits: 500,
+        party: { role_token: "Party A" },
+        of_token: { currency_symbol: "", token_name: "" },
+        into_account: { role_token: "Party B" }
+      },
+      then: { if: true, then: "close", else: "close" }
+    },
+    {
+      case: { notify_if: false },
+      then: { assert: true, then: "close" }
+    },
+    {
+      case: {
+        for_choice:
+        {
+          choice_name: "The way",
+          choice_owner: { role_token: "Party C" }
+        },
+        choose_between: [
+          { from: 1, to: 3 },
+          { from: 5, to: 8 }
+        ]
+      },
+      merkleized_then: "huey-dewey-louie"
+    },
+    {
+      case: { notify_if: true },
+      then: { let: "x", be: 13, then: "close" }
+    }
+  ],
+  timout: 1985,
+  timeout_continuation: {
+    if: true,
+    then: {
+      if: false,
+      then: "close",
+      else: {
+        pay: 1234,
+        token: { currency_symbol: "", token_name: "" },
+        to: { party: { role_token: "Owner" } },
+        from_account: { role_token: "Participant" },
+        then: "close",
+      }
+    },
+    else: { let: "x", be: 13, then: { assert: true, then: "close" } },
+  }
+}
 
-// root.render(<MarloweGraphView contract={contract} />)
+const root = createRoot(document.getElementById("app") as HTMLElement)
 
-// const counter = (state: number, action: "INC" | "DEC"): number => {
-//   switch (action) {
-//     case "INC": return state + 1
-//     case "DEC": return state - 1
-//   }
-// }
-
-// const Counter = (): JSX.Element => {
-//   const [state, dispatch] = React.useReducer(counter, 0)
-
-//   return <>
-//     <h1>Count: {state}</h1>
-//     <button onClick={() => dispatch("INC")}>increment</button>
-//     <button onClick={() => dispatch("DEC")}>decrement</button>
-//   </>
-// }
+root.render(<MarloweGraphView contract={contract} path={[null, 0, 1]} />)
 
 // https://reactflow.dev/docs/concepts/terms-and-definitions
 // https://reactflow.dev/docs/guides/custom-nodes

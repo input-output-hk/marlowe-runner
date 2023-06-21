@@ -3,7 +3,8 @@
     "module": "commonjs",
     "jsx": "react",
     "strict": true,
-    "rootDir": "./"
+    "rootDir": "./",
+    "noUncheckedIndexedAccess": true
   },
   "exclude": ["node_modules"]
 }
