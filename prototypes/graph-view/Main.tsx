@@ -1,5 +1,5 @@
 import * as React from "react"
-import { createRoot } from "react-dom/client"
+// import { createRoot } from "react-dom/client"
 import {
   ReactFlow,
   Node,
@@ -211,7 +211,16 @@ type ContractEdgeData = {
 const edgeTypes: EdgeTypes = {
   ContractEdge({ data, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, markerEnd, style = {} }: EdgeProps<ContractEdgeData>): JSX.Element {
     const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
-    const style_: React.CSSProperties = { ...style, strokeOpacity: data && data.disabled ? "30%" : "100%" }
+    const style_: React.CSSProperties =
+      data && data.disabled
+        ? { ...style, strokeOpacity: "30%" }
+        : {
+          ...style, strokeOpacity: "100%",
+          strokeWidth: 3,
+          // strokeDasharray: "5",
+          // strokeDashoffset: "0",
+          // animation: "edgeflow 1000ms linear infinite",
+        }
     return <BaseEdge path={edgePath} markerEnd={markerEnd} style={style_} />
   }
 }
@@ -360,61 +369,62 @@ export const MarloweGraphView = ({ contract, path }: { contract: Contract, path?
   </div>
 }
 
-const contract: Contract = {
-  when: [
-    {
-      case: {
-        deposits: 500,
-        party: { role_token: "Party A" },
-        of_token: { currency_symbol: "", token_name: "" },
-        into_account: { role_token: "Party B" }
-      },
-      then: { if: true, then: "close", else: "close" }
-    },
-    {
-      case: { notify_if: false },
-      then: { assert: true, then: "close" }
-    },
-    {
-      case: {
-        for_choice:
-        {
-          choice_name: "The way",
-          choice_owner: { role_token: "Party C" }
-        },
-        choose_between: [
-          { from: 1, to: 3 },
-          { from: 5, to: 8 }
-        ]
-      },
-      merkleized_then: "huey-dewey-louie"
-    },
-    {
-      case: { notify_if: true },
-      then: { let: "x", be: 13, then: "close" }
-    }
-  ],
-  timout: 1985,
-  timeout_continuation: {
-    if: true,
-    then: {
-      if: false,
-      then: "close",
-      else: {
-        pay: 1234,
-        token: { currency_symbol: "", token_name: "" },
-        to: { party: { role_token: "Owner" } },
-        from_account: { role_token: "Participant" },
-        then: "close",
-      }
-    },
-    else: { let: "x", be: 13, then: { assert: true, then: "close" } },
-  }
-}
+// const contract: Contract = {
+//   when: [
+//     {
+//       case: {
+//         deposits: 500,
+//         party: { role_token: "Party A" },
+//         of_token: { currency_symbol: "", token_name: "" },
+//         into_account: { role_token: "Party B" }
+//       },
+//       then: { if: true, then: "close", else: "close" }
+//     },
+//     {
+//       case: { notify_if: false },
+//       then: { assert: true, then: "close" }
+//     },
+//     {
+//       case: {
+//         for_choice:
+//         {
+//           choice_name: "The way",
+//           choice_owner: { role_token: "Party C" }
+//         },
+//         choose_between: [
+//           { from: 1, to: 3 },
+//           { from: 5, to: 8 }
+//         ]
+//       },
+//       merkleized_then: "huey-dewey-louie"
+//     },
+//     {
+//       case: { notify_if: true },
+//       then: { let: "x", be: 13, then: "close" }
+//     }
+//   ],
+//   timout: 1985,
+//   timeout_continuation: {
+//     if: true,
+//     then: {
+//       if: false,
+//       then: "close",
+//       else: {
+//         pay: 1234,
+//         token: { currency_symbol: "", token_name: "" },
+//         to: { party: { role_token: "Owner" } },
+//         from_account: { role_token: "Participant" },
+//         then: "close",
+//       }
+//     },
+//     else: { let: "x", be: 13, then: { assert: true, then: "close" } },
+//   }
+// }
 
-const root = createRoot(document.getElementById("app") as HTMLElement)
+// const root = createRoot(document.getElementById("app") as HTMLElement)
 
-root.render(<MarloweGraphView contract={contract} path={[null, 0, 1]} />)
+// root.render(<MarloweGraphView contract={contract} path={[]} />)
+// root.render(<MarloweGraphView contract={contract} path={[null, 0, 1]} />)
 
 // https://reactflow.dev/docs/concepts/terms-and-definitions
 // https://reactflow.dev/docs/guides/custom-nodes
