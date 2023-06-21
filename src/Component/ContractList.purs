@@ -132,7 +132,6 @@ mkForm onFieldValueChange = FormBuilder.evalBuilder' ado
   in
     { query }
 
-
 actionIconSizing :: String
 actionIconSizing = " h4"
 
@@ -170,8 +169,8 @@ mkContractList = do
           sortedContracts = case ordering.orderBy of
             OrderByCreationDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.createdAt)) contracts
             OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contracts
-        pure $ if ordering.orderAsc
-          then sortedContracts
+        pure $
+          if ordering.orderAsc then sortedContracts
           else Array.reverse sortedContracts
       possibleContracts'' = do
         let
@@ -182,15 +181,19 @@ mkContractList = do
               let
                 tagList = case Map.lookup runLiteTag metadata of
                   Just (Metadata tag) ->
-                    filter ((_>2) <<< length) -- ignoring short tags
-                      $ catMaybes $ map toString $ Map.values tag
+                    filter ((_ > 2) <<< length) -- ignoring short tags
+
+                      $ catMaybes
+                      $ map toString
+                      $ Map.values tag
                   Nothing -> Nil
                 pattern = Pattern queryValue
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
         filtered <|> possibleContracts'
---         pure $ if ordering.orderAsc
---           then sortedContracts
---           else Array.reverse sortedContracts
+
+      --         pure $ if ordering.orderAsc
+      --           then sortedContracts
+      --           else Array.reverse sortedContracts
 
       isLoadingContracts :: Boolean
       isLoadingContracts = case possibleContracts'' of
@@ -247,20 +250,20 @@ mkContractList = do
         Nothing, _ -> BodyLayout.component
           { title: "Your Marlowe Contracts"
           , description: DOOM.div_
-                [ DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that your wallet is involved in on the Cardano Blockchain's `preview` network."
-                , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Your involvement means that one of your wallet addresses is a part of the contract (some contracts are non fully public) or that you have a token (so called \"role token\") which gives you permission to act as a party in some contract."
-                -- , DOM.div "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
-                , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
-                ]
+              [ DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that your wallet is involved in on the Cardano Blockchain's `preview` network."
+              , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Your involvement means that one of your wallet addresses is a part of the contract (some contracts are non fully public) or that you have a token (so called \"role token\") which gives you permission to act as a party in some contract."
+              -- , DOM.div "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
+              , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
+              ]
           , content: React.fragment
               [ if isLoadingContracts then
-                    DOM.div
-                      { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
-                      }
-                      $ loadingSpinnerLogo
-                          {}
-                  else
-                    mempty
+                  DOM.div
+                    { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
+                    }
+                    $ loadingSpinnerLogo
+                        {}
+                else
+                  mempty
               , DOM.div { className: "row" } do
                   let
                     disabled = isNothing connectedWallet
@@ -301,7 +304,6 @@ mkContractList = do
                   Nothing -> mempty
                   Just contracts -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
 
-
                     [ table { striped: Table.striped.boolean true, hover: true }
                         [ DOM.thead {} do
                             let
@@ -312,7 +314,7 @@ mkContractList = do
                                     let
                                       label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
                                     orderingTh label OrderByCreationDate
-                                , th $ DOOM.text "Contract Id"
+                                , DOM.th { className: "text-center w-16rem" } $ DOOM.text "Contract Id"
                                 , th $ DOOM.text "Tags"
                                 , th $ DOOM.text "Actions"
                                 ]
@@ -322,30 +324,32 @@ mkContractList = do
                               ContractHeader { contractId, status } = _runtime.contractHeader
                               tdCentered = DOM.td { className: "text-center" }
                             in
-                              DOM.tr {}
+                              DOM.tr { className: "align-middle" }
                                 [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
                                 , tdCentered
                                     [ DOM.a
-                                      do
-                                        let
-                                          onClick = case marloweInfo of
-                                            Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> do
-                                              setModalAction $ ContractDetails currentContract currentState
-                                            _ -> pure unit
-                                          disabled = isNothing marloweInfo
-                                        { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text"
-                                        , onClick: handler_ onClick
-                                        -- , disabled
-                                        }
-                                      [ text $ txOutRefToString contractId ]
+                                        do
+                                          let
+                                            onClick = case marloweInfo of
+                                              Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> do
+                                                setModalAction $ ContractDetails currentContract currentState
+                                              _ -> pure unit
+                                            disabled = isNothing marloweInfo
+                                          { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem"
+                                          , onClick: handler_ onClick
+                                          -- , disabled
+                                          }
+                                        [ text $ txOutRefToString contractId ]
                                     ]
-                                  , tdCentered
-                                      [ case Map.lookup runLiteTag metadata of
-                                          Just (Metadata tag) ->
-                                            let values = catMaybes $ map toString $ Map.values tag
-                                             in DOOM.text $ intercalate ", " values
-                                          Nothing -> mempty
-                                      ]
+                                , tdCentered
+                                    [ case Map.lookup runLiteTag metadata of
+                                        Just (Metadata tag) ->
+                                          let
+                                            values = catMaybes $ map toString $ Map.values tag
+                                          in
+                                            DOOM.text $ intercalate ", " values
+                                        Nothing -> mempty
+                                    ]
                                 , tdCentered
                                     [ do
                                         case endpoints.transactions, marloweInfo of
@@ -381,10 +385,10 @@ mkContractList = do
                                         _, _ -> mempty
                                     ]
                                 ]
-                            ]
                         ]
                     ]
-            }
+              ]
+          }
         _, _ -> mempty
 
 prettyState :: V1.State -> String
