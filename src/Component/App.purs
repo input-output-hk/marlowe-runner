@@ -369,6 +369,7 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
             { initialContract: contractState'.initialContract
             , state: contractState'.state
             , currentContract: contractState'.currentContract
+            , unclaimedPayouts: contractState'.unclaimedPayouts
             }
 
       case contractId `Map.lookup` prev of

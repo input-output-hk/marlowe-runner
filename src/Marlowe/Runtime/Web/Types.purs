@@ -413,12 +413,24 @@ derive instance Generic TxBody _
 derive instance Newtype TxBody _
 derive instance Eq TxBody
 
+newtype Payout = Payout
+  { payoutId :: TxOutRef
+  , role :: String
+  }
+
+derive instance Generic Payout _
+derive instance Newtype Payout _
+derive instance Eq Payout
+derive instance Ord Payout
+derive newtype instance DecodeJson Payout
+
 type ContractStateRow = ContractHeadersRowBase
   ( initialContract :: V1.Contract
   , currentContract :: Maybe V1.Contract
   , state :: Maybe V1.State
   , utxo :: Maybe TxOutRef
   , txBody :: Maybe (TextEnvelope TransactionObject)
+  , unclaimedPayouts :: Array Payout
   )
 
 newtype ContractState = ContractState { | ContractStateRow }

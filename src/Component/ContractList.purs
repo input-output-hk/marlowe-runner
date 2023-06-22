@@ -45,7 +45,7 @@ import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata(..), PutTransactionRequest(..), Runtime(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata(..), Payout(..), PutTransactionRequest(..), Runtime(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import React.Basic (fragment) as DOOM
@@ -399,11 +399,11 @@ mkContractList = do
                                             }
                                           _, _ -> mempty
                                     , case marloweInfo, possibleWalletContext of
-                                        Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
+                                        Just (MarloweInfo { initialContract, state: _ , unclaimedPayouts }), Just { balance } -> do
                                           let
                                             rolesFromContract = rolesInContract initialContract
                                             roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
-                                          case Array.uncons (Array.intersect roleTokens rolesFromContract) of
+                                          case Array.uncons (Array.intersect (Array.intersect roleTokens rolesFromContract) (map (\(Payout { role }) -> role) unclaimedPayouts)) of
                                             Just { head, tail } ->
                                               linkWithIcon
                                                 { icon: unsafeIcon $ "cash-coin warning-color" <> actionIconSizing
