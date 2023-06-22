@@ -7,20 +7,19 @@ import Component.BodyLayout as BodyLayout
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM)
 import Component.Widgets (link)
-import Data.BigInt.Argonaut (BigInt(..))
+import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
-import Data.DateTime (DateTime(..))
 import Data.DateTime.Instant (Instant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either(..))
-import Data.FormURLEncoded.Query (Query(..))
+import Data.FormURLEncoded.Query (Query)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Seconds(..))
 import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Polyform.Validator (liftFn, liftFnMaybe)
+import Polyform.Validator (liftFnMaybe)
 import React.Basic.DOM (text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (JSX, component, fragment, (/\))
@@ -160,7 +159,6 @@ mkComponent = do
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
-        -- Just (V (Right escrowParams) /\ _) -> onSuccess $ mkEscrowContract escrowParams
         Just (V (Right escrowParams) /\ _) -> setContract $ Just $ mkEscrowContract escrowParams
         _ -> pure unit
 
@@ -172,7 +170,6 @@ mkComponent = do
 
     let
       fields = UseForm.renderForm form formState
-      -- formBody = DOM.div { className: "form-group" } fields
       formBody = case possibleContract of
         Nothing -> DOM.div { className: "form-group" } fields
         Just contract -> marloweYaml contract

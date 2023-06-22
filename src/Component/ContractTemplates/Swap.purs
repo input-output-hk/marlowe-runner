@@ -4,60 +4,189 @@ import Prelude
 
 import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
+import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM)
 import Component.Widgets (link)
+import Data.BigInt.Argonaut (BigInt)
+import Data.BigInt.Argonaut as BigInt
+import Data.DateTime.Instant (Instant)
+import Data.DateTime.Instant as Instant
+import Data.Either (Either(..))
+import Data.FormURLEncoded.Query (Query)
+import Data.Maybe (Maybe(..))
+import Data.Time.Duration (Seconds(..))
+import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Polyform.Validator (liftFnMaybe)
 import React.Basic.DOM (text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (JSX, component)
+import React.Basic.Hooks (JSX, component, fragment, (/\))
+import React.Basic.Hooks as React
+import React.Basic.Hooks.UseForm (useForm)
+import React.Basic.Hooks.UseForm as UseForm
+import ReactBootstrap.FormBuilder (BootstrapForm)
+import ReactBootstrap.FormBuilder as FormBuilder
 
 type Props =
   { onSuccess :: V1.Contract -> Effect Unit
   , onDismiss :: Effect Unit
   }
 
-content :: String
-content =
-  """
-When [
-  (Case
-     (Deposit (Role "Ada provider") (Role "Ada provider")
-        (Token "" "")
-        (MulValue
-           (Constant 1000000)
-           (ConstantParam "Amount of Ada")))
-     (When [
-        (Case
-           (Deposit (Role "Dollar provider") (Role "Dollar provider")
-              (Token "85bb65" "dollar")
-              (ConstantParam "Amount of dollars"))
-           (Pay (Role "Ada provider")
-              (Party (Role "Dollar provider"))
-              (Token "" "")
-              (MulValue
-                 (Constant 1000000)
-                 (ConstantParam "Amount of Ada"))
-              (Pay (Role "Dollar provider")
-                 (Party (Role "Ada provider"))
-                 (Token "85bb65" "dollar")
-                 (ConstantParam "Amount of dollars") Close)))] (TimeParam "Timeout for dollar deposit") Close))] (TimeParam "Timeout for Ada deposit") Close
-"""
+mkSwapContract
+  :: { tokenADepositDeadline :: Instant
+     , tokenBDepositDeadline :: Instant
+     , tokenACurrencySymbol :: String
+     , tokenBCurrencySymbol :: String
+     , tokenAName :: String
+     , tokenBName :: String
+     , tokenAAmount :: BigInt
+     , tokenBAmount :: BigInt
+     }
+  -> V1.Contract
+mkSwapContract { tokenADepositDeadline, tokenBDepositDeadline, tokenACurrencySymbol, tokenBCurrencySymbol, tokenAAmount, tokenBAmount, tokenAName, tokenBName } = do
+  V1.When
+    [ ( V1.Case
+          ( V1.Deposit (V1.Role "Token A provider") (V1.Role "Token A provider")
+              (V1.Token tokenACurrencySymbol tokenAName)
+              (V1.Constant tokenAAmount)
+          )
+          ( V1.When
+              [ ( V1.Case
+                    ( V1.Deposit (V1.Role "Token B provider") (V1.Role "Token B provider")
+                        (V1.Token tokenBCurrencySymbol tokenBName)
+                        (V1.Constant tokenBAmount)
+                    )
+                    ( V1.Pay (V1.Role "Token A provider")
+                        (V1.Party (V1.Role "Token B provider"))
+                        (V1.Token tokenACurrencySymbol tokenAName)
+                        (V1.Constant tokenAAmount)
+                        ( V1.Pay (V1.Role "Token B provider")
+                            (V1.Party (V1.Role "Token A provider"))
+                            (V1.Token tokenBCurrencySymbol tokenBName)
+                            (V1.Constant tokenBAmount)
+                            V1.Close
+                        )
+                    )
+                )
+              ]
+              tokenBDepositDeadline
+              V1.Close
+          )
+      )
+    ]
+    tokenADepositDeadline
+    V1.Close
+
+reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
+
+reqValidator' = reqValidator "This field is required"
+
+swapForm :: BootstrapForm Effect Query { tokenAAmount :: BigInt, tokenBAmount :: BigInt, tokenAName :: String, tokenBName :: String, tokenACurrencySymbol :: String, tokenBCurrencySymbol :: String, tokenADepositDeadline :: Instant, tokenBDepositDeadline :: Instant }
+swapForm = FormBuilder.evalBuilder' $ ado
+  tokenAAmount <- FormBuilder.intInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "Token A Amount"
+    , touched: false
+    }
+  tokenAName <- FormBuilder.textInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "Token A Name"
+    , touched: false
+    , validator: reqValidator'
+    }
+  tokenACurrencySymbol <- FormBuilder.textInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "Token A Currency Symbol"
+    , touched: false
+    , validator: reqValidator'
+    }
+  tokenBAmount <- FormBuilder.intInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "Token B Amount"
+    , touched: false
+    }
+  tokenBName <- FormBuilder.textInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "Token B Name"
+    , touched: false
+    , validator: reqValidator'
+    }
+  tokenBCurrencySymbol <- FormBuilder.textInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "Token B Currency Symbol"
+    , touched: false
+    , validator: reqValidator'
+    }
+
+  tokenADepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timoeut help") reqValidator'
+  tokenBDepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timoeut help") reqValidator'
+  in
+    { tokenAAmount: BigInt.fromInt tokenAAmount
+    , tokenAName: tokenAName
+    , tokenACurrencySymbol: tokenACurrencySymbol
+    , tokenBAmount: BigInt.fromInt tokenBAmount
+    , tokenBName: tokenBName
+    , tokenBCurrencySymbol: tokenBCurrencySymbol
+    , tokenADepositDeadline: Instant.fromDateTime tokenADepositDeadline
+    , tokenBDepositDeadline: Instant.fromDateTime tokenBDepositDeadline
+    }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   liftEffect $ component "ContractTemplates.Swap" \{ onSuccess, onDismiss } -> React.do
+
+    possibleContract /\ setContract <- React.useState' Nothing
+    let
+      form = swapForm
+
+      onSubmit :: _ -> Effect Unit
+      onSubmit = _.result >>> case _ of
+        Just (V (Right swapParams) /\ _) -> setContract $ Just $ mkSwapContract swapParams
+        _ -> pure unit
+
+    { formState, onSubmit: onSubmit', result } <- useForm
+      { spec: form
+      , onSubmit
+      , validationDebounce: Seconds 0.5
+      }
+
+    let
+      fields = UseForm.renderForm form formState
+      formBody = case possibleContract of
+        Nothing -> DOM.div { className: "form-group" } fields
+        Just contract -> marloweYaml contract
+      formActions = fragment
+        [ link
+            { label: DOOM.text "Cancel"
+            , onClick: onDismiss
+            , showBorders: true
+            , extraClassNames: "me-3"
+            }
+        , DOM.button
+            do
+              let
+                disabled = case result of
+                  Just (V (Right _) /\ _) -> false
+                  _ -> true
+              { className: "btn btn-primary"
+              , onClick: onSubmit'
+              , disabled
+              }
+            [ DOOM.text "Submit" ]
+        ]
     pure $ BodyLayout.component
       { title: "Swap"
-      , description: DOOM.text "Takes Ada from one party and dollar tokens from another party, and it swaps them atomically."
+      , description: DOOM.text "Takes currency amount from one party and another currency amount from another party, and it swaps them atomically."
       , content: wrappedContentWithFooter
-          (DOM.pre {} content)
-          ( link
-              { label: DOOM.text "Cancel"
-              , onClick: onDismiss
-              , showBorders: true
-              }
-          )
+          formBody
+          formActions
       }
 
