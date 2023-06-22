@@ -8,6 +8,8 @@ import Component.ApplyInputs as ApplyInputs
 import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
 import Component.ContractTemplates.Escrow as Escrow
+import Component.ContractTemplates.Swap as Swap
+import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle
 import Component.CreateContract (runLiteTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
@@ -116,8 +118,8 @@ submit witnesses serverUrl transactionEndpoint = do
     req = PutTransactionRequest textEnvelope
   put' serverUrl transactionEndpoint req
 
-data ContractTemplate
-  = Escrow
+data ContractTemplate = Escrow | Swap | ContractForDifferencesWithOracle
+
 derive instance Eq ContractTemplate
 
 data ModalAction
@@ -126,6 +128,7 @@ data ModalAction
   | ApplyInputs TransactionsEndpoint V1.Contract V1.State
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
   | ContractTemplate ContractTemplate
+
 derive instance Eq ModalAction
 
 queryFieldId :: FieldId
@@ -158,6 +161,8 @@ mkContractList = do
   withdrawalsComponent <- Withdrawals.mkComponent
   contractDetails <- ContractDetails.mkComponent
   escrowComponent <- Escrow.mkComponent
+  swapComponent <- Swap.mkComponent
+  contractForDifferencesWithOracleComponent <- ContractForDifferencesWithOracle.mkComponent
 
   liftEffect $ component "ContractList" \{ connectedWallet, possibleContracts } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -266,6 +271,16 @@ mkContractList = do
           , onDismiss: resetModalAction
           }
 
+        Just (ContractTemplate Swap), _ -> swapComponent
+          { onSuccess: \_ -> resetModalAction
+          , onDismiss: resetModalAction
+          }
+
+        Just (ContractTemplate ContractForDifferencesWithOracle), _ -> contractForDifferencesWithOracleComponent
+          { onSuccess: \_ -> resetModalAction
+          , onDismiss: resetModalAction
+          }
+
         Nothing, _ -> BodyLayout.component
           { title: "Your Marlowe Contracts"
           , description: DOOM.div_
@@ -305,11 +320,17 @@ mkContractList = do
                       -- , onToggle: const $ pure unit
                       }
                       [ dropdownItem
-                        { onClick: handler_ $ setModalAction $ ContractTemplate Escrow
-                        }
-                        [DOOM.text "Escrow"]
-                      , dropdownItem { disabled: true } [DOOM.text "Swap"]
-                      , dropdownItem { disabled: true } [DOOM.text "Contract For Differences with Oracle"]
+                          { onClick: handler_ $ setModalAction $ ContractTemplate Escrow
+                          }
+                          [ DOOM.text "Escrow" ]
+                      , dropdownItem
+                          { onClick: handler_ $ setModalAction $ ContractTemplate Swap
+                          }
+                          [ DOOM.text "Swap" ]
+                      , dropdownItem
+                          { onClick: handler_ $ setModalAction $ ContractTemplate ContractForDifferencesWithOracle
+                          }
+                          [ DOOM.text "Contract For Differences with Oracle" ]
                       ]
                   [ DOM.div { className: "col-7 text-end" }
                       [ DOM.div { className: "form-group" } $ UseForm.renderForm form formState ]
@@ -319,8 +340,7 @@ mkContractList = do
                           [ newContractButton
                           , templateContractButton
                           ]
-                      if disabled
-                      then do
+                      if disabled then do
                         let
                           tooltipJSX = tooltip
                             { placement: placement.left }
