@@ -280,7 +280,7 @@ mkComponent = do
   walletInfoCtx <- asks _.walletInfoCtx
 
   let
-    initialAutoRun = AutoRun false
+    initialAutoRun = AutoRun true
 
   roleTokenComponent <- mkRoleTokensComponent
 

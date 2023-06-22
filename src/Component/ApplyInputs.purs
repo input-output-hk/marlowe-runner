@@ -36,6 +36,7 @@ import Data.Nullable as Argonaut
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -329,16 +330,14 @@ data Step = Creating CreateInputStep
 -- | Signed (Either ClientError PostContractsResponseContent)
 
 type Props =
-  { inModal :: Boolean
-  , onDismiss :: Effect Unit
+  { onDismiss :: Effect Unit
   , onSuccess :: TransactionEndpoint -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , transactionsEndpoint :: TransactionsEndpoint
-  , contract :: V1.Contract
-  , state :: V1.State
+  , marloweContext :: Machine.MarloweContext
   }
 
-machineProps contract state transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime = do
+machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime = do
   let
     env = { connectedWallet, cardanoMultiplatformLib, runtime }
     -- allInputsChoices = case nextTimeoutAdvance environment contract of
@@ -350,7 +349,7 @@ machineProps contract state transactionsEndpoint connectedWallet cardanoMultipla
     --       notify = NonEmpty.head <$> NonEmpty.fromArray (nextNotify environment state contract)
     --     Right { deposits, choices, notify }
 
-  { initialState: Machine.initialState contract state transactionsEndpoint
+  { initialState: Machine.initialState marloweContext transactionsEndpoint
   , step: Machine.step
   , driver: Machine.driver env
   , output: identity
@@ -378,7 +377,7 @@ mkContractDetailsComponent = do
       , initial: true
       , touched: true
       }
-  liftEffect $ component "ApplyInputs.ContractDetailsComponent" \{ marloweContext: { contract, state }, onSuccess, onDismiss } -> React.do
+  liftEffect $ component "ApplyInputs.ContractDetailsComponent" \{ marloweContext: { initialContract, contract, state }, onSuccess, onDismiss } -> React.do
     { formState, onSubmit: onSubmit' } <- useForm
       { spec: autoRunForm
       , onSubmit: _.result >>> case _ of
@@ -389,33 +388,33 @@ mkContractDetailsComponent = do
 
     let
       contractSection =
-        tabs { fill: true, justify: true, defaultActiveKey: "source", variant: Tabs.variant.pills } do
+        tabs { fill: true, justify: true, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
           let
             renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto"} children
           [ renderTab
-            { eventKey: eventKey "source"
-            , title: DOOM.span_
-                [ Icons.toJSX $ unsafeIcon "filetype-yml"
-                , DOOM.text " Source code"
-                ]
-            }
-            [ marloweYaml contract ]
+              { eventKey: eventKey "graph"
+              , title: DOOM.span_
+                  [ Icons.toJSX $ unsafeIcon "diagram-2"
+                  , DOOM.text " Source graph"
+                  ]
+              }
+            [ marloweGraph { contract: initialContract } ]
           , renderTab
-            { eventKey: eventKey "graph"
-            , title: DOOM.span_
-                [ Icons.toJSX $ unsafeIcon "diagram-2"
-                , DOOM.text " Source graph"
-                ]
-            }
-            [ marloweGraph { contract } ]
+              { eventKey: eventKey "source"
+              , title: DOOM.span_
+                  [ Icons.toJSX $ unsafeIcon "filetype-yml"
+                  , DOOM.text " Source code"
+                  ]
+              }
+              [ marloweYaml contract ]
           , renderTab
-            { eventKey: eventKey "state"
-            , title: DOOM.span_
-                [ Icons.toJSX $ unsafeIcon "bank"
-                , DOOM.text " Contract state"
-                ]
-            }
-            [ marloweStateYaml state ]
+              { eventKey: eventKey "state"
+              , title: DOOM.span_
+                  [ Icons.toJSX $ unsafeIcon "bank"
+                  , DOOM.text " Contract state"
+                  ]
+              }
+              [ marloweStateYaml state ]
           ]
       fields = UseForm.renderForm autoRunForm formState
       body = fragment $
@@ -536,7 +535,7 @@ mkComponent = do
   notifyFormComponent <- mkNotifyFormComponent
   advanceFormComponent <- mkAdvanceFormComponent
 
-  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, contract, state, inModal, transactionsEndpoint } -> React.do
+  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, marloweContext, transactionsEndpoint } -> React.do
     walletRef <- React.useRef connectedWallet
     previewFlow /\ setPreviewFlow <- React.useState' $ DetailedFlow { showPrevStep: true }
     let
@@ -547,15 +546,28 @@ mkComponent = do
 
     machine <- do
       let
-        props = machineProps contract state transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime
+        props = machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime
       useMooreMachine props
 
+    let
+      setNextFlow = case previewFlow of
+        DetailedFlow { showPrevStep: true } -> do
+          traceM "NEXT STEP"
+          traceM previewFlow
+          setPreviewFlow $ DetailedFlow { showPrevStep: false }
+        DetailedFlow { showPrevStep: false } -> do
+          traceM "NEXT STEP"
+          traceM previewFlow
+          setPreviewFlow $ DetailedFlow { showPrevStep: true }
+        SimplifiedFlow -> pure unit
+
     pure $ case machine.state of
-      Machine.PresentingContractDetails { marloweContext } -> do
+      Machine.PresentingContractDetails { } -> do
         let
           onStepSuccess (AutoRun autoRun) = do
-            currWallet <- React.readRef walletRef
             machine.applyAction $ Machine.FetchRequiredWalletContext { autoRun: AutoRun true, marloweContext, transactionsEndpoint }
+            traceM "AUTO RUN:"
+            traceM autoRun
             if autoRun
               then setPreviewFlow SimplifiedFlow
               else setPreviewFlow $ DetailedFlow { showPrevStep: true }
@@ -566,12 +578,12 @@ mkComponent = do
         SimplifiedFlow -> DOOM.text "Auto fetching... (progress bar?)"
 
       Machine.ChoosingInputType {allInputsChoices, requiredWalletContext} -> case previewFlow of
-        DetailedFlow { showPrevStep: true } ->
-          fetchingRequiredWalletContextDetails (setPreviewFlow $ DetailedFlow { showPrevStep: false }) $ Just requiredWalletContext
+        DetailedFlow { showPrevStep: true } -> do
+          fetchingRequiredWalletContextDetails (setNextFlow) $ Just requiredWalletContext
         _ -> do
           let
             body = DOM.div { className: "row" }
-              [ DOM.div { className: "col-12" } $ marloweYaml contract ]
+              [ DOM.div { className: "col-12" } $ marloweYaml marloweContext.contract ]
 
             footer = DOM.div { className: "row" }
               [ DOM.div { className: "col-3 text-center" } $
@@ -624,7 +636,7 @@ mkComponent = do
       Machine.PickingInput { inputChoices } -> do
         let
           applyPickInputSucceeded input = do
-            setPreviewFlow $ DetailedFlow { showPrevStep: true }
+            setNextFlow
             machine.applyAction <<< Machine.PickInputSucceeded $ input
         case inputChoices of
           DepositInputs depositInputs ->
@@ -642,8 +654,8 @@ mkComponent = do
           creatingTxDetails (pure unit) Argonaut.null Nothing
         SimplifiedFlow -> DOOM.text "Auto creating tx... (progress bar?)"
       Machine.SigningTx { createTxResponse } -> case previewFlow of
-        DetailedFlow { showPrevStep: true } ->
-          creatingTxDetails (setPreviewFlow $ DetailedFlow { showPrevStep: false }) Argonaut.null $ Just createTxResponse
+        DetailedFlow { showPrevStep: true } -> do
+          creatingTxDetails (setNextFlow) Argonaut.null $ Just createTxResponse
         DetailedFlow _ -> DOOM.text "Signing tx..."
           -- signingTxDetails modal (pure unit) Argonaut.null Nothing
         SimplifiedFlow -> DOOM.text "Auto signing tx... (progress bar?)"

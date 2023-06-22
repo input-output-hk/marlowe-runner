@@ -5,6 +5,7 @@ import Prelude
 import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
+import Component.ApplyInputs.Machine as ApplyInputs.Machine
 import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
 import Component.ContractTemplates.Escrow as Escrow
@@ -125,7 +126,7 @@ derive instance Eq ContractTemplate
 data ModalAction
   = NewContract
   | ContractDetails V1.Contract V1.State
-  | ApplyInputs TransactionsEndpoint V1.Contract V1.State
+  | ApplyInputs TransactionsEndpoint ApplyInputs.Machine.MarloweContext
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
   | ContractTemplate ContractTemplate
 
@@ -230,17 +231,15 @@ mkContractList = do
                 ]
               resetModalAction
           }
-        Just (ApplyInputs transactionsEndpoint contract st), Just cw -> do
+        Just (ApplyInputs transactionsEndpoint marloweContext), Just cw -> do
           let
             onSuccess = \_ -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
                 [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
               resetModalAction
           applyInputsComponent
-            { inModal: true
-            , transactionsEndpoint
-            , contract
-            , state: st
+            { transactionsEndpoint
+            , marloweContext
             , connectedWallet: cw
             , onSuccess
             , onDismiss: resetModalAction
@@ -381,7 +380,7 @@ mkContractList = do
                             in
                               DOM.tr { className: "align-middle" }
                                 [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
-                                , tdCentered
+                                , DOM.td { className: "text-center" } $ DOM.span { className: "d-flex" }
                                     [ DOM.a
                                         do
                                           let
@@ -389,12 +388,13 @@ mkContractList = do
                                               Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> do
                                                 setModalAction $ ContractDetails currentContract currentState
                                               _ -> pure unit
-                                            disabled = isNothing marloweInfo
-                                          { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem"
+                                          { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
                                           , onClick: handler_ onClick
                                           -- , disabled
                                           }
                                         [ text $ txOutRefToString contractId ]
+                                    , DOM.a { href: "#", className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset" } $
+                                        Icons.toJSX $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
                                     ]
                                 , tdCentered
                                     [ case Map.lookup runLiteTag metadata of
@@ -408,13 +408,16 @@ mkContractList = do
                                 , tdCentered
                                     [ do
                                         case endpoints.transactions, marloweInfo of
-                                          Just transactionsEndpoint, Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> linkWithIcon
-                                            { icon: unsafeIcon $ "fast-forward-fill" <> actionIconSizing
-                                            , label: mempty
-                                            , tooltipText: Just "Apply available inputs to the contract"
-                                            , tooltipPlacement: Just placement.left
-                                            , onClick: setModalAction $ ApplyInputs transactionsEndpoint currentContract currentState
-                                            }
+                                          Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
+                                            let
+                                              marloweContext = { initialContract, state, contract }
+                                            linkWithIcon
+                                              { icon: unsafeIcon $ "fast-forward-fill" <> actionIconSizing
+                                              , label: mempty
+                                              , tooltipText: Just "Apply available inputs to the contract"
+                                              , tooltipPlacement: Just placement.left
+                                              , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
+                                              }
                                           _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
                                             { icon: unsafeIcon $ "file-earmark-check-fill success-color" <> actionIconSizing
                                             , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
@@ -424,10 +427,11 @@ mkContractList = do
                                             }
                                           _, _ -> mempty
                                     , case marloweInfo, possibleWalletContext of
-                                        Just (MarloweInfo { initialContract, state: _ }), Just { balance } -> do
+                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, initialContract, state: _ }), Just { balance } -> do
                                           let
                                             rolesFromContract = rolesInContract initialContract
-                                            roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance
+                                            balance' = Map.filterKeys (eq currencySymbol) balance
+                                            roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance'
                                           case Array.uncons (Array.intersect roleTokens rolesFromContract) of
                                             Just { head, tail } ->
                                               linkWithIcon

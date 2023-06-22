@@ -31,6 +31,7 @@ data UserCashFlowDirection
 
 newtype MarloweInfo = MarloweInfo
   { initialContract :: V1.Contract
+  , currencySymbol :: Maybe V1.CurrencySymbol
   , state :: Maybe V1.State
   , currentContract :: Maybe V1.Contract
   }
