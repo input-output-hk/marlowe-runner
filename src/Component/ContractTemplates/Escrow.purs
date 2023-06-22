@@ -4,6 +4,7 @@ import Prelude
 
 import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
+import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM)
 import Component.Widgets (link)
 import Data.BigInt.Argonaut (BigInt(..))
@@ -11,15 +12,21 @@ import Data.BigInt.Argonaut as BigInt
 import Data.DateTime (DateTime(..))
 import Data.DateTime.Instant (Instant)
 import Data.DateTime.Instant as Instant
+import Data.Either (Either(..))
 import Data.FormURLEncoded.Query (Query(..))
 import Data.Maybe (Maybe(..))
+import Data.Time.Duration (Seconds(..))
+import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Polyform.Validator (liftFn, liftFnMaybe)
 import React.Basic.DOM (text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (JSX, component)
+import React.Basic.Hooks (JSX, component, fragment, (/\))
+import React.Basic.Hooks as React
+import React.Basic.Hooks.UseForm (useForm)
+import React.Basic.Hooks.UseForm as UseForm
 import ReactBootstrap.FormBuilder (BootstrapForm)
 import ReactBootstrap.FormBuilder as FormBuilder
 
@@ -28,63 +35,13 @@ type Props =
   , onDismiss :: Effect Unit
   }
 
--- mkContractForm :: (Maybe V1.Contract /\ AutoRun) -> BootstrapForm Effect Query Result
--- mkContractForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuilder.evalBuilder' $ ado
---   contract <- FormBuilder.textArea
---     { missingError: "Please provide contract terms JSON value"
---     , helpText: Just $ DOOM.div_
---         [ DOOM.text "Basic JSON validation"
---         ]
---     , initial: case possibleInitialContract of
---         Nothing -> ""
---         Just initialContract -> stringifyWithIndent 2 $ encodeJson initialContract
---     , label: Just $ DOOM.text "Contract JSON"
---     , touched: isJust possibleInitialContract
---     , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
---         json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
---         lmap (Array.singleton <<< show) (decodeJson json)
---     , rows: 15
---     , name: Just contractFieldId
---     }
--- 
---   tags <- FormBuilder.textInput
---     { helpText: Just $ DOOM.div_
---         [ DOOM.text "Tags"
---         ]
---     , initial: ""
---     , label: Just $ DOOM.text "Tags"
---     , touched: false
---     , validator: liftFn case _ of
---         Nothing -> Tags mempty
---         Just tags ->
---           (Tags $ Map.singleton runLiteTag
---              (Metadata $ Map.fromFoldableWithIndex
---                $ map (encodeJson <<< trim) $ split (Pattern ",") tags))
---     }
--- 
---   autoRun <- AutoRun <$> do
---     -- FIXME: This should be documented I left this as an example of more hard core lifting of validator
---     -- let
---     --   toAutoRun = liftBuilderM $ pure $ liftValidator $ liftFnM \value -> do
---     --       let
---     --         value' = AutoRun value
---     --       -- onAutoRunChange value'
---     --       pure value'
---     FormBuilder.booleanField
---       { label: DOOM.text "Auto run"
---       , helpText: DOOM.text "Whether to run the contract creation process automatically"
---       , initial: initialAutoRun
---       }
---   in
---     contract /\ tags /\ autoRun
-
-mkEscrowContract ::
-  { complaintDeadline :: Instant
-  , complaintResponseDeadline :: Instant
-  , mediationDeadline :: Instant
-  , paymentDeadline :: Instant
-  , price :: BigInt
-  }
+mkEscrowContract
+  :: { complaintDeadline :: Instant
+     , complaintResponseDeadline :: Instant
+     , mediationDeadline :: Instant
+     , paymentDeadline :: Instant
+     , price :: BigInt
+     }
   -> V1.Contract
 mkEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline, complaintResponseDeadline } =
   V1.When
@@ -173,80 +130,76 @@ reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
 
 reqValidator' = reqValidator "This field is required"
 
-mkEscrowForm :: BootstrapForm Effect Query { mediatorTimeout :: Instant, price :: BigInt }
-mkEscrowForm = FormBuilder.evalBuilder' $ ado
+escrowForm :: BootstrapForm Effect Query { mediationDeadline :: Instant, price :: BigInt, complaintDeadline :: Instant, complaintResponseDeadline :: Instant, paymentDeadline :: Instant }
+escrowForm = FormBuilder.evalBuilder' $ ado
   price <- FormBuilder.intInput
     { helpText: Nothing -- Just $ DOOM.text "Price"
     , initial: ""
     , label: Just $ DOOM.text "Price"
     , touched: false
     }
-  mediatorTimeout <- FormBuilder.dateTimeField (Just $ DOOM.text "Mediator timeout") (Just $ DOOM.text "MEDIATOR timoeut help") reqValidator'
+  mediationDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Mediator timeout") (Just $ DOOM.text "MEDIATOR timoeut help") reqValidator'
+  complaintDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Complaint Deadline timeout") (Just $ DOOM.text "COMPLAINT timoeut help") reqValidator'
+  complaintResponseDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Complaint Response Deadline timeout") (Just $ DOOM.text "COMPLAINT RESPONSE timoeut help") reqValidator'
+  paymentDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Payment Deadline timeout") (Just $ DOOM.text "PAYMENT timoeut help") reqValidator'
   in
     { price: BigInt.fromInt price
-    , mediatorTimeout: Instant.fromDateTime mediatorTimeout
+    , mediationDeadline: Instant.fromDateTime mediationDeadline
+    , complaintDeadline: Instant.fromDateTime complaintDeadline
+    , complaintResponseDeadline: Instant.fromDateTime complaintResponseDeadline
+    , paymentDeadline: Instant.fromDateTime paymentDeadline
     }
-
-content :: String
-content =
-  """
-When [
-  (Case
-     (Deposit (Role "Seller") (Role "Buyer")
-        (Token "" "")
-        (ConstantParam "Price"))
-     (When [
-           (Case
-              (Choice
-                 (ChoiceId "Everything is alright" (Role "Buyer")) [
-                 (Bound 0 0)]) Close)
-           ,
-           (Case
-              (Choice
-                 (ChoiceId "Report problem" (Role "Buyer")) [
-                 (Bound 1 1)])
-              (Pay (Role "Seller")
-                 (Account (Role "Buyer"))
-                 (Token "" "")
-                 (ConstantParam "Price")
-                 (When [
-                       (Case
-                          (Choice
-                             (ChoiceId "Confirm problem" (Role "Seller")) [
-                             (Bound 1 1)]) Close)
-                       ,
-                       (Case
-                          (Choice
-                             (ChoiceId "Dispute problem" (Role "Seller")) [
-                             (Bound 0 0)])
-                          (When [
-                                (Case
-                                   (Choice
-                                      (ChoiceId "Dismiss claim" (Role "Mediator")) [
-                                      (Bound 0 0)])
-                                   (Pay (Role "Buyer")
-                                      (Party (Role "Seller"))
-                                      (Token "" "")
-                                      (ConstantParam "Price") Close))
-                                ,
-                                (Case
-                                   (Choice
-                                      (ChoiceId "Confirm problem" (Role "Mediator")) [
-                                      (Bound 1 1)]) Close)] (TimeParam "Mediation deadline") Close))] (TimeParam "Complaint response deadline") Close)))] (TimeParam "Complaint deadline") Close))] (TimeParam "Payment deadline") Close
-"""
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   liftEffect $ component "ContractTemplates.Escrow" \{ onSuccess, onDismiss } -> React.do
+
+    possibleContract /\ setContract <- React.useState' Nothing
+    let
+      form = escrowForm
+
+      onSubmit :: _ -> Effect Unit
+      onSubmit = _.result >>> case _ of
+        -- Just (V (Right escrowParams) /\ _) -> onSuccess $ mkEscrowContract escrowParams
+        Just (V (Right escrowParams) /\ _) -> setContract $ Just $ mkEscrowContract escrowParams
+        _ -> pure unit
+
+    { formState, onSubmit: onSubmit', result } <- useForm
+      { spec: form
+      , onSubmit
+      , validationDebounce: Seconds 0.5
+      }
+
+    let
+      fields = UseForm.renderForm form formState
+      -- formBody = DOM.div { className: "form-group" } fields
+      formBody = case possibleContract of
+        Nothing -> DOM.div { className: "form-group" } fields
+        Just contract -> marloweYaml contract
+      formActions = fragment
+        [ link
+            { label: DOOM.text "Cancel"
+            , onClick: onDismiss
+            , showBorders: true
+            , extraClassNames: "me-3"
+            }
+        , DOM.button
+            do
+              let
+                disabled = case result of
+                  Just (V (Right _) /\ _) -> false
+                  _ -> true
+              { className: "btn btn-primary"
+              , onClick: onSubmit'
+              , disabled
+              }
+            [ DOOM.text "Submit" ]
+        ]
     pure $ BodyLayout.component
       { title: "Escrow"
       , description: DOOM.text "Regulates a money exchange between a \"Buyer\" and a \"Seller\". If there is a disagreement, an \"Mediator\" will decide whether the money is refunded or paid to the \"Seller\"."
       , content: wrappedContentWithFooter
-          (DOM.pre {} content)
-          ( link
-              { label: DOOM.text "Cancel"
-              , onClick: onDismiss
-              , showBorders: true
-              }
-          )
+          formBody
+          formActions
       }
+
