@@ -7,6 +7,7 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
 import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
+import Component.ContractTemplates.Escrow as Escrow
 import Component.CreateContract (runLiteTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
@@ -14,10 +15,12 @@ import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), Mk
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (buttonWithIcon, dropDownButtonWithIcon, linkWithIcon)
+import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Fetch (FetchError)
 import Contrib.React.Svg (loadingSpinnerLogo)
+import Contrib.ReactBootstrap.DropdownButton (dropdownButton)
+import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
 import Control.Alt ((<|>))
 import Control.Monad.List.Trans (drop)
 import Control.Monad.Reader.Class (asks)
@@ -39,6 +42,7 @@ import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration (Seconds(..))
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -48,6 +52,7 @@ import Marlowe.Runtime.Web.Client (put')
 import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata(..), PutTransactionRequest(..), Runtime(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
+import React.Basic (fragment)
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_, text) as DOOM
 import React.Basic.DOM (text)
@@ -62,6 +67,7 @@ import ReactBootstrap (overlayTrigger, tooltip)
 import ReactBootstrap.FormBuilder (BootstrapForm, textInput)
 import ReactBootstrap.FormBuilder as FormBuilder
 import ReactBootstrap.Icons (unsafeIcon)
+import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Table (striped) as Table
 import ReactBootstrap.Table (table)
 import ReactBootstrap.Types (placement)
@@ -110,12 +116,16 @@ submit witnesses serverUrl transactionEndpoint = do
     req = PutTransactionRequest textEnvelope
   put' serverUrl transactionEndpoint req
 
+data ContractTemplate
+  = Escrow
+derive instance Eq ContractTemplate
+
 data ModalAction
   = NewContract
   | ContractDetails V1.Contract V1.State
   | ApplyInputs TransactionsEndpoint V1.Contract V1.State
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
-
+  | ContractTemplate ContractTemplate
 derive instance Eq ModalAction
 
 queryFieldId :: FieldId
@@ -147,6 +157,7 @@ mkContractList = do
   applyInputsComponent <- ApplyInputs.mkComponent
   withdrawalsComponent <- Withdrawals.mkComponent
   contractDetails <- ContractDetails.mkComponent
+  escrowComponent <- Escrow.mkComponent
 
   liftEffect $ component "ContractList" \{ connectedWallet, possibleContracts } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -249,6 +260,12 @@ mkContractList = do
             onClose = resetModalAction
           contractDetails { contract, onClose, state }
 
+        -- This should be fixed later on - for now we put some stubs
+        Just (ContractTemplate Escrow), _ -> escrowComponent
+          { onSuccess: \_ -> resetModalAction
+          , onDismiss: resetModalAction
+          }
+
         Nothing, _ -> BodyLayout.component
           { title: "Your Marlowe Contracts"
           , description: DOOM.div_
@@ -260,57 +277,50 @@ mkContractList = do
           , content: React.fragment
               [ if isLoadingContracts then
                   DOM.div
-                    { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg"
+                    { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
                     }
                     $ loadingSpinnerLogo
                         {}
                 else
                   mempty
-              , DOM.div { className: "row" } do
+              , DOM.div { className: "row p-4" } do
                   let
                     disabled = isNothing connectedWallet
                     newContractButton = buttonWithIcon
-                      { icon: unsafeIcon "file-earmark-plus h5 mr-2"
-                      , label: DOOM.text "New Contract"
-                      , extraClassNames: "font-weight-bold"
+                      { icon: unsafeIcon "file-earmark-plus h5 me-1"
+                      , label: DOOM.text "Create Contract"
+                      , extraClassNames: "font-weight-bold me-2"
                       , disabled
                       , onClick: do
                           readRef possibleModalActionRef >>= case _ of
                             Nothing -> setModalAction NewContract
                             _ -> pure unit
                       }
-                    templateContractButton = dropDownButtonWithIcon
-                      { id: "templateContractMenuButton"
-                      , icon: unsafeIcon "file-earmark-plus h5 mr-2"
-                      , label: DOOM.text "Use Template"
-                      , disabled
-                      , extraClassNames: "font-weight-bold"
-                      , dropDownMenuItems:
-                          [ { menuLabel: "Escrow"
-                            , onClick: do
-                                possibleModalAction <- readRef possibleModalActionRef
-                                case possibleModalAction of
-                                  Nothing -> setModalAction NewContract
-                                  _ -> pure unit
-                            }
-                          , { menuLabel: "Swap"
-                            , onClick: do
-                                possibleModalAction <- readRef possibleModalActionRef
-                                case possibleModalAction of
-                                  Nothing -> setModalAction NewContract
-                                  _ -> pure unit
-                            }
+                    templateContractButton = dropdownButton
+                      { className: "d-inline-block"
+                      , title: fragment
+                          [ Icons.toJSX $ unsafeIcon "file-earmark-medical h5 me-1"
+                          , DOOM.text "Use Contract Template"
                           ]
+                      -- , onToggle: const $ pure unit
                       }
-                    fields = UseForm.renderForm form formState
-                    body = DOM.div { className: "form-group" } fields
-                    spacing = "m-4"
-                  [ DOM.div { className: "col-7 text-end" } $ DOM.div { className: spacing }
-                      [ body
-                      -- , actions
+                      [ dropdownItem
+                        { onClick: handler_ $ setModalAction $ ContractTemplate Escrow
+                        }
+                        [DOOM.text "Escrow"]
+                      , dropdownItem { disabled: true } [DOOM.text "Swap"]
+                      , dropdownItem { disabled: true } [DOOM.text "Contract For Differences with Oracle"]
                       ]
-                  , DOM.div { className: "col-5" } $ Array.singleton $
-                      if disabled then do
+                  [ DOM.div { className: "col-7 text-end" }
+                      [ DOM.div { className: "form-group" } $ UseForm.renderForm form formState ]
+                  , DOM.div { className: "col-5" } $ Array.singleton $ do
+                      let
+                        buttons = DOM.div { className: "text-end" }
+                          [ newContractButton
+                          , templateContractButton
+                          ]
+                      if disabled
+                      then do
                         let
                           tooltipJSX = tooltip
                             { placement: placement.left }
@@ -321,14 +331,9 @@ mkContractList = do
                           }
                           -- Disabled button doesn't trigger the hook,
                           -- so we wrap it in a `span`
-                          (DOM.div { className: spacing } [ newContractButton ])
+                          buttons
                       else
-                        DOM.div { className: "row my-4 justify-content-end" }
-                          [ DOM.div { className: "col-3" } [ newContractButton ]
-                          , DOM.div
-                              { className: "col-3" }
-                              [ templateContractButton ]
-                          ]
+                        buttons
                   ]
               , case possibleContracts'' of
                   Nothing -> mempty

@@ -78,7 +78,7 @@ main configJson = do
         pollInterval = PollingInterval (Milliseconds 120_000.0)
         filterContracts getContractResponse = case un ContractHeader getContractResponse.resource of
           { block: Nothing } -> true
-          { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 904279
+          { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
         maxPages = Just (MaxPages 1)
       Streaming.mkContractsWithTransactions pollInterval reqInterval filterContracts maxPages config.marloweWebServerUrl
 

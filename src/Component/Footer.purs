@@ -13,7 +13,7 @@ footer (Fixed fixed) = do
     possibleFixedClass =
         if fixed then "footer " else ""
   DOM.footer
-    { className: possibleFixedClass <> "mt-auto py-2 bg-light shadow-top"
+    { className: possibleFixedClass <> "mt-auto py-2 bg-light shadow-top z-index-sticky"
     , children:
         [ DOM.div
             { className: "container"
