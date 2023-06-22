@@ -392,7 +392,11 @@ create inputs walletAddresses serverUrl transactionsEndpoint = do
   let
     nowPosixMilliseconds = unInstant nowInstant
     oneHour = fromDuration $ Time.Duration.Hours 1.0
+    oneMinuteAgo = fromDuration $ Time.Duration.Minutes (-1.0)
     inOneHourInstant = case instant (nowPosixMilliseconds <> oneHour) of
+      Just instant' -> instant'
+      Nothing -> unsafeCrashWith "Component.ApplyInputs.Machine: Failed to subtract one minute to the current time"
+    beforeOneHourInstant = case instant (nowPosixMilliseconds <> oneMinuteAgo) of
       Just instant' -> instant'
       Nothing -> unsafeCrashWith "Component.ApplyInputs.Machine: Failed to add one hour to the current time"
   let
@@ -400,7 +404,7 @@ create inputs walletAddresses serverUrl transactionsEndpoint = do
 
     req = PostTransactionsRequest
       { metadata: mempty
-      , invalidBefore: toDateTime nowInstant
+      , invalidBefore: toDateTime beforeOneHourInstant
       , invalidHereafter: toDateTime inOneHourInstant
       -- , version :: MarloweVersion
       , inputs
