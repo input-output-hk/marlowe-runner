@@ -323,9 +323,8 @@ mkApp = do
               contractArray = Array.fromFoldable contracts
             subcomponents.contractListComponent
               { possibleContracts: do
-                if version == initialVersion
-                then Nothing
-                else Just contractArray
+                  if version == initialVersion then Nothing
+                  else Just contractArray
               , connectedWallet: possibleWalletInfo
               }
         -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children

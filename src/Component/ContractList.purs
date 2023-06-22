@@ -14,11 +14,12 @@ import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), Mk
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (buttonWithIcon, linkWithIcon)
+import Component.Widgets (buttonWithIcon, dropDownButtonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Fetch (FetchError)
 import Contrib.React.Svg (loadingSpinnerLogo)
 import Control.Alt ((<|>))
+import Control.Monad.List.Trans (drop)
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (encodeJson, stringify, toString)
 import Data.Array as Array
@@ -68,6 +69,7 @@ import ReactBootstrap.Types as OverlayTrigger
 import Utils.React.Basic.Hooks (useMaybeValue', useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
+import Web.HTML.HTMLButtonElement (disabled)
 
 type ContractId = TxOutRef
 
@@ -277,6 +279,29 @@ mkContractList = do
                             Nothing -> setModalAction NewContract
                             _ -> pure unit
                       }
+                    templateContractButton = dropDownButtonWithIcon
+                      { id: "templateContractMenuButton"
+                      , icon: unsafeIcon "file-earmark-plus h5 mr-2"
+                      , label: DOOM.text "Use Template"
+                      , disabled
+                      , extraClassNames: "font-weight-bold"
+                      , dropDownMenuItems:
+                          [ { menuLabel: "Escrow"
+                            , onClick: do
+                                possibleModalAction <- readRef possibleModalActionRef
+                                case possibleModalAction of
+                                  Nothing -> setModalAction NewContract
+                                  _ -> pure unit
+                            }
+                          , { menuLabel: "Swap"
+                            , onClick: do
+                                possibleModalAction <- readRef possibleModalActionRef
+                                case possibleModalAction of
+                                  Nothing -> setModalAction NewContract
+                                  _ -> pure unit
+                            }
+                          ]
+                      }
                     fields = UseForm.renderForm form formState
                     body = DOM.div { className: "form-group" } fields
                     spacing = "m-4"
@@ -284,7 +309,7 @@ mkContractList = do
                       [ body
                       -- , actions
                       ]
-                  , DOM.div { className: "col-5 text-end" } $ Array.singleton $
+                  , DOM.div { className: "col-5" } $ Array.singleton $
                       if disabled then do
                         let
                           tooltipJSX = tooltip
@@ -298,7 +323,12 @@ mkContractList = do
                           -- so we wrap it in a `span`
                           (DOM.div { className: spacing } [ newContractButton ])
                       else
-                        DOM.div { className: spacing } [ newContractButton ]
+                        DOM.div { className: "row my-4 justify-content-end" }
+                          [ DOM.div { className: "col-3" } [ newContractButton ]
+                          , DOM.div
+                              { className: "col-3" }
+                              [ templateContractButton ]
+                          ]
                   ]
               , case possibleContracts'' of
                   Nothing -> mempty
