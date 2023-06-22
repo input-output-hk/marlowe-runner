@@ -103,7 +103,7 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Just Nami -- Eternl -- Nami -- Nothing
+debugWallet = Nothing -- Just Nami -- Eternl -- Nami -- Nothing
 
 -- debugWallet = Nothing
 
