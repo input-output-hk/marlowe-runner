@@ -5,13 +5,16 @@ import Prelude
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.App (mkApp)
 import Component.MessageHub (mkMessageHub)
+import Component.Types (Slotting(..))
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
+import Contrib.JsonBigInt (fromJson)
 import Contrib.JsonBigInt as JsonBigInt
 import Control.Monad.Reader (runReaderT)
-import Data.Argonaut (Json, decodeJson, (.:))
+import Data.Argonaut (Json, decodeJson, fromString, (.:))
+import Data.BigInt.Argonaut as BigInt
 import Data.Map as Map
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (un)
 import Data.Tuple.Nested ((/\))
 import Debug (traceM)
@@ -27,6 +30,7 @@ import Marlowe.Runtime.Web.Streaming (MaxPages(..), PollingInterval(..), Request
 import Marlowe.Runtime.Web.Streaming as Streaming
 import Marlowe.Runtime.Web.Types (BlockHeader(..), BlockNumber(..), ContractHeader(..), ServerURL(..))
 import Marlowe.Runtime.Web.Types as Runtime
+import Partial.Unsafe (unsafePartial)
 import React.Basic (createContext)
 import React.Basic.DOM.Client (createRoot, renderRoot)
 import Web.DOM (Element)
@@ -66,6 +70,11 @@ main configJson = do
       if config.develMode then Console.log
       else const (pure unit)
     runtime = Marlowe.Runtime.Web.runtime config.marloweWebServerUrl
+    -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
+    slotting = Slotting
+      { slotLength: BigInt.fromInt 1000
+      , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000"
+      }
 
   doc :: HTMLDocument <- document =<< window
   container :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<
@@ -96,6 +105,7 @@ main configJson = do
             , msgHub
             , runtime
             , aboutMarkdown: config.aboutMarkdown
+            , slotting
             }
 
         app <- liftEffect $ runReaderT mkApp mkAppCtx

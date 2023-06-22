@@ -10,7 +10,7 @@ import Component.ContractDetails as ContractDetails
 import Component.CreateContract (runLiteTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
-import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
+import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, Slotting(..), WalletInfo)
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
@@ -19,24 +19,28 @@ import Component.Withdrawals as Withdrawals
 import Contrib.Fetch (FetchError)
 import Contrib.React.Svg (loadingSpinnerLogo)
 import Control.Alt ((<|>))
-import Control.Monad.List.Trans (drop)
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (encodeJson, stringify, toString)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
-import Data.Either (Either)
+import Data.BigInt.Argonaut as BigInt
+import Data.DateTime.Instant (Instant, instant, toDateTime)
+import Data.Either (Either, hush)
 import Data.Foldable (any, fold, foldMap, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
+import Data.Formatter.DateTime (format, parseFormatString)
 import Data.Function (on)
+import Data.Int (toNumber)
 import Data.List (List(..), catMaybes, concat, filter, intercalate)
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (un)
+import Data.Number (fromString)
 import Data.Set as Set
 import Data.String (contains, length)
 import Data.String.Pattern (Pattern(..))
-import Data.Time.Duration (Seconds(..))
+import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
@@ -45,7 +49,7 @@ import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata(..), PutTransactionRequest(..), Runtime(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata(..), PutTransactionRequest(..), Runtime(..), ServerURL, SlotNumber(..), Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import React.Basic (fragment) as DOOM
@@ -69,7 +73,6 @@ import ReactBootstrap.Types as OverlayTrigger
 import Utils.React.Basic.Hooks (useMaybeValue', useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
-import Web.HTML.HTMLButtonElement (disabled)
 
 type ContractId = TxOutRef
 
@@ -142,6 +145,7 @@ mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
   Runtime runtime <- asks _.runtime
   walletInfoCtx <- asks _.walletInfoCtx
+  slotting <- asks _.slotting
 
   createContractComponent <- CreateContract.mkComponent
   applyInputsComponent <- ApplyInputs.mkComponent
@@ -160,7 +164,7 @@ mkContractList = do
     { formState } <- useForm
       { spec: form
       , onSubmit: const $ pure unit
-      , validationDebounce: Seconds 0.5
+      , validationDebounce: Duration.Seconds 0.5
       }
     let
       possibleContracts' = do
@@ -355,7 +359,12 @@ mkContractList = do
                               tdCentered = DOM.td { className: "text-center" }
                             in
                               DOM.tr { className: "align-middle" }
-                                [ tdCentered [ text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci ]
+                                [ let
+                                   tooltipJSX = tooltip {} (DOOM.text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci)
+                                 in overlayTrigger { overlay: tooltipJSX } $
+                                      tdCentered [
+                                        text $ fromMaybe "" $ (map (_.slotNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci) >>= slotToTimestamp slotting
+                                      ]
                                 , tdCentered
                                     [ DOM.a
                                         do
@@ -423,3 +432,15 @@ mkContractList = do
 
 prettyState :: V1.State -> String
 prettyState = stringify <<< encodeJson
+
+instantFromMillis :: Number -> Maybe Instant
+instantFromMillis ms = instant (Duration.Milliseconds ms)
+
+slotToTimestamp :: Slotting -> SlotNumber -> Maybe String
+slotToTimestamp (Slotting { slotZeroTime, slotLength }) (SlotNumber n) = do
+  let
+    slotNo = BigInt.fromInt n
+    time = BigInt.toNumber $ slotZeroTime + (slotNo * slotLength)
+  formatter <- hush $ parseFormatString "YYYY-MM-DDThh:mm:ssZ"
+  instant <- instantFromMillis time
+  pure $ format formatter $ toDateTime instant
