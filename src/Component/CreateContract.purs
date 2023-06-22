@@ -82,6 +82,7 @@ newtype AutoRun = AutoRun Boolean
 
 type Result = V1.Contract /\ Tags /\ AutoRun
 
+contractFieldId :: FieldId
 contractFieldId = FieldId "contract-json"
 
 mkContractForm :: (Maybe V1.Contract /\ AutoRun) -> BootstrapForm Effect Query Result
@@ -244,7 +245,7 @@ mkRoleTokensComponent = do
       , validationDebounce: Seconds 0.5
       }
 
-    pure $ do
+    pure do
       let
         fields = UseForm.renderForm form formState
         formBody = DOM.div { className: "form-group" } fields
@@ -267,13 +268,7 @@ mkRoleTokensComponent = do
                 }
               [ R.text "Submit" ]
           ]
-      BodyLayout.component
-        { title: "Role token assignments"
-        , description: R.text "Assign addresses to role tokens"
-        , content: wrappedContentWithFooter
-            formBody
-            formActions
-        }
+      wrappedContentWithFooter formBody formActions
 
 runLiteTag :: String
 runLiteTag = "run-lite"
@@ -375,14 +370,7 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: wrappedContentWithFooter
-              do roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
-              do link
-                  { label: DOOM.text "Cancel"
-                  , onClick: onDismiss
-                  , showBorders: true
-                  , extraClassNames: "me-3"
-                  }
+          , content: roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
           }
       Machine.ContractCreated { contract, createTxResponse } -> do
         let
