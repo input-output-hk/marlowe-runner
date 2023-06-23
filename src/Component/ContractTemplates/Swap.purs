@@ -46,6 +46,11 @@ mkSwapContract
      }
   -> V1.Contract
 mkSwapContract { tokenADepositDeadline, tokenBDepositDeadline, tokenACurrencySymbol, tokenBCurrencySymbol, tokenAAmount, tokenBAmount, tokenAName, tokenBName } = do
+  -- NOTES: Possible Validation Rules
+  -- 1. Token A and Token B must be different
+  -- 2. Should we check if ada is being used and if so, multiply by 1,000,000 to get lovelace amount
+  -- 3. Check Ada amount is not greater than total supply
+  -- 4. Check against deadlines i.e. deposit should be sooner than swap
   V1.When
     [ ( V1.Case
           ( V1.Deposit (V1.Role "Token A provider") (V1.Role "Token A provider")
@@ -127,7 +132,7 @@ swapForm = FormBuilder.evalBuilder' $ ado
     }
 
   tokenADepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timoeut help") reqValidator'
-  tokenBDepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timoeut help") reqValidator'
+  tokenBDepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Token B Deposit timeout") (Just $ DOOM.text "Token B timoeut help") reqValidator'
   in
     { tokenAAmount: BigInt.fromInt tokenAAmount
     , tokenAName: tokenAName
