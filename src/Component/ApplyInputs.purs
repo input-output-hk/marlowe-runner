@@ -393,7 +393,7 @@ mkContractDetailsComponent = do
                   , DOOM.text " Source graph"
                   ]
               }
-            [ marloweGraph { contract: initialContract } ]
+            [ marloweGraph { contract: contract } ]
           , renderTab
               { eventKey: eventKey "source"
               , title: DOOM.span_
@@ -438,7 +438,7 @@ mkContractDetailsComponent = do
       }
 
 -- In here we want to summarize the initial interaction with the wallet
-fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
+fetchingRequiredWalletContextDetails possibleOnNext onDismiss possibleWalletResponse = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
@@ -459,12 +459,24 @@ fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
             ]
       ]
     footer = fragment
-      [ DOM.button
-          { className: "btn btn-primary"
-          , onClick: handler_ onNext
-          , disabled: false
+      [ link
+          { label: DOOM.text "Cancel"
+          , onClick: onDismiss
+          , showBorders: true
+          , extraClassNames: "me-3"
           }
-          [ R.text "Next" ]
+      , case possibleOnNext of
+          Nothing -> DOM.button
+            { className: "btn btn-primary"
+            , disabled: true
+            }
+            [ R.text "Next" ]
+          Just onNext -> DOM.button
+            { className: "btn btn-primary"
+            , onClick: handler_ onNext
+            , disabled: false
+            }
+            [ R.text "Next" ]
       ]
 
   BodyLayout.component
@@ -476,7 +488,7 @@ fetchingRequiredWalletContextDetails onNext possibleWalletResponse = do
 -- Now we want to to describe the interaction with the API where runtimeRequest is
 -- a { headers: Map String String, body: JSON }.
 -- We really want to provide the detailed informatin (headers and payoload)
-creatingTxDetails onNext runtimeRequest possibleRuntimeResponse = do
+creatingTxDetails possibleOnNext onDismiss runtimeRequest possibleRuntimeResponse = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
@@ -493,12 +505,24 @@ creatingTxDetails onNext runtimeRequest possibleRuntimeResponse = do
             ]
       ]
     footer = fragment
-      [ DOM.button
-          { className: "btn btn-primary"
-          , onClick: handler_ onNext
-          , disabled: false
+      [ link
+          { label: DOOM.text "Cancel"
+          , onClick: onDismiss
+          , showBorders: true
+          , extraClassNames: "me-3"
           }
-          [ R.text "Next" ]
+      , case possibleOnNext of
+          Nothing -> DOM.button
+            { className: "btn btn-primary"
+            , disabled: true
+            }
+            [ R.text "Dismiss" ]
+          Just onNext -> DOM.button
+            { className: "btn btn-primary"
+            , onClick: handler_ onNext
+            , disabled: false
+            }
+            [ R.text "Next" ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
     { title: "Apply Inputs | Creating Transaction"
@@ -506,6 +530,96 @@ creatingTxDetails onNext runtimeRequest possibleRuntimeResponse = do
     , content: wrappedContentWithFooter body footer
     }
 
+signingTransaction possibleOnNext onDismiss possibleWalletResponse = do
+  let
+    body = DOM.div { className: "row" }
+      [ DOM.div { className: "col-6" } $ case possibleWalletResponse of
+          Nothing -> -- FIXME: loader
+            DOM.p {} $ DOOM.text "No response yet."
+          Just runtimeResponse -> fragment
+            [ DOM.p {} $ DOOM.text "API response:"
+            , DOM.p {} $ DOOM.text $ unsafeStringify runtimeResponse
+            ]
+      ]
+    footer = fragment
+      [ link
+          { label: DOOM.text "Cancel"
+          , onClick: onDismiss
+          , showBorders: true
+          , extraClassNames: "me-3"
+          }
+      , case possibleOnNext of
+          Nothing -> DOM.button
+            { className: "btn btn-primary"
+            , disabled: true
+            }
+            [ R.text "Dismiss" ]
+          Just onNext -> DOM.button
+            { className: "btn btn-primary"
+            , onClick: handler_ onNext
+            , disabled: false
+            }
+            [ R.text "Next" ]
+      ]
+  DOM.div { className: "row" } $ BodyLayout.component
+    { title: "Apply Inputs | Creating Transaction"
+    , description: DOOM.text "We are singning the transaction."
+    , content: wrappedContentWithFooter body footer
+    }
+
+submittingTransaction onDismiss runtimeRequest possibleRuntimeResponse = do
+  let
+    body = DOM.div { className: "row" }
+      [ DOM.div { className: "col-6" }
+        [ DOM.p {} $ DOOM.text "We submitting the final transaction"
+        , DOM.p {} $ DOOM.text $ unsafeStringify runtimeRequest
+        ]
+      , DOM.div { className: "col-6" } $ case possibleRuntimeResponse of
+          Nothing -> -- FIXME: loader
+            DOM.p {} $ DOOM.text "No response yet."
+          Just runtimeResponse -> fragment
+            [ DOM.p {} $ DOOM.text "API response:"
+            , DOM.p {} $ DOOM.text $ unsafeStringify runtimeResponse
+            ]
+      ]
+    footer = fragment
+      [ link
+          { label: DOOM.text "Cancel"
+          , onClick: onDismiss
+          , showBorders: true
+          , extraClassNames: "me-3"
+          }
+      ]
+  DOM.div { className: "row" } $ BodyLayout.component
+    { title: "Apply Inputs | Submitting Transaction"
+    , description: DOOM.text "We are submitting the final signed transaction."
+    , content: wrappedContentWithFooter body footer
+    }
+
+inputApplied onNext = do
+  let
+    body = DOM.div { className: "row" }
+      [ DOM.div { className: "col-6" }
+        [ DOM.p {} $ DOOM.text "Input applied successfully?"
+        ]
+      , DOM.div { className: "col-6" } $ fragment
+            [ DOM.p {} $ DOOM.text "API response:"
+            , DOM.p {} $ DOOM.text $ unsafeStringify "201"
+            ]
+      ]
+    footer = fragment
+      [ DOM.button
+          { className: "btn btn-primary"
+          , onClick: handler_ onNext
+          , disabled: false
+          }
+          [ R.text "Ok" ]
+      ]
+  DOM.div { className: "row" } $ BodyLayout.component
+    { title: "Apply Inputs | Submitting Transaction"
+    , description: DOOM.text "We are submitting the final signed transaction."
+    , content: wrappedContentWithFooter body footer
+    }
 
 data PreviewMode
   = DetailedFlow { showPrevStep :: Boolean }
@@ -518,6 +632,30 @@ setShowPrevStep SimplifiedFlow _ = SimplifiedFlow
 shouldShowPrevStep :: PreviewMode -> Boolean
 shouldShowPrevStep (DetailedFlow { showPrevStep }) = showPrevStep
 shouldShowPrevStep SimplifiedFlow = false
+
+showPossibleErrorAndDismiss title body onDismiss errors = do
+  let
+    body' = case errors of
+      Just errors -> fragment
+        [ DOM.p {} $ DOOM.text "Error:"
+        , DOM.p {} $ DOOM.text $ unsafeStringify errors
+        ]
+      Nothing -> body
+    footer = case errors of
+      Just errors -> fragment
+        [ link
+            { label: DOOM.text "Cancel"
+            , onClick: onDismiss
+            , showBorders: true
+            , extraClassNames: "me-3"
+            }
+        ]
+      Nothing -> mempty
+  DOM.div { className: "row" } $ BodyLayout.component
+    { title: "Apply Inputs | Submitting Transaction"
+    , description: DOOM.text "We are submitting the final signed transaction."
+    , content: wrappedContentWithFooter body' footer
+    }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
@@ -568,13 +706,16 @@ mkComponent = do
               else setPreviewFlow $ DetailedFlow { showPrevStep: true }
 
         contractDetailsComponent { marloweContext, onSuccess: onStepSuccess, onDismiss }
-      Machine.FetchingRequiredWalletContext _ -> case previewFlow of
-        DetailedFlow _ -> fetchingRequiredWalletContextDetails (pure unit) Nothing
-        SimplifiedFlow -> DOOM.text "Auto fetching... (progress bar?)"
+      Machine.FetchingRequiredWalletContext { errors } -> case previewFlow of
+        DetailedFlow _ -> fetchingRequiredWalletContextDetails Nothing onDismiss Nothing
+        SimplifiedFlow -> do
+          let
+            body = DOOM.text "Auto fetching... (progress bar?)"
+          showPossibleErrorAndDismiss "Fetching wallet context" body onDismiss errors
 
       Machine.ChoosingInputType {allInputsChoices, requiredWalletContext} -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
-          fetchingRequiredWalletContextDetails (setNextFlow) $ Just requiredWalletContext
+          fetchingRequiredWalletContextDetails (Just setNextFlow) onDismiss $ Just requiredWalletContext
         _ -> do
           let
             body = DOM.div { className: "row" }
@@ -642,25 +783,46 @@ mkComponent = do
             notifyFormComponent { notifyInput, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
           AdvanceContract cont ->
             advanceFormComponent { contract: cont, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
-      Machine.CreatingTx { allInputsChoices, requiredWalletContext } -> case previewFlow of
+      Machine.CreatingTx { allInputsChoices, errors } -> case previewFlow of
         DetailedFlow _ -> do
+          creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
+            Just err -> Just $ err
+            Nothing -> Nothing
+        SimplifiedFlow -> do
           let
-            req = allInputsChoices
-          creatingTxDetails (pure unit) Argonaut.null Nothing
-        SimplifiedFlow -> DOOM.text "Auto creating tx... (progress bar?)"
-      Machine.SigningTx { createTxResponse } -> case previewFlow of
+            body = DOOM.text "Auto creating tx..."
+          showPossibleErrorAndDismiss "Creating Transaction" body onDismiss errors
+        -- SimplifiedFlow -> BodyLayout.component
+        --   { title: "Creating transaction"
+        --   , description: DOOM.text "We are creating the initial transaction."
+        --   , content: DOOM.text "Auto creating tx... (progress bar?)"
+        --   }
+      Machine.SigningTx { createTxResponse, errors } -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
-          creatingTxDetails (setNextFlow) Argonaut.null $ Just createTxResponse
-        DetailedFlow _ -> DOOM.text "Signing tx..."
-          -- signingTxDetails modal (pure unit) Argonaut.null Nothing
-        SimplifiedFlow -> DOOM.text "Auto signing tx... (progress bar?)"
+          creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
+        DetailedFlow _ ->
+          signingTransaction Nothing onDismiss Nothing
+        SimplifiedFlow -> do
+          let
+            body = DOOM.text "Auto signing tx... (progress bar?)"
+          showPossibleErrorAndDismiss "Signing Transaction" body onDismiss errors
+      Machine.SubmittingTx { txWitnessSet, errors } -> case previewFlow of
+        DetailedFlow { showPrevStep: true } -> do
+          signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
+        DetailedFlow _ ->
+          submittingTransaction onDismiss "Final request placeholder" $ errors
+        SimplifiedFlow -> BodyLayout.component
+          { title: "Submitting transaction"
+          , description: DOOM.text "We are submitting the initial transaction."
+          , content: DOOM.text "Auto submitting tx... (progress bar?)"
+          }
+      Machine.InputApplied { } -> case previewFlow of
+        DetailedFlow { showPrevStep: true } -> do
+          submittingTransaction onDismiss "Final request placeholder" (Just "201")
+        _ ->
+          inputApplied onDismiss
 
-      -- case previewFlow of
-      --   DetailedFlow { showPrevStep: true } ->
-      --     creatingTxDetails modal (setPreviewFlow $ DetailedFlow { showPrevStep: false }) $ Just requiredWalletContext
-      --   _ -> do
 
-      _ -> DOOM.text "Not implemented"
     --     let
     --       body = DOM.div { className: "row" }
     --         [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
