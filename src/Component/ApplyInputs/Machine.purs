@@ -435,4 +435,4 @@ sign
 sign walletApi tx = do
   let
     TextEnvelope { cborHex: txCborHex } = tx
-  Wallet.signTx walletApi txCborHex false
+  Wallet.signTx walletApi txCborHex true

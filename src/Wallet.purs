@@ -49,10 +49,12 @@ import CardanoMultiplatformLib.Transaction (TransactionHashObject, TransactionOb
 import CardanoMultiplatformLib.Types (unsafeCborHex)
 import Control.Alt ((<|>))
 import Control.Monad.Except (runExcept, runExceptT)
-import Data.Either (Either(..), either, hush)
+import Control.Monad.Except.Trans (except)
+import Data.Either (Either(..), either, hush, note)
 import Data.Foldable (fold)
-import Data.List.NonEmpty (NonEmptyList)
+import Data.List.NonEmpty (NonEmptyList(..))
 import Data.Maybe (Maybe(..), fromMaybe')
+import Data.NonEmpty (singleton)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Data.Traversable (for)
@@ -64,9 +66,11 @@ import Effect (Effect)
 import Effect.Aff (Aff, makeAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import Foreign (Foreign, ForeignError)
+import Foreign (Foreign, ForeignError(..))
 import Foreign as Foreign
+import Foreign.Generic.Internal as Foreign.Generic
 import Foreign.Index as Foreign.Index
+import Foreign.Object (Object, lookup)
 import HexString as HexString
 import JS.Object (EffectMth0, EffectMth1, EffectMth2, EffectProp, JSObject)
 import JS.Object.Generic (mkFFI)
@@ -181,10 +185,17 @@ unknownError = Variant.inj (Proxy :: Proxy "unknownError")
 foreignErrors :: forall r. NonEmptyList ForeignError -> Variant (| ApiForeignErrors + r)
 foreignErrors = Variant.inj (Proxy :: Proxy "foreignErrors")
 
+lookupForeign :: forall a. String -> Object a -> Either (NonEmptyList ForeignError) a
+lookupForeign str obj = note (NonEmptyList (singleton $ ForeignError $ "Missing " <> str)) $ lookup str obj
+
 readWalletError :: Foreign -> Either (NonEmptyList ForeignError) { info :: String, code :: Int }
 readWalletError rejection = runExcept do
-  info <- Foreign.readString rejection
-  code <- Foreign.readInt rejection
+  obj <- Foreign.Generic.readObject rejection
+  info' <- except $ lookupForeign "info" obj
+  code' <- except $ lookupForeign "code" obj
+
+  info <- Foreign.readString info'
+  code <- Foreign.readInt code'
   pure { info, code }
 
 newtype Cbor :: forall k. k -> Type

@@ -188,3 +188,10 @@ in upstream
         ]
         "https://github.com/paluh/purescript-datetime-iso"
         "c7b75bb16e0543687fc4c9b21c34a49cdaa22f0c"
+  with foreign-generic =
+      mkPackage
+      [ "effect", "foreign", "foreign-object", "ordered-collections"
+      , "exceptions", "record", "identity"
+      ]
+      "https://github.com/paluh/purescript-foreign-generic.git"
+      "a5c23d29e72619624978446293ac9bb45ccd2fde"
