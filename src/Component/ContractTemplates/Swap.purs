@@ -7,6 +7,9 @@ import Component.BodyLayout as BodyLayout
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM)
 import Component.Widgets (link)
+import Contrib.Polyform.FormSpecBuilder (evalBuilder')
+import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, dateTimeField, intInput, textInput)
 import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (Instant)
@@ -24,10 +27,7 @@ import React.Basic.DOM (text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (JSX, component, fragment, (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.UseForm (useForm)
-import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (BootstrapForm)
-import ReactBootstrap.FormBuilder as FormBuilder
+import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 
 type Props =
   { onSuccess :: V1.Contract -> Effect Unit
@@ -88,42 +88,52 @@ reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
 
 reqValidator' = reqValidator "This field is required"
 
-swapForm :: BootstrapForm Effect Query { tokenAAmount :: BigInt, tokenBAmount :: BigInt, tokenAName :: String, tokenBName :: String, tokenACurrencySymbol :: String, tokenBCurrencySymbol :: String, tokenADepositDeadline :: Instant, tokenBDepositDeadline :: Instant }
-swapForm = FormBuilder.evalBuilder' $ ado
-  tokenAAmount <- FormBuilder.intInput
+swapFormSpec
+  :: StatelessBootstrapFormSpec Effect Query
+       { tokenAAmount :: BigInt
+       , tokenBAmount :: BigInt
+       , tokenAName :: String
+       , tokenBName :: String
+       , tokenACurrencySymbol :: String
+       , tokenBCurrencySymbol :: String
+       , tokenADepositDeadline :: Instant
+       , tokenBDepositDeadline :: Instant
+       }
+swapFormSpec = evalBuilder' $ ado
+  tokenAAmount <- intInput
     { helpText: Nothing
     , initial: ""
     , label: Just $ DOOM.text "Token A Amount"
     , touched: false
     }
-  tokenAName <- FormBuilder.textInput
+  tokenAName <- textInput
     { helpText: Nothing
     , initial: ""
     , label: Just $ DOOM.text "Token A Name"
     , touched: false
     , validator: reqValidator'
     }
-  tokenACurrencySymbol <- FormBuilder.textInput
+  tokenACurrencySymbol <- textInput
     { helpText: Nothing
     , initial: ""
     , label: Just $ DOOM.text "Token A Currency Symbol"
     , touched: false
     , validator: reqValidator'
     }
-  tokenBAmount <- FormBuilder.intInput
+  tokenBAmount <- intInput
     { helpText: Nothing
     , initial: ""
     , label: Just $ DOOM.text "Token B Amount"
     , touched: false
     }
-  tokenBName <- FormBuilder.textInput
+  tokenBName <- textInput
     { helpText: Nothing
     , initial: ""
     , label: Just $ DOOM.text "Token B Name"
     , touched: false
     , validator: reqValidator'
     }
-  tokenBCurrencySymbol <- FormBuilder.textInput
+  tokenBCurrencySymbol <- textInput
     { helpText: Nothing
     , initial: ""
     , label: Just $ DOOM.text "Token B Currency Symbol"
@@ -131,8 +141,8 @@ swapForm = FormBuilder.evalBuilder' $ ado
     , validator: reqValidator'
     }
 
-  tokenADepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timoeut help") reqValidator'
-  tokenBDepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Token B Deposit timeout") (Just $ DOOM.text "Token B timoeut help") reqValidator'
+  tokenADepositDeadline <- dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timoeut help") reqValidator'
+  tokenBDepositDeadline <- dateTimeField (Just $ DOOM.text "Token B Deposit timeout") (Just $ DOOM.text "Token B timoeut help") reqValidator'
   in
     { tokenAAmount: BigInt.fromInt tokenAAmount
     , tokenAName: tokenAName
@@ -150,21 +160,19 @@ mkComponent = do
 
     possibleContract /\ setContract <- React.useState' Nothing
     let
-      form = swapForm
-
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
         Just (V (Right swapParams) /\ _) -> setContract $ Just $ mkSwapContract swapParams
         _ -> pure unit
 
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
+    { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
+      { spec: swapFormSpec
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
 
     let
-      fields = UseForm.renderForm form formState
+      fields = renderFormSpec swapFormSpec formState
       formBody = case possibleContract of
         Nothing -> DOM.div { className: "form-group" } fields
         Just contract -> marloweYaml contract
@@ -194,4 +202,3 @@ mkComponent = do
           formBody
           formActions
       }
-

@@ -2,6 +2,11 @@ module Component.Widgets.Form where
 
 import Prelude
 
+import CardanoMultiplatformLib (Bech32, bech32FromString)
+import CardanoMultiplatformLib as CardanoMultiplatformLib
+import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, TextInputOptionalProps, TextInputProps, TextInputValidator, textInput)
+import ConvertableOptions (class Defaults)
 import Data.Array.ArrayAL (ArrayAL)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Either (Either(..))
@@ -20,17 +25,20 @@ import Data.Time.Duration (Seconds)
 import Data.Traversable (traverse)
 import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Random (random)
 import Effect.Ref as Ref
 import Effect.Uncurried (EffectFn1)
+import Polyform.Batteries as Batteries
 import Polyform.Batteries.UrlEncoded as UrlEncoded
 import Polyform.Batteries.UrlEncoded as UrleEncoded
 import Polyform.Batteries.UrlEncoded.Types (stringifyValidator)
 import Polyform.Batteries.UrlEncoded.Types.Errors as Errors
 import Polyform.Batteries.UrlEncoded.Validators (MissingValue)
 import Polyform.Batteries.UrlEncoded.Validators as Validators
-import Polyform.Validator (runValidator)
+import Polyform.Validator (liftFnMEither, liftFnMMaybe, liftFnMaybe, runValidator)
 import Polyform.Validator as Validator
+import Prim.Row as Row
 import React.Basic (JSX)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
@@ -39,7 +47,9 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, SyntheticEvent, handler, handler_)
 import React.Basic.Hooks (type (&), type (/\), Hook, UseEffect, UseMemo, UseState, component, useEffect, useEffectOnce, useMemo, useState, useState', (/\))
 import React.Basic.Hooks as React
+import Record as Record
 import Safe.Coerce (coerce)
+import Type.Prelude (Proxy(..))
 import Type.Row (type (+))
 import Utils.React.Basic.Hooks (useDebounce)
 
@@ -189,3 +199,31 @@ mkBooleanField = do
     , type: RadioButtonField $ ArrayAL.solo ("on" /\ label /\ disabled)
     }
 
+reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
+
+reqValidator' = reqValidator "This field is required"
+
+-- reqValidator' $ Validator.liftFnMMaybe (const $ pure [ "Invalid address" ]) 
+
+type AddressInputValidator m = TextInputValidator m (Maybe Bech32)
+
+addressInput
+  :: forall builderM props validatorM
+   . Monad builderM
+  => MonadEffect validatorM
+  => Row.Lacks "validator" props
+  => Row.Cons "validator" (AddressInputValidator validatorM) props ( validator :: AddressInputValidator validatorM | props)
+  => Defaults TextInputOptionalProps { validator :: AddressInputValidator validatorM | props } (TextInputProps validatorM (Maybe Bech32))
+  => CardanoMultiplatformLib.Lib
+  -> { | props }
+  -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query (Maybe Bech32)
+addressInput cardanoMultiplatformLib props = do
+  let
+    validator = liftFnMEither case _ of
+      Nothing -> pure $ Right Nothing
+      Just value -> liftEffect $ bech32FromString cardanoMultiplatformLib value >>= case _ of
+        Nothing -> pure $ Left [ "Invalid bech32 address" ]
+        Just bech32 -> pure $ Right $ Just bech32
+    props' :: { validator :: AddressInputValidator validatorM | props }
+    props' = Record.insert (Proxy :: Proxy "validator") validator props
+  textInput props'

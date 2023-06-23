@@ -8,9 +8,9 @@ import Component.ApplyInputs as ApplyInputs
 import Component.ApplyInputs.Machine as ApplyInputs.Machine
 import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
+import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle
 import Component.ContractTemplates.Escrow as Escrow
 import Component.ContractTemplates.Swap as Swap
-import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle
 import Component.CreateContract (runLiteTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (rolesInContract)
@@ -21,9 +21,12 @@ import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Fetch (FetchError)
+import Contrib.Polyform.FormSpecBuilder (evalBuilder')
+import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
 import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.DropdownButton (dropdownButton)
 import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FormControlSizing(..), StatelessBootstrapFormSpec, textInput)
 import Control.Alt ((<|>))
 import Control.Monad.List.Trans (drop)
 import Control.Monad.Reader.Class (asks)
@@ -64,11 +67,8 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (EventHandler, handler, handler_)
 import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useState, useState', (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.UseForm (useForm)
-import React.Basic.Hooks.UseForm as UseForm
+import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import ReactBootstrap (overlayTrigger, tooltip)
-import ReactBootstrap.FormBuilder (BootstrapForm, textInput)
-import ReactBootstrap.FormBuilder as FormBuilder
 import ReactBootstrap.Icons (unsafeIcon)
 import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Table (striped) as Table
@@ -135,15 +135,15 @@ derive instance Eq ModalAction
 queryFieldId :: FieldId
 queryFieldId = FieldId "query"
 
-mkForm :: (Maybe String -> Effect Unit) -> BootstrapForm Effect Query { query :: Maybe String }
-mkForm onFieldValueChange = FormBuilder.evalBuilder' ado
+mkForm :: (Maybe String -> Effect Unit) -> StatelessBootstrapFormSpec Effect Query { query :: Maybe String }
+mkForm onFieldValueChange = evalBuilder' ado
   query <- textInput
     { validator: liftFnM \value -> do
         onFieldValueChange value -- :: Batteries.Validator Effect _ _  _
         pure value
     , name: Just queryFieldId
     , placeholder: "Filter contracts..."
-    , sizing: Just FormBuilder.FormControlLg
+    , sizing: Just FormControlLg
     }
   in
     { query }
@@ -174,7 +174,7 @@ mkContractList = do
     possibleQueryValue /\ setQueryValue <- useState' Nothing
     let
       form = mkForm setQueryValue
-    { formState } <- useForm
+    { formState } <- useStatelessFormSpec
       { spec: form
       , onSubmit: const $ pure unit
       , validationDebounce: Seconds 0.5
@@ -332,7 +332,7 @@ mkContractList = do
                           [ DOOM.text "Contract For Differences with Oracle" ]
                       ]
                   [ DOM.div { className: "col-7 text-end" }
-                      [ DOM.div { className: "form-group" } $ UseForm.renderForm form formState ]
+                      [ DOM.div { className: "form-group" } $ renderFormSpec form formState ]
                   , DOM.div { className: "col-5" } $ Array.singleton $ do
                       let
                         buttons = DOM.div { className: "text-end" }

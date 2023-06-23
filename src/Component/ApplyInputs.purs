@@ -14,11 +14,11 @@ import Component.Types (MkComponentM, WalletInfo(..))
 import Component.Widgets (link)
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
-import Contrib.Language.Marlowe.Core.V1 (compareMarloweJsonKeys)
+import Contrib.Polyform.FormSpecBuilder (evalBuilder')
+import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.React.MarloweGraph (marloweGraph)
-import Contrib.ReactBootstrap.FormBuilder as FB
-import Contrib.ReactSyntaxHighlighter (yamlSyntaxHighlighter)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), FieldLayout(..), LabelSpacing(..), booleanField, choiceField, intInput, radioFieldChoice, selectFieldChoice)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Data.Array.ArrayAL as ArrayAL
@@ -26,7 +26,6 @@ import Data.Array.NonEmpty (NonEmptyArray)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (instant, toDateTime, unInstant)
 import Data.Either (Either(..))
-import Data.Function.Uncurried (mkFn2)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int as Int
 import Data.Map as Map
@@ -42,8 +41,7 @@ import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
-import JsYaml as JsYaml
-import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Input(..), InputContent(..), Party(..), State, TimeInterval(..), Token(..), Value(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Input(..), InputContent(..), Party(..), TimeInterval(..), Token(..), Value(..)) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Input(..))
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse, PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
@@ -57,10 +55,7 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.UseForm (useForm)
-import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (ChoiceFieldChoices(SelectFieldChoices, RadioButtonFieldChoices), choiceField, intInput, radioFieldChoice, selectFieldChoice)
-import ReactBootstrap.FormBuilder as FB
+import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import ReactBootstrap.Icons (unsafeIcon)
 import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Tab (tab)
@@ -136,7 +131,7 @@ mkDepositFormComponent = do
           idx <- possibleIdx
           Map.lookup idx value2Deposit
 
-      form = FB.evalBuilder' $
+      formSpec = evalBuilder' $
         choiceField { choices, validator }
 
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
@@ -146,14 +141,14 @@ mkDepositFormComponent = do
           Nothing -> pure unit
         _ -> pure unit
 
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
+    { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
+      { spec: formSpec
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
     pure $ BodyLayout.component do
       let
-        fields = UseForm.renderForm form formState
+        fields = renderFormSpec formSpec formState
         body = DOM.div { className: "form-group" } fields
         actions = fragment
           [ DOM.button
@@ -212,7 +207,7 @@ mkChoiceFormComponent = do
           liftEffect $ setPartialFormResult $ Just deposit
           pure deposit
 
-      form = FB.evalBuilder' $ ado
+      formSpec = evalBuilder' $ ado
         choice <- choiceField { choices, validator, touched: true, initial: "0" }
         value <- intInput {}
         in
@@ -225,14 +220,14 @@ mkChoiceFormComponent = do
           Nothing -> pure unit
         _ -> pure unit
 
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
+    { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
+      { spec: formSpec
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
     pure $ BodyLayout.component do
       let
-        fields = UseForm.renderForm form formState
+        fields = renderFormSpec formSpec formState
         body = DOOM.div_ $
           [ DOM.div { className: "form-group" } fields ]
             <> case partialFormResult of
@@ -364,9 +359,9 @@ type ContractDetailsProps =
 mkContractDetailsComponent :: MkComponentM (ContractDetailsProps -> JSX)
 mkContractDetailsComponent = do
   let
-    autoRunForm = FB.evalBuilder' $ AutoRun <$> FB.booleanField
+    autoRunFormSpec = evalBuilder' $ AutoRun <$> booleanField
       { label: DOOM.text "Auto run"
-      , layout: FB.MultiColumn { sm: FB.Col3Label, md: FB.Col2Label, lg: FB.Col2Label }
+      , layout: MultiColumn { sm: Col3Label, md: Col2Label, lg: Col2Label }
       , helpText: fragment
         [ DOOM.text "Whether to run some of the steps automatically."
         , DOOM.br {}
@@ -378,8 +373,8 @@ mkContractDetailsComponent = do
       , touched: true
       }
   liftEffect $ component "ApplyInputs.ContractDetailsComponent" \{ marloweContext: { initialContract, contract, state }, onSuccess, onDismiss } -> React.do
-    { formState, onSubmit: onSubmit' } <- useForm
-      { spec: autoRunForm
+    { formState, onSubmit: onSubmit' } <- useStatelessFormSpec
+      { spec: autoRunFormSpec
       , onSubmit: _.result >>> case _ of
           Just (V (Right autoRun) /\ _) -> onSuccess autoRun
           _ -> pure unit
@@ -416,7 +411,7 @@ mkContractDetailsComponent = do
               }
               [ marloweStateYaml state ]
           ]
-      fields = UseForm.renderForm autoRunForm formState
+      fields = renderFormSpec autoRunFormSpec formState
       body = fragment $
         [ contractSection
         , DOOM.hr {}
