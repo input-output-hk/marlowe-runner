@@ -30,7 +30,7 @@ import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FormControlSizing(..), StatelessBootstrapFormSpec, textInput)
 import Control.Alt (alt, (<|>))
 import Control.Monad.Reader.Class (asks)
-import Data.Argonaut (encodeJson, stringify, toString)
+import Data.Argonaut (decodeJson, encodeJson, stringify, toString)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.BigInt.Argonaut as BigInt
@@ -60,6 +60,7 @@ import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
+import Foreign.Object as Object
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
@@ -158,6 +159,12 @@ mkForm onFieldValueChange = evalBuilder' ado
 actionIconSizing :: String
 actionIconSizing = " h4"
 
+runLiteTags (Tags metadata) = case Map.lookup runLiteTag metadata >>= decodeJson >>> hush of
+  Just obj ->
+      Array.filter ((_ > 2) <<< length) -- ignoring short tags
+      $ Object.values obj
+  Nothing -> []
+
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
@@ -204,16 +211,9 @@ mkContractList = do
           filtered = do
             queryValue <- possibleQueryValue
             contracts <- possibleContracts'
-            pure $ contracts # Array.filter \(ContractInfo { contractId, tags: Tags metadata }) -> do
+            pure $ contracts # Array.filter \(ContractInfo { contractId, tags: contractTags }) -> do
               let
-                tagList = case Map.lookup runLiteTag metadata of
-                  Just (Metadata tag) ->
-                    filter ((_ > 2) <<< length) -- ignoring short tags
-
-                      $ catMaybes
-                      $ map toString
-                      $ Map.values tag
-                  Nothing -> Nil
+                tagList = runLiteTags contractTags
                 pattern = Pattern queryValue
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
         filtered <|> possibleContracts'
@@ -385,7 +385,7 @@ mkContractList = do
                                 , th $ DOOM.text "Actions"
                                 ]
                             ]
-                        , DOM.tbody {} $ contracts <#> \ci@(ContractInfo { _runtime, endpoints, marloweInfo, tags: Tags metadata }) ->
+                        , DOM.tbody {} $ contracts <#> \ci@(ContractInfo { _runtime, endpoints, marloweInfo, tags: contractTags }) ->
                             let
                               ContractHeader { contractId } = _runtime.contractHeader
                               tdCentered = DOM.td { className: "text-center" }
@@ -423,13 +423,10 @@ mkContractList = do
                                         Icons.toJSX $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
                                     ]
                                 , tdCentered
-                                    [ case Map.lookup runLiteTag metadata of
-                                        Just (Metadata tag) ->
-                                          let
-                                            values = catMaybes $ map toString $ Map.values tag
-                                          in
-                                            DOOM.text $ intercalate ", " values
-                                        Nothing -> mempty
+                                    [ do
+                                        let
+                                          tags = runLiteTags contractTags
+                                        DOOM.text $ intercalate ", " tags
                                     ]
                                 , tdCentered
                                     [ do

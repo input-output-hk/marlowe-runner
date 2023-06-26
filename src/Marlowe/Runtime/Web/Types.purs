@@ -13,7 +13,7 @@ import Data.Argonaut.Decode.Combinators ((.:))
 import Data.Argonaut.Decode.Decoders (decodeJObject, decodeMaybe)
 import Data.DateTime (DateTime)
 import Data.DateTime.ISO (ISO(..))
-import Data.Either (Either(..), note)
+import Data.Either (Either, note)
 import Data.Generic.Rep (class Generic)
 import Data.Int as Int
 import Data.JSDate as JSDate
@@ -281,7 +281,7 @@ instance DecodeJson Metadata where
 metadataFieldDecoder :: { metadata :: DecodeJsonFieldFn Metadata }
 metadataFieldDecoder = { metadata: map decodeJson :: Maybe Json -> Maybe (JsonParserResult Metadata) }
 
-newtype Tags = Tags (Map String Metadata)
+newtype Tags = Tags (Map String Json)
 
 derive instance Generic Tags _
 derive instance Newtype Tags _
@@ -300,9 +300,9 @@ instance EncodeJson Tags where
 
 instance DecodeJson Tags where
   decodeJson json = do
-    (obj :: Object Metadata) <- decodeJson json
+    (obj :: Object Json) <- decodeJson json
     let
-      (arr :: Array (String /\ Metadata)) = Object.toUnfoldable obj
+      (arr :: Array (String /\ Json)) = Object.toUnfoldable obj
     pure <<< Tags <<< Map.fromFoldable $ arr
 
 type ContractHeadersRowBase r =

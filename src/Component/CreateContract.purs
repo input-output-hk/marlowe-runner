@@ -116,11 +116,10 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
     , label: Just $ DOOM.text "Tags"
     , touched: false
     , validator: liftFn case _ of
-        Nothing -> Tags mempty
+        Nothing -> Tags Map.empty
         Just tags ->
           (Tags $ Map.singleton runLiteTag
-             (Metadata $ Map.fromFoldableWithIndex
-               $ map (encodeJson <<< trim) $ split (Pattern ",") tags))
+             (encodeJson $ map (encodeJson <<< trim) $ split (Pattern ",") tags))
     }
 
   autoRun <- AutoRun <$> do
