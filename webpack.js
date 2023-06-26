@@ -21,9 +21,16 @@ function getWebServerUrl() {
   }
 };
 
+function getNetwork() {
+  if(!process.env.NETWORK) {
+    console.log("NETWORK not configured, defaulting to preview. For explicitly setting the network, do : export NETWORK=preview");
+  } else { return process.env.MARLOWE_WEB_SERVER_URL; }
+};
+
 export default function(_env, argv) {
   const develMode = argv.mode == "development";
   const webServerUrl = getWebServerUrl();
+  const network = getNetwork();
 
   return {
     experiments: {
@@ -46,6 +53,7 @@ export default function(_env, argv) {
       new webpack.EnvironmentPlugin({
         MARLOWE_WEB_SERVER_URL: webServerUrl,
         DEVEL_MODE: develMode,
+        NETWORK: network,
       }),
     ],
     output: {

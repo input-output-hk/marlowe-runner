@@ -7,6 +7,7 @@ module Component.Types
   , MessageId(..)
   , MessageContent(..)
   , WalletInfo(..)
+  , Slotting(..)
   , module Exports
   ) where
 
@@ -15,6 +16,7 @@ import Prelude
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.Types.ContractInfo (ContractInfo(..)) as Exports
 import Control.Monad.Reader (ReaderT)
+import Data.BigInt.Argonaut (BigInt)
 import Data.List (List)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
@@ -55,6 +57,11 @@ newtype MessageHub = MessageHub
   , ctx :: ReactContext (List Message)
   }
 
+newtype Slotting = Slotting
+  { slotLength :: BigInt,
+    slotZeroTime :: BigInt
+  }
+
 type MkContextBase r =
   { cardanoMultiplatformLib :: CardanoMultiplatformLib.Lib
   , walletInfoCtx :: ReactContext (Maybe (WalletInfo Wallet.Api /\ WalletContext))
@@ -65,6 +72,7 @@ type MkContextBase r =
   , runtime :: Runtime
   , msgHub :: MessageHub
   , aboutMarkdown :: String
+  , slotting :: Slotting
   | r
   }
 
