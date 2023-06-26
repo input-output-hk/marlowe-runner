@@ -90,7 +90,11 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
   contract <- StatelessFormSpecBuilders.textArea
     { missingError: "Please provide contract terms JSON value"
     , helpText: Just $ DOOM.div_
-        [ DOOM.text "Basic JSON validation"
+        [ DOOM.text "Please provide a contract in a JSON format. To generate it you can use a Marlowe library for your language of choice (for example "
+        , DOM.a { href: "https://github.com/input-output-hk/marlowe-ts-sdk", target: "_blank" } $ DOOM.text "marlowe-ts-sdk)"
+        , DOOM.text " or use "
+        , DOM.a { href: "https://play.marlowe.iohk.io/", target: "_blank" } $ DOOM.text "the playground"
+        , DOOM.text " to generate it (after creating a contract in the simulator you can use \"Download JSON\" button):"
         ]
     , initial: case possibleInitialContract of
         Nothing -> ""

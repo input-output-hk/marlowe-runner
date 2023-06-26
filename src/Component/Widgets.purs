@@ -6,6 +6,7 @@ import ConvertableOptions (defaults, class Defaults)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import React.Basic (JSX)
+import React.Basic.DOM (css)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM.Events (preventDefault)
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -107,7 +108,7 @@ linkWithIcon provided = do
     Just text -> do
       let
         placement = fromMaybe OverlayTrigger.placement.left tooltipPlacement
-        tooltipJSX = tooltip { placement } (DOOM.text text)
+        tooltipJSX = tooltip { placement, className: "p-fixed" } (DOOM.text text)
       DOM.div
         { className: "d-inline-block" }
         [ overlayTrigger

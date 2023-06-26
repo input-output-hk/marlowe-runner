@@ -7,6 +7,9 @@ import Component.BodyLayout as BodyLayout
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM)
 import Component.Widgets (link)
+import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
+import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, dateTimeField, intInput)
 import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (Instant)
@@ -19,17 +22,13 @@ import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFnMaybe)
 import React.Basic.DOM (text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (JSX, component, fragment, (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.UseForm (useForm)
-import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (BootstrapForm)
-import ReactBootstrap.FormBuilder as FormBuilder
+import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 
 type Props =
   { onSuccess :: V1.Contract -> Effect Unit
@@ -171,12 +170,8 @@ mkContractForDifferencesWithOracleContract { partyDepositDeadline, counterPartyD
     (partyDepositDeadline)
     V1.Close
 
-reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
-
-reqValidator' = reqValidator "This field is required"
-
-contractForm
-  :: BootstrapForm Effect Query
+contractFormSpec
+  :: StatelessBootstrapFormSpec Effect Query
        { partyDepositDeadline :: Instant
        , counterPartyDepositDeadline :: Instant
        , firstWindowBeginning :: Instant
@@ -187,67 +182,70 @@ contractForm
        , counterPartyTokenAmount :: BigInt
        , adaAmountToUseAsAsset :: BigInt
        }
-contractForm = FormBuilder.evalBuilder' $ ado
-  partyTokenAmount <- FormBuilder.intInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "Party Token Amount"
-    , touched: false
-    }
+contractFormSpec = do
+  let
+    reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
+    reqValidator' = reqValidator "This field is required"
 
-  counterPartyTokenAmount <- FormBuilder.intInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "Counter-Party Token Amount"
-    , touched: false
-    }
+  FormSpecBuilder.evalBuilder' $ ado
+    partyTokenAmount <- intInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "Party Token Amount"
+      , touched: false
+      }
 
-  adaAmountToUseAsAsset <- FormBuilder.intInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "ADA Amount to use as asset"
-    , touched: false
-    }
+    counterPartyTokenAmount <- intInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "Counter-Party Token Amount"
+      , touched: false
+      }
 
-  partyDepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Party Deposit timeout") (Just $ DOOM.text "Party timoeut help") reqValidator'
-  counterPartyDepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Counter-Party Deposit timeout") (Just $ DOOM.text "Counter-Party timoeut help") reqValidator'
-  firstWindowBeginning <- FormBuilder.dateTimeField (Just $ DOOM.text "First Window Beginning timeout") (Just $ DOOM.text "First Window Beginning timoeut help") reqValidator'
-  firstWindowDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "First Window Deadline timeout") (Just $ DOOM.text "First Window Deadline timoeut help") reqValidator'
-  secondWindowBeginning <- FormBuilder.dateTimeField (Just $ DOOM.text "Second Window Beginning timeout") (Just $ DOOM.text "Second Window Beginning timoeut help") reqValidator'
-  secondWindowDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Second Window Ending timeout") (Just $ DOOM.text "Second Window Deadline timoeut help") reqValidator'
-  in
-    { partyTokenAmount: BigInt.fromInt partyTokenAmount
-    , counterPartyTokenAmount: BigInt.fromInt counterPartyTokenAmount
-    , adaAmountToUseAsAsset: BigInt.fromInt adaAmountToUseAsAsset
-    , partyDepositDeadline: Instant.fromDateTime partyDepositDeadline
-    , counterPartyDepositDeadline: Instant.fromDateTime counterPartyDepositDeadline
-    , firstWindowBeginning: Instant.fromDateTime firstWindowBeginning
-    , firstWindowDeadline: Instant.fromDateTime firstWindowDeadline
-    , secondWindowBeginning: Instant.fromDateTime secondWindowBeginning
-    , secondWindowDeadline: Instant.fromDateTime secondWindowDeadline
-    }
+    adaAmountToUseAsAsset <- intInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "ADA Amount to use as asset"
+      , touched: false
+      }
+
+    partyDepositDeadline <- dateTimeField (Just $ DOOM.text "Party Deposit timeout") (Just $ DOOM.text "Party timoeut help") reqValidator'
+    counterPartyDepositDeadline <- dateTimeField (Just $ DOOM.text "Counter-Party Deposit timeout") (Just $ DOOM.text "Counter-Party timoeut help") reqValidator'
+    firstWindowBeginning <- dateTimeField (Just $ DOOM.text "First Window Beginning timeout") (Just $ DOOM.text "First Window Beginning timoeut help") reqValidator'
+    firstWindowDeadline <- dateTimeField (Just $ DOOM.text "First Window Deadline timeout") (Just $ DOOM.text "First Window Deadline timoeut help") reqValidator'
+    secondWindowBeginning <- dateTimeField (Just $ DOOM.text "Second Window Beginning timeout") (Just $ DOOM.text "Second Window Beginning timoeut help") reqValidator'
+    secondWindowDeadline <- dateTimeField (Just $ DOOM.text "Second Window Ending timeout") (Just $ DOOM.text "Second Window Deadline timoeut help") reqValidator'
+    in
+      { partyTokenAmount: BigInt.fromInt partyTokenAmount
+      , counterPartyTokenAmount: BigInt.fromInt counterPartyTokenAmount
+      , adaAmountToUseAsAsset: BigInt.fromInt adaAmountToUseAsAsset
+      , partyDepositDeadline: Instant.fromDateTime partyDepositDeadline
+      , counterPartyDepositDeadline: Instant.fromDateTime counterPartyDepositDeadline
+      , firstWindowBeginning: Instant.fromDateTime firstWindowBeginning
+      , firstWindowDeadline: Instant.fromDateTime firstWindowDeadline
+      , secondWindowBeginning: Instant.fromDateTime secondWindowBeginning
+      , secondWindowDeadline: Instant.fromDateTime secondWindowDeadline
+      }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
-  liftEffect $ component "ContractTemplates.ContractForDifferencesWithOracle" \{ onSuccess, onDismiss } -> React.do
+  liftEffect $ component "ContractTemplates.ContractForDifferencesWithOracle" \{ onDismiss } -> React.do
 
     possibleContract /\ setContract <- React.useState' Nothing
     let
-      form = contractForm
-
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
         Just (V (Right contractParams) /\ _) -> setContract $ Just $ mkContractForDifferencesWithOracleContract contractParams
         _ -> pure unit
 
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
+    { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
+      { spec: contractFormSpec
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
 
     let
-      fields = UseForm.renderForm form formState
+      fields = renderFormSpec contractFormSpec formState
       formBody = case possibleContract of
         Nothing -> DOM.div { className: "form-group" } fields
         Just contract -> marloweYaml contract

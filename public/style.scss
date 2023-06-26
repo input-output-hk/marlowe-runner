@@ -208,7 +208,6 @@ $link-color: #511CF7;
 .cursor-pointer { cursor: pointer; }
 
 .pointer-events-none { pointer-events: none; }
-.tooltip { pointer-events: none; }
 
 $utilities: map-merge(
   $utilities, (

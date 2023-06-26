@@ -149,6 +149,7 @@ in upstream
       "https://github.com/purescript-react/purescript-react-basic-hooks.git"
       "v8.2.0"
   with
+    -- react-bootstrap = ../purescript-react-bootstrap/spago.dhall as Location
     react-bootstrap = mkPackage
       [ "aff", "arrays", "atleast", "bifunctors", "console", "control"
       , "convertable-options", "datetime", "datetime-iso", "debug", "decimals"
@@ -163,7 +164,7 @@ in upstream
       , "validation", "web-html"
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
-      "c9aebb63979ab3ea0f941b9061ac83402d6f6765"
+      "39c055d3a3d4fadca6afba31326fdf27d315aec8"
   with datetime-iso =
       mkPackage
         [ "aff"
