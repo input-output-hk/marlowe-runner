@@ -22,7 +22,6 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Time.Duration (Milliseconds(..), fromDuration)
 import Data.Time.Duration as Time.Duration
 import Data.Variant (Variant)
-import Debug (traceM)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
@@ -256,14 +255,13 @@ type Env =
   , runtime :: Runtime
   }
 
-initialState :: V1.Contract -> V1.State -> TransactionsEndpoint -> State
-initialState contract state transactionsEndpoint = PresentingContractDetails do
-  let
-    marloweContext = { contract, state }
+initialState :: MarloweContext -> TransactionsEndpoint -> State
+initialState marloweContext transactionsEndpoint = PresentingContractDetails do
   { marloweContext, transactionsEndpoint }
 
 type MarloweContext =
   { contract :: V1.Contract
+  , initialContract :: V1.Contract
   , state :: V1.State
   }
 
@@ -343,7 +341,7 @@ requestToAffAction = case _ of
             { contract, state } = marloweContext
             timeInterval = V1.TimeInterval invalidBefore invalidHereafter
             environment = V1.Environment { timeInterval }
-            allInputsChoices = case nextTimeoutAdvance environment contract of
+            allInputsChoices = case nextTimeoutAdvance environment state contract of
               Just advanceContinuation -> Left advanceContinuation
               Nothing -> do
                 let
@@ -437,4 +435,4 @@ sign
 sign walletApi tx = do
   let
     TextEnvelope { cborHex: txCborHex } = tx
-  Wallet.signTx walletApi txCborHex false
+  Wallet.signTx walletApi txCborHex true

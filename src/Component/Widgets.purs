@@ -15,7 +15,6 @@ import ReactBootstrap.Icons (Icon)
 import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Types (Placement)
 import ReactBootstrap.Types as OverlayTrigger
-import Unsafe.Coerce (unsafeCoerce)
 
 spinner :: Maybe JSX -> JSX
 spinner possibleBody = DOM.div
@@ -34,25 +33,8 @@ type LinkOptionalPropsRow =
   , tooltipPlacement :: Maybe Placement
   )
 
-type MenuOptionalPropsRow =
-  ( extraClassNames :: String
-  , disabled :: Boolean
-  , showBorders :: Boolean
-  , tooltipText :: Maybe String
-  , tooltipPlacement :: Maybe Placement
-  )
-
 defaultLinkOptionalProps :: { | LinkOptionalPropsRow }
 defaultLinkOptionalProps =
-  { extraClassNames: ""
-  , disabled: false
-  , showBorders: false
-  , tooltipText: Nothing
-  , tooltipPlacement: Nothing
-  }
-
-defaultMenuOptionalProps :: { | MenuOptionalPropsRow }
-defaultMenuOptionalProps =
   { extraClassNames: ""
   , disabled: false
   , showBorders: false
@@ -89,24 +71,12 @@ link provided = do
     [ label ]
 
 type LinkWithIconOptionalProps = LinkOptionalPropsRow
-type MenuWithIconOptionalProps = MenuOptionalPropsRow
-
-type MenuItemRecord = { menuLabel :: String, onClick :: Effect Unit }
-type DropDownMenuItems = Array MenuItemRecord
 
 type LinkWithIconProps =
   ( icon :: Icon
   , label :: JSX
   , onClick :: Effect Unit
   | LinkWithIconOptionalProps
-  )
-
-type MenuWithIconProps =
-  ( id :: String
-  , icon :: Icon
-  , dropDownMenuItems :: DropDownMenuItems
-  , label :: JSX
-  | MenuWithIconOptionalProps
   )
 
 -- FIXME: We should just call `link` here and not repeat the code
@@ -131,7 +101,6 @@ linkWithIcon provided = do
       , type: "button"
       }
       [ Icons.toJSX icon
-      , DOOM.text " "
       , label
       ]
   case tooltipText of
@@ -167,45 +136,6 @@ buttonWithIcon provided = do
     , type: "button"
     }
     [ Icons.toJSX icon
-    , DOOM.text " "
     , label
-    ]
-
-dropDownButtonWithIcon
-  :: forall provided
-   . Defaults { | MenuWithIconOptionalProps } { | provided } { | MenuWithIconProps }
-  => { | provided }
-  -> JSX
-
-dropDownButtonWithIcon provided = do
-  let
-    { id, icon, label, extraClassNames, disabled, dropDownMenuItems } =
-      defaults defaultMenuOptionalProps provided
-    extraClassNames' = " " <> extraClassNames <>
-      if disabled then " disabled"
-      else ""
-  DOM.div { className: "dropdown" } $
-    [ DOM.button
-        { className: "btn btn-primary dropdown-toggle" <> extraClassNames'
-        , _data: unsafeCoerce { bsToggle: "dropdown" }
-        , _aria: unsafeCoerce { expanded: "false" }
-        , type: "button"
-        , id
-        }
-        [ Icons.toJSX icon
-        , DOOM.text " "
-        , label
-        ]
-    , DOM.ul { className: "dropdown-menu", _aria: unsafeCoerce { labelledby: id } } $
-        map
-          ( \{ menuLabel, onClick } ->
-              DOM.li {} $
-                DOM.a
-                  { className: "dropdown-item"
-                  , onClick: handler preventDefault (const $ onClick)
-                  }
-                  [ DOOM.text menuLabel ]
-          )
-          dropDownMenuItems
     ]
 

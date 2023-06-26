@@ -1,0 +1,280 @@
+module Component.ContractTemplates.ContractForDifferencesWithOracle where
+
+import Prelude
+
+import Component.BodyLayout (wrappedContentWithFooter)
+import Component.BodyLayout as BodyLayout
+import Component.MarloweYaml (marloweYaml)
+import Component.Types (MkComponentM)
+import Component.Widgets (link)
+import Data.BigInt.Argonaut (BigInt)
+import Data.BigInt.Argonaut as BigInt
+import Data.DateTime.Instant (Instant)
+import Data.DateTime.Instant as Instant
+import Data.Either (Either(..))
+import Data.FormURLEncoded.Query (Query)
+import Data.Maybe (Maybe(..))
+import Data.Time.Duration (Seconds(..))
+import Data.Validation.Semigroup (V(..))
+import Effect (Effect)
+import Effect.Class (liftEffect)
+import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Partial.Unsafe (unsafeCrashWith)
+import Polyform.Validator (liftFnMaybe)
+import React.Basic.DOM (text) as DOOM
+import React.Basic.DOM.Simplified.Generated as DOM
+import React.Basic.Hooks (JSX, component, fragment, (/\))
+import React.Basic.Hooks as React
+import React.Basic.Hooks.UseForm (useForm)
+import React.Basic.Hooks.UseForm as UseForm
+import ReactBootstrap.FormBuilder (BootstrapForm)
+import ReactBootstrap.FormBuilder as FormBuilder
+
+type Props =
+  { onSuccess :: V1.Contract -> Effect Unit
+  , onDismiss :: Effect Unit
+  }
+
+unsafeBigIntFromString :: String -> BigInt
+unsafeBigIntFromString str = case BigInt.fromString str of
+  Just bigInt -> bigInt
+  Nothing -> unsafeCrashWith $ "unsafeBigIntFromString failed for input: " <> str
+
+mkContractForDifferencesWithOracleContract
+  :: { partyDepositDeadline :: Instant
+     , counterPartyDepositDeadline :: Instant
+     , firstWindowBeginning :: Instant
+     , secondWindowBeginning :: Instant
+     , firstWindowDeadline :: Instant
+     , secondWindowDeadline :: Instant
+     , partyTokenAmount :: BigInt
+     , counterPartyTokenAmount :: BigInt
+     , adaAmountToUseAsAsset :: BigInt
+     }
+  -> V1.Contract
+mkContractForDifferencesWithOracleContract { partyDepositDeadline, counterPartyDepositDeadline, firstWindowBeginning, secondWindowBeginning, firstWindowDeadline, secondWindowDeadline, partyTokenAmount, counterPartyTokenAmount, adaAmountToUseAsAsset } =
+  V1.When
+    [ ( V1.Case
+          ( V1.Deposit (V1.Role "Party") (V1.Role "Party")
+              (V1.Token "" "")
+              (V1.Constant partyTokenAmount)
+          )
+          ( V1.When
+              [ ( V1.Case
+                    ( V1.Deposit (V1.Role "Counterparty") (V1.Role "Counterparty")
+                        (V1.Token "" "")
+                        (V1.Constant counterPartyTokenAmount)
+                    )
+                    ( V1.When [] (firstWindowBeginning)
+                        ( V1.When
+                            [ ( V1.Case
+                                  ( V1.Choice
+                                      (V1.ChoiceId "dir-adausd" (V1.Role "kraken"))
+                                      [ (V1.Bound zero (unsafeBigIntFromString "100000000000"))
+                                      ]
+                                  )
+                                  ( V1.When [] (secondWindowBeginning)
+                                      ( V1.When
+                                          [ ( V1.Case
+                                                ( V1.Choice
+                                                    (V1.ChoiceId "inv-adausd" (V1.Role "kraken"))
+                                                    [ (V1.Bound zero (unsafeBigIntFromString "100000000000"))
+                                                    ]
+                                                )
+                                                ( V1.Let (V1.ValueId "Price in second window")
+                                                    ( V1.DivValue
+                                                        ( V1.MulValue
+                                                            (V1.Constant adaAmountToUseAsAsset)
+                                                            ( V1.MulValue
+                                                                ( V1.ChoiceValue
+                                                                    (V1.ChoiceId "dir-adausd" (V1.Role "kraken"))
+                                                                )
+                                                                ( V1.ChoiceValue
+                                                                    (V1.ChoiceId "inv-adausd" (V1.Role "kraken"))
+                                                                )
+                                                            )
+                                                        )
+                                                        (V1.Constant (unsafeBigIntFromString "100000000000"))
+                                                    )
+                                                    ( V1.If
+                                                        ( V1.ValueGT
+                                                            (V1.Constant adaAmountToUseAsAsset)
+                                                            (V1.UseValue (V1.ValueId "Price in second window"))
+                                                        )
+                                                        ( V1.Let (V1.ValueId "Decrease in price")
+                                                            ( V1.SubValue
+                                                                (V1.Constant adaAmountToUseAsAsset)
+                                                                (V1.UseValue (V1.ValueId "Price in second window"))
+                                                            )
+                                                            ( V1.Pay (V1.Role "Counterparty")
+                                                                (V1.Account (V1.Role "Party"))
+                                                                (V1.Token "" "")
+                                                                ( V1.Cond
+                                                                    ( V1.ValueLT
+                                                                        (V1.UseValue (V1.ValueId "Decrease in price"))
+                                                                        (V1.Constant adaAmountToUseAsAsset)
+                                                                    )
+                                                                    (V1.UseValue (V1.ValueId "Decrease in price"))
+                                                                    (V1.Constant adaAmountToUseAsAsset)
+                                                                )
+                                                                V1.Close
+                                                            )
+                                                        )
+                                                        ( V1.If
+                                                            ( V1.ValueLT
+                                                                (V1.Constant adaAmountToUseAsAsset)
+                                                                (V1.UseValue (V1.ValueId "Price in second window"))
+                                                            )
+                                                            ( V1.Let (V1.ValueId "Increase in price")
+                                                                ( V1.SubValue
+                                                                    (V1.UseValue (V1.ValueId "Price in second window"))
+                                                                    (V1.Constant adaAmountToUseAsAsset)
+                                                                )
+                                                                ( V1.Pay (V1.Role "Party")
+                                                                    (V1.Account (V1.Role "Counterparty"))
+                                                                    (V1.Token "" "")
+                                                                    ( V1.Cond
+                                                                        ( V1.ValueLT
+                                                                            (V1.UseValue (V1.ValueId "Increase in price"))
+                                                                            (V1.Constant partyTokenAmount)
+                                                                        )
+                                                                        (V1.UseValue (V1.ValueId "Increase in price"))
+                                                                        (V1.Constant partyTokenAmount)
+                                                                    )
+                                                                    V1.Close
+                                                                )
+                                                            )
+                                                            V1.Close
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                          ]
+                                          (secondWindowDeadline)
+                                          V1.Close
+                                      )
+                                  )
+                              )
+                            ]
+                            (firstWindowDeadline)
+                            V1.Close
+                        )
+                    )
+                )
+              ]
+              (counterPartyDepositDeadline)
+              V1.Close
+          )
+      )
+    ]
+    (partyDepositDeadline)
+    V1.Close
+
+reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
+
+reqValidator' = reqValidator "This field is required"
+
+contractForm
+  :: BootstrapForm Effect Query
+       { partyDepositDeadline :: Instant
+       , counterPartyDepositDeadline :: Instant
+       , firstWindowBeginning :: Instant
+       , secondWindowBeginning :: Instant
+       , firstWindowDeadline :: Instant
+       , secondWindowDeadline :: Instant
+       , partyTokenAmount :: BigInt
+       , counterPartyTokenAmount :: BigInt
+       , adaAmountToUseAsAsset :: BigInt
+       }
+contractForm = FormBuilder.evalBuilder' $ ado
+  partyTokenAmount <- FormBuilder.intInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "Party Token Amount"
+    , touched: false
+    }
+
+  counterPartyTokenAmount <- FormBuilder.intInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "Counter-Party Token Amount"
+    , touched: false
+    }
+
+  adaAmountToUseAsAsset <- FormBuilder.intInput
+    { helpText: Nothing
+    , initial: ""
+    , label: Just $ DOOM.text "ADA Amount to use as asset"
+    , touched: false
+    }
+
+  partyDepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Party Deposit timeout") (Just $ DOOM.text "Party timoeut help") reqValidator'
+  counterPartyDepositDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Counter-Party Deposit timeout") (Just $ DOOM.text "Counter-Party timoeut help") reqValidator'
+  firstWindowBeginning <- FormBuilder.dateTimeField (Just $ DOOM.text "First Window Beginning timeout") (Just $ DOOM.text "First Window Beginning timoeut help") reqValidator'
+  firstWindowDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "First Window Deadline timeout") (Just $ DOOM.text "First Window Deadline timoeut help") reqValidator'
+  secondWindowBeginning <- FormBuilder.dateTimeField (Just $ DOOM.text "Second Window Beginning timeout") (Just $ DOOM.text "Second Window Beginning timoeut help") reqValidator'
+  secondWindowDeadline <- FormBuilder.dateTimeField (Just $ DOOM.text "Second Window Ending timeout") (Just $ DOOM.text "Second Window Deadline timoeut help") reqValidator'
+  in
+    { partyTokenAmount: BigInt.fromInt partyTokenAmount
+    , counterPartyTokenAmount: BigInt.fromInt counterPartyTokenAmount
+    , adaAmountToUseAsAsset: BigInt.fromInt adaAmountToUseAsAsset
+    , partyDepositDeadline: Instant.fromDateTime partyDepositDeadline
+    , counterPartyDepositDeadline: Instant.fromDateTime counterPartyDepositDeadline
+    , firstWindowBeginning: Instant.fromDateTime firstWindowBeginning
+    , firstWindowDeadline: Instant.fromDateTime firstWindowDeadline
+    , secondWindowBeginning: Instant.fromDateTime secondWindowBeginning
+    , secondWindowDeadline: Instant.fromDateTime secondWindowDeadline
+    }
+
+mkComponent :: MkComponentM (Props -> JSX)
+mkComponent = do
+  liftEffect $ component "ContractTemplates.ContractForDifferencesWithOracle" \{ onSuccess, onDismiss } -> React.do
+
+    possibleContract /\ setContract <- React.useState' Nothing
+    let
+      form = contractForm
+
+      onSubmit :: _ -> Effect Unit
+      onSubmit = _.result >>> case _ of
+        Just (V (Right contractParams) /\ _) -> setContract $ Just $ mkContractForDifferencesWithOracleContract contractParams
+        _ -> pure unit
+
+    { formState, onSubmit: onSubmit', result } <- useForm
+      { spec: form
+      , onSubmit
+      , validationDebounce: Seconds 0.5
+      }
+
+    let
+      fields = UseForm.renderForm form formState
+      formBody = case possibleContract of
+        Nothing -> DOM.div { className: "form-group" } fields
+        Just contract -> marloweYaml contract
+      formActions = fragment
+        [ link
+            { label: DOOM.text "Cancel"
+            , onClick: onDismiss
+            , showBorders: true
+            , extraClassNames: "me-3"
+            }
+        , DOM.button
+            do
+              let
+                disabled = case result of
+                  Just (V (Right _) /\ _) -> false
+                  _ -> true
+              { className: "btn btn-primary"
+              , onClick: onSubmit'
+              , disabled
+              }
+            [ DOOM.text "Submit" ]
+        ]
+    pure $ BodyLayout.component
+      { title: "Contract For Differences With Oracle"
+      , description: DOOM.text "\"Party\" and \"Counterparty\" deposit 100 Ada and after 60 slots these assets are redistributed depending on the change in price of 100 Ada worth of dollars between the start and the end of the contract. If the price increases, the difference goes to \"Counterparty\"; if it decreases, the difference goes to \"Party\", up to a maximum of 100 Ada."
+      , content: wrappedContentWithFooter
+          formBody
+          formActions
+      }
+

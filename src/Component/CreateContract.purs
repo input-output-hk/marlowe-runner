@@ -12,8 +12,11 @@ import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo)
 import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
+import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
+import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
-import Contrib.ReactBootstrap.FormBuilder (booleanField) as FormBuilder
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, booleanField)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
@@ -59,10 +62,7 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, Ref, component, fragment, readRef, useRef, (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.UseForm (useForm)
-import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (BootstrapForm, FormBuilder')
-import ReactBootstrap.FormBuilder (evalBuilder', textArea, textInput) as FormBuilder
+import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 import Web.DOM.Node (Node)
@@ -82,11 +82,12 @@ newtype AutoRun = AutoRun Boolean
 
 type Result = V1.Contract /\ Tags /\ AutoRun
 
+contractFieldId :: FieldId
 contractFieldId = FieldId "contract-json"
 
-mkContractForm :: (Maybe V1.Contract /\ AutoRun) -> BootstrapForm Effect Query Result
-mkContractForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuilder.evalBuilder' $ ado
-  contract <- FormBuilder.textArea
+mkContractFormSpec :: (Maybe V1.Contract /\ AutoRun) -> StatelessBootstrapFormSpec Effect Query Result
+mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormSpecBuilder.evalBuilder Nothing $ ado
+  contract <- StatelessFormSpecBuilders.textArea
     { missingError: "Please provide contract terms JSON value"
     , helpText: Just $ DOOM.div_
         [ DOOM.text "Basic JSON validation"
@@ -103,7 +104,7 @@ mkContractForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuild
     , name: Just contractFieldId
     }
 
-  tags <- FormBuilder.textInput
+  tags <- StatelessFormSpecBuilders.textInput
     { helpText: Just $ DOOM.div_
         [ DOOM.text "Tags"
         ]
@@ -126,7 +127,7 @@ mkContractForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuild
     --         value' = AutoRun value
     --       -- onAutoRunChange value'
     --       pure value'
-    FormBuilder.booleanField
+    booleanField
       { label: DOOM.text "Auto run"
       , helpText: DOOM.text "Whether to run the contract creation process automatically"
       , initial: initialAutoRun
@@ -134,9 +135,9 @@ mkContractForm (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormBuild
   in
     contract /\ tags /\ autoRun
 
-mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> BootstrapForm Effect Query RolesConfig
-mkRolesConfigForm roleNames cardanoMultiplatformLib = FormBuilder.evalBuilder' $ Mint <<< Map.fromFoldable <$> for roleNames \roleName -> ado
-  address <- FormBuilder.textInput
+mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> StatelessBootstrapFormSpec Effect Query RolesConfig
+mkRolesConfigForm roleNames cardanoMultiplatformLib = FormSpecBuilder.evalBuilder Nothing $ Mint <<< Map.fromFoldable <$> for roleNames \roleName -> ado
+  address <- StatelessFormSpecBuilders.textInput
     { missingError: "Please provide an address for a role token"
     , helpText: Just $ DOOM.div_
         [ DOOM.text "Role token destination address"
@@ -207,18 +208,6 @@ data CurrentRun
   -- at the moment. This is useful to avoid double clicking and show throbber
   | Manual Boolean
 
-addressInput :: CardanoMultiplatformLib.Lib -> String -> String -> Maybe FieldId -> FormBuilder' Effect Bech32
-addressInput cardanoMultiplatformLib label initial name = do
-  let
-    props =
-      { initial
-      , label: Just $ DOOM.text label
-      , name
-      , validator: requiredV' $ Validator.liftFnMMaybe (const $ pure [ "Invalid address" ]) \str -> do
-          bech32FromString cardanoMultiplatformLib str
-      }
-  FormBuilder.textInput props
-
 type RoleProps =
   { onDismiss :: Effect Unit
   , onSuccess :: RolesConfig -> Effect Unit
@@ -231,22 +220,22 @@ mkRoleTokensComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   liftEffect $ component "RoleTokensAssignment" \{ onDismiss , onSuccess, roleNames } -> React.do
     let
-      form = mkRolesConfigForm roleNames cardanoMultiplatformLib
+      formSpec = mkRolesConfigForm roleNames cardanoMultiplatformLib
 
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
         Just (V (Right roleAssignments) /\ _) -> onSuccess roleAssignments
         _ -> pure unit
 
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
+    { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
+      { spec: formSpec
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
 
-    pure $ do
+    pure do
       let
-        fields = UseForm.renderForm form formState
+        fields = StatelessFormSpec.renderFormSpec formSpec formState
         formBody = DOM.div { className: "form-group" } fields
         formActions = DOOM.fragment
           [ link
@@ -267,13 +256,7 @@ mkRoleTokensComponent = do
                 }
               [ R.text "Submit" ]
           ]
-      BodyLayout.component
-        { title: "Role token assignments"
-        , description: R.text "Assign addresses to role tokens"
-        , content: wrappedContentWithFooter
-            formBody
-            formActions
-        }
+      wrappedContentWithFooter formBody formActions
 
 runLiteTag :: String
 runLiteTag = "run-lite"
@@ -285,7 +268,7 @@ mkComponent = do
   walletInfoCtx <- asks _.walletInfoCtx
 
   let
-    initialAutoRun = AutoRun false
+    initialAutoRun = AutoRun true
 
   roleTokenComponent <- mkRoleTokensComponent
 
@@ -296,7 +279,7 @@ mkComponent = do
         props = machineProps initialAutoRun connectedWallet cardanoMultiplatformLib runtime
       useMooreMachine props
 
-    form <- React.useMemo unit \_ -> mkContractForm (Nothing /\ initialAutoRun)
+    formSpec <- React.useMemo unit \_ -> mkContractFormSpec (Nothing /\ initialAutoRun)
 
     let
       onSubmit :: _ -> Effect Unit
@@ -313,8 +296,8 @@ mkComponent = do
           applyAction' $ Machine.TriggerSubmission contract tags
         _ -> pure unit
 
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
+    { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
+      { spec: formSpec
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
@@ -336,7 +319,7 @@ mkComponent = do
     pure $ case submissionState of
       Machine.DefiningContract -> do
         let
-          fields = UseForm.renderForm form formState
+          fields = StatelessFormSpec.renderFormSpec formSpec formState
           formBody = DOM.div { className: "form-group" } fields
           formActions = DOOM.fragment
             [ link
@@ -375,14 +358,7 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: wrappedContentWithFooter
-              do roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
-              do link
-                  { label: DOOM.text "Cancel"
-                  , onClick: onDismiss
-                  , showBorders: true
-                  , extraClassNames: "me-3"
-                  }
+          , content: roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
           }
       Machine.ContractCreated { contract, createTxResponse } -> do
         let

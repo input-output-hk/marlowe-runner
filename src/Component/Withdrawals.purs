@@ -3,20 +3,19 @@ module Component.Withdrawals where
 import Prelude
 
 import CardanoMultiplatformLib (Bech32, CborHex)
-import CardanoMultiplatformLib.Transaction (TransactionObject(..), TransactionWitnessSetObject(..))
-import Component.InputHelper (ChoiceInput(..))
+import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
 import Component.Modal (mkModal)
 import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo(..))
-import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
-import Contrib.Fetch (FetchError(..))
+import Contrib.Fetch (FetchError)
+import Contrib.Polyform.FormSpecBuilder (evalBuilder)
+import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), choiceField, radioFieldChoice)
 import Control.Monad.Reader.Class (asks)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
-import Data.Array.NonEmpty as NonEmptyArray
 import Data.BigInt.Argonaut as BigInt
 import Data.Either (Either(..))
-import Data.FormURLEncoded.Query (Query)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int (fromString)
 import Data.Map as Map
@@ -30,22 +29,17 @@ import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
-import Language.Marlowe.Core.V1.Semantics.Types (Ada(..), ChoiceId(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Ada(..)) as V1
 import Marlowe.Runtime.Web.Client (post', put')
-import Marlowe.Runtime.Web.Types (PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), PutWithdrawalRequest(..), Runtime(Runtime), ServerURL(..), TextEnvelope(..), TransactionEndpoint, TxOutRef, WithdrawalEndpoint(..), WithdrawalsEndpoint, toTextEnvelope, txOutRefFromString, txOutRefToString)
-import Polyform.Batteries as Batteries
-import Polyform.Validator (liftFn, liftFnM, liftFnMaybe)
-import Polyform.Validator as Validator
+import Marlowe.Runtime.Web.Types (PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), PutWithdrawalRequest(..), Runtime(Runtime), ServerURL, TextEnvelope(..), TxOutRef, WithdrawalEndpoint, WithdrawalsEndpoint, toTextEnvelope)
+import Polyform.Validator (liftFn)
 import React.Basic (fragment)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (JSX, component, useContext, (/\))
 import React.Basic.Hooks as React
-import React.Basic.Hooks.UseForm (useForm)
-import React.Basic.Hooks.UseForm as UseForm
-import ReactBootstrap.FormBuilder (BootstrapForm, ChoiceFieldChoices(..), choiceField, radioFieldChoice, requiredV', selectFieldChoice)
-import ReactBootstrap.FormBuilder as FormBuilder
+import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 
@@ -76,7 +70,7 @@ mkComponent = do
         }
 
       rolesMap = Map.fromFoldableWithIndex roles
-      form = FormBuilder.evalBuilder' $ ado
+      formSpec = evalBuilder Nothing $ ado
         role <- choiceField
           { choices
           , validator: liftFn \idx ->
@@ -99,7 +93,6 @@ mkComponent = do
             launchAff_ $ do
               withdrawal withdrawalContext runtime.serverURL runtime.withdrawalsEndpoint >>= case _ of
                 Right { resource: PostWithdrawalsResponseContent res, links: { withdrawal: withdrawalEndpoint } } -> do
-                  traceM res
                   let
                     { tx } = res
                     TextEnvelope { cborHex: txCborHex } = tx
@@ -128,15 +121,15 @@ mkComponent = do
           traceM "withdrawal error"
           pure unit
  
-    { formState, onSubmit: onSubmit', result } <- useForm
-      { spec: form
+    { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
+      { spec: formSpec
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
     pure $ modal
       do
         let
-          fields = UseForm.renderForm form formState
+          fields = StatelessFormSpec.renderFormSpec formSpec formState
           formBody = DOM.div { className: "form-group" } fields
           actions = fragment
              [ DOM.button

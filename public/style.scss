@@ -172,6 +172,44 @@ $link-color: #511CF7;
   padding-bottom: 71px !important;
 }
 
+.z-index-sticky {
+  z-index: $zindex-sticky;
+}
+
+.z-index-fixed {
+  z-index: $zindex-fixed;
+}
+
+.z-index-modal-backdrop {
+  z-index: $zindex-modal-backdrop;
+}
+
+.z-index-offcanvas {
+  z-index: $zindex-offcanvas;
+}
+
+.z-index-modal {
+  z-index: $zindex-modal;
+}
+
+.z-index-popover {
+  z-index: $zindex-popover;
+}
+
+.z-index-tooltip {
+  z-index: $zindex-tooltip;
+}
+
+.cursor-auto { cursor: auto; }
+.cursor-copy { cursor: copy; }
+.cursor-grab { cursor: grab; }
+.cursor-move { cursor: move; }
+.cursor-not-allowed { cursor: not-allowed; }
+.cursor-pointer { cursor: pointer; }
+
+.pointer-events-none { pointer-events: none; }
+.tooltip { pointer-events: none; }
+
 $utilities: map-merge(
   $utilities, (
     "text-decoration": (

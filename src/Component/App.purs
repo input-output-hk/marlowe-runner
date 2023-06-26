@@ -41,7 +41,9 @@ import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Effect.Now (now)
 import Halogen.Subscription (Emitter) as Subscription
+import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsEvent, ContractWithTransactionsMap, ContractWithTransactionsStream(..))
+import Marlowe.Runtime.Web.Types (PolicyId(..))
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX)
 import React.Basic as ReactContext
@@ -101,7 +103,7 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Just Nami -- Eternl -- Nami -- Nothing
+debugWallet = Nothing -- Just Nami -- Eternl -- Nami -- Nothing
 
 -- debugWallet = Nothing
 
@@ -361,12 +363,15 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
     walletChanged = prevWalletContext /= walletContext
     usedAddresses = fromMaybe [] $ _.usedAddresses <<< un WalletContext <$> walletContext
 
-    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block, tags }), links: endpoints }, contractState, transactions } -> do
+    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
       let
         marloweInfo = do
           Runtime.ContractState contractState' <- contractState
           pure $ MarloweInfo
             { initialContract: contractState'.initialContract
+            , currencySymbol: case roleTokenMintingPolicyId of
+                PolicyId "" -> Nothing
+                PolicyId policyId -> Just $ policyId
             , state: contractState'.state
             , currentContract: contractState'.currentContract
             }

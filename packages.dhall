@@ -163,7 +163,7 @@ in upstream
       , "validation", "web-html"
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
-    "b20a4abbc3875e5346c2d72e869bc6ddc1b519a7"
+      "c9aebb63979ab3ea0f941b9061ac83402d6f6765"
   with datetime-iso =
       mkPackage
         [ "aff"
@@ -188,3 +188,10 @@ in upstream
         ]
         "https://github.com/paluh/purescript-datetime-iso"
         "c7b75bb16e0543687fc4c9b21c34a49cdaa22f0c"
+  with foreign-generic =
+      mkPackage
+      [ "effect", "foreign", "foreign-object", "ordered-collections"
+      , "exceptions", "record", "identity"
+      ]
+      "https://github.com/paluh/purescript-foreign-generic.git"
+      "a5c23d29e72619624978446293ac9bb45ccd2fde"
