@@ -23,8 +23,11 @@ function getWebServerUrl() {
 
 function getNetwork() {
   if(!process.env.NETWORK) {
-    console.log("NETWORK not configured, defaulting to preview. For explicitly setting the network, do : export NETWORK=preview");
-  } else { return process.env.MARLOWE_WEB_SERVER_URL; }
+    console.log("NETWORK not configured, defaulting to the 'preview' network. For explicitly setting the network, do : export NETWORK=preview");
+    return "preview";
+  } else {
+    return process.env.NETWORK;
+  }
 };
 
 export default function(_env, argv) {
