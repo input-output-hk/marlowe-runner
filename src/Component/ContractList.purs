@@ -359,9 +359,10 @@ mkContractList = do
                               tdCentered = DOM.td { className: "text-center" }
                             in
                               DOM.tr { className: "align-middle" }
-                                [ let
-                                   tooltipJSX = tooltip {} (DOOM.text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci)
-                                 in overlayTrigger { overlay: tooltipJSX } $
+                                [ -- TODO: overlay trigger introduces flickering...
+                                  -- let
+                                  -- tooltipJSX = tooltip {} (DOOM.text $ foldMap show $ map (un Runtime.BlockNumber <<< _.blockNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci)
+                                 -- in overlayTrigger { overlay: tooltipJSX } $
                                       tdCentered [
                                         text $ fromMaybe "" $ (map (_.slotNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci) >>= slotToTimestamp slotting
                                       ]
