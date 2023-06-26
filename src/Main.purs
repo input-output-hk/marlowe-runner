@@ -42,6 +42,7 @@ import Web.HTML.Window (document)
 type Config =
   { marloweWebServerUrl :: ServerURL
   , develMode :: Boolean
+  , network :: String
   , aboutMarkdown :: String
   }
 
@@ -50,10 +51,12 @@ decodeConfig json = do
   obj <- decodeJson json
   marloweWebServerUrl <- obj .: "marloweWebServerUrl"
   develMode <- obj .: "develMode"
+  network <- obj .: "network"
   aboutMarkdown <- obj .: "aboutMarkdown"
   pure
     { marloweWebServerUrl: ServerURL marloweWebServerUrl
     , develMode
+    , network
     , aboutMarkdown
     }
 
@@ -71,10 +74,10 @@ main configJson = do
       else const (pure unit)
     runtime = Marlowe.Runtime.Web.runtime config.marloweWebServerUrl
     -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
-    slotting = Slotting
-      { slotLength: BigInt.fromInt 1000
-      , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000"
-      }
+    slotting =
+      case config.network of
+        "mainnet" -> Slotting { slotLength: BigInt.fromInt 1000 , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
+        _ -> Slotting { slotLength: BigInt.fromInt 1000 , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
 
   doc :: HTMLDocument <- document =<< window
   container :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<
