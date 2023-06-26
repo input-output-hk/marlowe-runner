@@ -20,6 +20,7 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
+import Contrib.Data.JSDate as JSDate
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
 import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
@@ -27,19 +28,22 @@ import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.DropdownButton (dropdownButton)
 import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FormControlSizing(..), StatelessBootstrapFormSpec, textInput)
-import Control.Alt ((<|>))
+import Control.Alt (alt, (<|>))
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (encodeJson, stringify, toString)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.BigInt.Argonaut as BigInt
+import Data.DateTime (DateTime(..))
 import Data.DateTime.Instant (Instant, instant, toDateTime)
+import Data.DateTime.Instant as Instant
 import Data.Either (Either, hush)
 import Data.Foldable (any, fold, foldMap, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Formatter.DateTime (format, parseFormatString)
 import Data.Function (on)
 import Data.Int (toNumber)
+import Data.JSDate as JSDate
 import Data.List (List(..), catMaybes, concat, filter, intercalate)
 import Data.List as List
 import Data.Map as Map
@@ -64,7 +68,7 @@ import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import React.Basic (fragment)
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (div_, text) as DOOM
+import React.Basic.DOM (br, div_, text) as DOOM
 import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -372,6 +376,10 @@ mkContractList = do
                                     let
                                       label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
                                     orderingTh label OrderByCreationDate
+                                , do
+                                    let
+                                      label = DOOM.fragment [ DOOM.text "Updated" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                                    orderingTh label OrderByLastUpdateDate
                                 , DOM.th { className: "text-center w-16rem" } $ DOOM.text "Contract Id"
                                 , th $ DOOM.text "Tags"
                                 , th $ DOOM.text "Actions"
@@ -379,11 +387,25 @@ mkContractList = do
                             ]
                         , DOM.tbody {} $ contracts <#> \ci@(ContractInfo { _runtime, endpoints, marloweInfo, tags: Tags metadata }) ->
                             let
-                              ContractHeader { contractId, status } = _runtime.contractHeader
+                              ContractHeader { contractId } = _runtime.contractHeader
                               tdCentered = DOM.td { className: "text-center" }
+                              tdSlotInfo Nothing = tdCentered $ []
+                              tdSlotInfo (Just slotNo) = do
+                                let
+                                  slotNoInfo = do
+                                    let
+                                      dateTime = slotToTimestamp slotting slotNo
+                                      jsDate = JSDate.fromDateTime dateTime
+                                    [ DOOM.text $ JSDate.toLocaleDateString jsDate
+                                    , DOOM.br {}
+                                    , DOOM.text $ JSDate.toLocaleTimeString jsDate
+                                    ]
+                                DOM.td { className: "text-center" } $ DOM.small {} slotNoInfo
+
                             in
                               DOM.tr { className: "align-middle" }
-                                [ tdCentered [ text $ fromMaybe "" $ (map (_.slotNo <<< un Runtime.BlockHeader) $ ContractInfo.createdAt ci) >>= slotToTimestamp slotting ]
+                                [ tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.createdAt ci
+                                , tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.updatedAt ci
                                 , DOM.td { className: "text-center" } $ DOM.span { className: "d-flex" }
                                     [ DOM.a
                                         do
@@ -460,11 +482,10 @@ prettyState = stringify <<< encodeJson
 instantFromMillis :: Number -> Maybe Instant
 instantFromMillis ms = instant (Duration.Milliseconds ms)
 
-slotToTimestamp :: Slotting -> SlotNumber -> Maybe String
-slotToTimestamp (Slotting { slotZeroTime, slotLength }) (SlotNumber n) = do
+slotToTimestamp :: Slotting -> SlotNumber -> DateTime
+slotToTimestamp (Slotting { slotZeroTime, slotLength }) (SlotNumber n) = fromMaybe bottom do
   let
     slotNo = BigInt.fromInt n
     time = BigInt.toNumber $ slotZeroTime + (slotNo * slotLength)
-  formatter <- hush $ parseFormatString "YYYY-MM-DDThh:mm:ssZ"
   instant <- instantFromMillis time
-  pure $ format formatter $ toDateTime instant
+  pure $ Instant.toDateTime instant
