@@ -773,12 +773,24 @@ mkComponent = do
                     }
                     [ R.text "Advance" ]
               ]
-
           BodyLayout.component
-            { title: "Select input type"
-            , description: DOOM.text "We are creating the initial transaction."
+            { title: "Select Input Type"
+            , description:
+                DOM.div {}
+                  [ DOM.p {}
+                      [ DOOM.text "You have reached a point in the contract where an input is required to proceed. The contract may allow for various types of inputs depending on its current state and the logic it contains. Below, you will find a selection of input types that you can choose from to interact with the contract. Note that not all input types may be available at this point in the contract. The available input types are enabled, while the others are disabled." ]
+                  , DOM.ul {}
+                      [ DOM.li {} [ DOM.strong {} [ DOOM.text "Deposit:" ], DOOM.text " If enabled, this option allows you to make a deposit into the contract. This might be required for certain conditions or actions within the contract." ]
+                      , DOM.li {} [ DOM.strong {} [ DOOM.text "Choice:" ], DOOM.text " If enabled, this option allows you to make a choice from a set of predefined options. This choice can affect the flow of the contract." ]
+                      , DOM.li {} [ DOM.strong {} [ DOOM.text "Notify:" ], DOOM.text " If enabled, this option allows you to notify the contract of a certain event or condition. This can be used to trigger specific actions within the contract." ]
+                      , DOM.li {} [ DOM.strong {} [ DOOM.text "Advance:" ], DOOM.text " If enabled, this option allows you to move the contract forward to the next state without making any other input." ]
+                      ]
+                  , DOM.p {}
+                      [ DOOM.text "Please select the appropriate input type based on the current state of the contract and the action you wish to take. After selecting an input type, you may be required to provide additional information or make a choice before the contract can proceed." ]
+                  ]
             , content: wrappedContentWithFooter body footer
             }
+
       Machine.PickingInput { inputChoices } -> do
         let
           applyPickInputSucceeded input = do
