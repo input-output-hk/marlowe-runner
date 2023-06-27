@@ -4,13 +4,24 @@ import Prelude
 
 import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
+import Component.InputHelper as InputHelper
 import Component.MarloweYaml (marloweYaml, marloweStateYaml)
 import Component.Types (MkComponentM)
+import Component.Types.ContractInfo (fetchAppliedInputs)
 import Contrib.React.MarloweGraph (marloweGraph)
+import Control.Monad.Reader (asks)
+import Data.Array as Array
+import Data.Either (Either(..))
+import Data.List as List
+import Data.Maybe (Maybe(..))
+import Data.Tuple.Nested (type (/\))
+import Data.Validation.Semigroup (V(..))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (_marloweState)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic as DOOM
 import React.Basic.DOM (css)
 import React.Basic.DOM (span_, text) as DOOM
@@ -18,6 +29,7 @@ import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, (/\))
 import React.Basic.Hooks as React
+import React.Basic.Hooks.Aff as React
 import ReactBootstrap.Icons (unsafeIcon)
 import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Nav (nav)
@@ -27,15 +39,38 @@ import ReactBootstrap.Tabs (tabs)
 import ReactBootstrap.Tabs as Tabs
 import ReactBootstrap.Types (eventKey)
 
-type Props = { contract :: V1.Contract, onClose :: Effect Unit, state :: V1.State }
+type AppliedInputs = Array (V1.InputContent /\ V1.TimeInterval)
+
+type Props =
+  { contract :: Maybe V1.Contract
+  , initialContract :: V1.Contract
+  , initialState :: V1.State
+  , onClose :: Effect Unit
+  , state :: Maybe V1.State
+  , transactionEndpoints :: Array Runtime.TransactionEndpoint
+  }
 
 data ContractView = SourceCode | Graph { compressed :: Boolean }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
-  liftEffect $ component "ContractDetails" \{ contract, state, onClose } -> React.do
-    contractView /\ setContractView <- React.useState' SourceCode
-    -- normalizeContract /\ setNormalizeContract <- React.useState' false
+  Runtime.Runtime { serverURL } <- asks _.runtime
+  liftEffect $ component "ContractDetails" \{ contract, state, initialState, initialContract, transactionEndpoints, onClose } -> React.do
+    possibleExecutionPath /\ setPossibleExecutionPath <- React.useState' Nothing
+
+    React.useAff unit do
+      traceM "ContractDetails: fetching applied inputs"
+      fetchAppliedInputs serverURL (Array.reverse transactionEndpoints) >>= case _ of
+        V (Right inputs) -> case InputHelper.executionPath inputs initialContract initialState of
+          Right executionPath -> liftEffect $ setPossibleExecutionPath $ Just executionPath
+          Left err -> do
+            traceM "ContractDetails: failed to compute execution path"
+            traceM err
+            pure unit
+        V (Left err) -> do
+          traceM "ContractDetails: failed to fetch applied inputs"
+          traceM err
+          pure unit
 
     let
       -- FIXME: We want to present here also:
@@ -49,35 +84,46 @@ mkComponent = do
       --  , target: "_blank"
       --  , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
       --  }
-      sixtyVH = css { "height": "60vh" }
-      body = React.fragment
-          [ tabs { fill: true, justify: true, defaultActiveKey: "source", variant: Tabs.variant.pills } do
+      body = do
+        let
+          defaultActiveKey = case contract of
+            Nothing -> "graph"
+            Just _ -> "source"
+        React.fragment
+          [ tabs { fill: true, justify: true, defaultActiveKey, variant: Tabs.variant.pills } do
               let
                 renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto"} children
-              [ renderTab
-                { eventKey: eventKey "source"
-                , title: DOOM.span_
-                    [ Icons.toJSX $ unsafeIcon "filetype-yml"
-                    , DOOM.text " Source code"
-                    ]
-                }
-                [ marloweYaml contract ]
-              , renderTab
-                { eventKey: eventKey "graph"
-                , title: DOOM.span_
-                    [ Icons.toJSX $ unsafeIcon "diagram-2"
-                    , DOOM.text " Source graph"
-                    ]
-                }
-                [ marloweGraph { contract } ]
-              , renderTab
-                { eventKey: eventKey "state"
-                , title: DOOM.span_
-                    [ Icons.toJSX $ unsafeIcon "bank"
-                    , DOOM.text " Contract state"
-                    ]
-                }
-                [ marloweStateYaml state ]
+              [ case contract of
+                  Nothing -> mempty
+                  Just contract' -> renderTab
+                    { eventKey: eventKey "source"
+                    , title: DOOM.span_
+                        [ Icons.toJSX $ unsafeIcon "filetype-yml"
+                        , DOOM.text " Source code"
+                        ]
+                    }
+                    [ marloweYaml contract' ]
+              , case possibleExecutionPath of
+                  Nothing -> mempty
+                  Just executionPath ->
+                    renderTab
+                      { eventKey: eventKey "graph"
+                      , title: DOOM.span_
+                          [ Icons.toJSX $ unsafeIcon "diagram-2"
+                          , DOOM.text " Source graph"
+                          ]
+                      }
+                      [ marloweGraph { contract: initialContract, executionPath } ]
+              , case state of
+                  Nothing -> mempty
+                  Just state -> renderTab
+                    { eventKey: eventKey "state"
+                    , title: DOOM.span_
+                        [ Icons.toJSX $ unsafeIcon "bank"
+                        , DOOM.text " Contract state"
+                        ]
+                    }
+                    [ marloweStateYaml state ]
               ]
           ]
       -- body = nav

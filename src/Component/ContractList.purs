@@ -133,7 +133,13 @@ derive instance Eq ContractTemplate
 
 data ModalAction
   = NewContract
-  | ContractDetails V1.Contract V1.State
+  | ContractDetails
+    { contract :: Maybe V1.Contract
+    , state :: Maybe V1.State
+    , initialContract :: V1.Contract
+    , initialState :: V1.State
+    , transactionEndpoints :: Array Runtime.TransactionEndpoint
+    }
   | ApplyInputs TransactionsEndpoint ApplyInputs.Machine.MarloweContext
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
   | ContractTemplate ContractTemplate
@@ -267,10 +273,10 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Just (ContractDetails contract state), _ -> do
+        Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints}), _ -> do
           let
             onClose = resetModalAction
-          contractDetails { contract, onClose, state }
+          contractDetails { contract, onClose, state, transactionEndpoints, initialContract, initialState }
 
         -- This should be fixed later on - for now we put some stubs
         Just (ContractTemplate Escrow), _ -> escrowComponent
@@ -411,8 +417,16 @@ mkContractList = do
                                         do
                                           let
                                             onClick = case marloweInfo of
-                                              Just (MarloweInfo { state: Just currentState, currentContract: Just currentContract }) -> do
-                                                setModalAction $ ContractDetails currentContract currentState
+                                              Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
+                                                let
+                                                  transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
+                                                setModalAction $ ContractDetails
+                                                  { contract: currentContract
+                                                  , state
+                                                  , initialState: initialState
+                                                  , initialContract: initialContract
+                                                  , transactionEndpoints
+                                                  }
                                               _ -> pure unit
                                           { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
                                           , onClick: handler_ onClick

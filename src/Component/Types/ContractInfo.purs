@@ -2,17 +2,24 @@ module Component.Types.ContractInfo where
 
 import Prelude
 
+import Contrib.Data.Foldable (foldMapFlipped)
 import Control.Alt ((<|>))
+import Control.Parallel (parTraverse)
 import Data.Array as Array
+import Data.DateTime.Instant as Instant
+import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.Tuple.Nested ((/\))
+import Data.Tuple.Nested (type (/\), (/\))
+import Data.Validation.Semigroup (V(..))
+import Effect.Aff (Aff)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Marlowe.Runtime.Web.Client (ClientError, getResource') as Runtime
 import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
-import Marlowe.Runtime.Web.Types (Tags)
-import Marlowe.Runtime.Web.Types as Runtime
+import Marlowe.Runtime.Web.Types (BlockHeader, ContractEndpoint, ContractHeader(..), ContractId, TransactionEndpoint, TransactionsEndpoint, Tx(..), TxHeader(..)) as Runtime
+import Marlowe.Runtime.Web.Types (ServerURL, Tags)
 
 data UserContractRole
   = ContractParty
@@ -31,6 +38,7 @@ data UserCashFlowDirection
 
 newtype MarloweInfo = MarloweInfo
   { initialContract :: V1.Contract
+  , initialState :: V1.State
   , currencySymbol :: Maybe V1.CurrencySymbol
   , state :: Maybe V1.State
   , currentContract :: Maybe V1.Contract
@@ -67,3 +75,23 @@ updatedAt ci@(ContractInfo { _runtime: { transactions } }) =
     Runtime.TxHeader tx /\ _ <- Array.last transactions
     tx.block
     <|> createdAt ci
+
+fetchAppliedInputs :: ServerURL -> Array Runtime.TransactionEndpoint -> Aff (V (Array (Runtime.ClientError String)) (Array ((Maybe V1.InputContent) /\ V1.TimeInterval)))
+fetchAppliedInputs serverURL transactionEndpoints = do
+  results <- transactionEndpoints `flip parTraverse` \transactionEndpoint -> do
+    Runtime.getResource' serverURL transactionEndpoint {}
+
+  pure $ results `foldMapFlipped` case _ of
+    Left err -> V (Left [err])
+    Right ({ payload: { resource: Runtime.Tx { inputs, invalidBefore, invalidHereafter }}}) -> do
+      let
+        -- = NormalInput InputContent
+        -- | MerkleizedInput InputContent String Contract
+        inputToInputContent = case _ of
+          V1.NormalInput inputContent -> inputContent
+          V1.MerkleizedInput inputContent _ _ -> inputContent
+        timeInterval = V1.TimeInterval (Instant.fromDateTime invalidBefore) (Instant.fromDateTime invalidHereafter)
+      V $ Right $ case Array.uncons inputs of
+        Just _ -> inputs <#> \input -> Just (inputToInputContent input) /\ timeInterval
+        Nothing -> [Nothing /\ timeInterval]
+

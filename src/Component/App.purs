@@ -41,6 +41,7 @@ import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Effect.Now (now)
 import Halogen.Subscription (Emitter) as Subscription
+import Language.Marlowe.Core.V1.Semantics as V1
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsEvent, ContractWithTransactionsMap, ContractWithTransactionsStream(..))
 import Marlowe.Runtime.Web.Types (PolicyId(..))
@@ -103,7 +104,7 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Just Lace -- Nami -- Eternl -- Nami -- Nothing
+debugWallet = Just Nami -- Just Lace -- Nami -- Eternl -- Nami -- Nothing
 
 data DisplayOption = Default | About
 
@@ -180,15 +181,7 @@ mkApp = do
     displayOption /\ setDisplayOption <- useState' Default
 
     -- We are ignoring contract events for now and we update the whole contractInfo set.
-    let
-      debugEmitter value = do
-        traceM "RECEIVED NOTIFICATION"
-        traceM value
-        n <- now
-        traceM initialVersion
-        traceM n
-        pure n
-    upstreamVersion <- useEmitter' initialVersion (Subscription.bindEffect debugEmitter throttledEmitter)
+    upstreamVersion <- useEmitter' initialVersion (Subscription.bindEffect (const now) throttledEmitter)
     upstreamVersionRef <- useStateRef' upstreamVersion
 
     -- Let's use versioning so we avoid large comparison.
@@ -196,7 +189,6 @@ mkApp = do
     idRef <- useStateRef version contractMap
 
     useEffect (upstreamVersion /\ possibleWalletContext) do
-      traceM "RUNNING NOTIFIER"
       updates <- contractStream.getLiveState
       old <- readRef idRef
       newVersion <- readRef upstreamVersionRef
@@ -212,10 +204,12 @@ mkApp = do
 
       when (deletionsNumber > 0 || additionsNumber > 0) do
         msgHubProps.add $ Info $ DOOM.text $
-          "New contracts: " <> show additionsNumber <> ", deleted contracts: " <> show deletionsNumber
+          "Update: "
+            <> (if deletionsNumber == 0 then "" else show deletionsNumber <> " contracts removed")
+            <> (if deletionsNumber > 0 && additionsNumber > 0 then ", " else "")
+            <> (if additionsNumber == 0 then "" else show additionsNumber <> " contracts discovered")
+            <> "."
 
-      traceM "setting new version"
-      traceM newVersion
 
       setContractMap (newVersion /\ new)
       pure $ pure unit
@@ -256,14 +250,6 @@ mkApp = do
                               , disabled: List.null msgs
                               }
                           ]
-                      -- FIXME: This should be moved to submenu
-                      -- , DOM.li { className: "nav-item" } $
-                      --     linkWithIcon
-                      --       { icon: Icons.cashStack
-                      --       , label: DOOM.text "Cash flows"
-                      --       , extraClassNames: "nav-link"
-                      --       , onClick: pure unit
-                      --       }
                       , DOM.li { className: "nav-item" } $
                           case possibleWalletInfo of
                             Just (WalletInfo wallet) -> link
@@ -283,6 +269,9 @@ mkApp = do
                       ]
                   ]
               ]
+        , DOM.div { className: "position-fixed mt-2 position-left-50 transform-translate-x--50 z-index-popover" } $
+            DOM.div { className: "container-xl" }
+                $ DOM.div { className: "row" } $ messagePreview msgHub
         , ReactContext.consumer msgHubProps.ctx \_ ->
             pure $ offcanvas
               { onHide: setCheckingNotifications false
@@ -372,6 +361,7 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
                 PolicyId policyId -> Just $ policyId
             , state: contractState'.state
             , currentContract: contractState'.currentContract
+            , initialState: V1.emptyState -- FIXME: No initial state on the API LEVEL?
             }
 
       case contractId `Map.lookup` prev of

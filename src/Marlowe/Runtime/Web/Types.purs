@@ -467,8 +467,8 @@ decodeUTCDateTime json = do
 
 type TxRow = TxRowBase
   ( inputUtxo :: TxOutRef
-  , inputContract :: V1.Contract
-  , inputState :: V1.State
+  -- , inputContract :: V1.Contract
+  -- , inputState :: V1.State
   , inputs :: Array V1.Input
   , outputUtxo :: Maybe TxOutRef
   , outputContract :: Maybe V1.Contract
