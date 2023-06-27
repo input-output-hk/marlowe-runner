@@ -441,6 +441,8 @@ mkContractDetailsComponent = do
           , DOM.p {} [ DOOM.text "In the Source Code tab, you can view the remaining part of the contract that is on the blockchain. This includes the logic and conditions that are yet to be executed. It's a textual representation of the contract, allowing you to understand the contract's structure and logic." ]
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Contract State" ]
           , DOM.p {} [ DOOM.text "In the Contract State tab, you can view the current status of the participant's account, as well as the chosen values and variables that have been set within the contract (using 'let' statements). This tab provides a snapshot of the contract's current state and the participant's interaction with it." ]
+          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Marlowe Explorer" ]
+          , DOM.p {} [ DOOM.text "To view the state of the contract on the Cardano blockchain, visit the ", DOM.a { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", target: "_blank", className: "white-color" } [ DOOM.text "Marlowe Explorer" ], DOOM.text "." ]
           ]
       , content: wrappedContentWithFooter body footer
       }
