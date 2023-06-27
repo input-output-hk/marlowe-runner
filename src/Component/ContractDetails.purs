@@ -58,8 +58,7 @@ mkComponent = do
   liftEffect $ component "ContractDetails" \{ contract, state, initialState, initialContract, transactionEndpoints, onClose } -> React.do
     possibleExecutionPath /\ setPossibleExecutionPath <- React.useState' Nothing
 
-    React.useAff unit do
-      traceM "ContractDetails: fetching applied inputs"
+    React.useAff (transactionEndpoints /\ contract /\ state) do
       fetchAppliedInputs serverURL (Array.reverse transactionEndpoints) >>= case _ of
         V (Right inputs) -> case InputHelper.executionPath inputs initialContract initialState of
           Right executionPath -> liftEffect $ setPossibleExecutionPath $ Just executionPath

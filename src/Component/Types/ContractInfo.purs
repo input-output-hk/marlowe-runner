@@ -72,7 +72,7 @@ createdAt (ContractInfo { _runtime: { contractHeader: Runtime.ContractHeader { b
 updatedAt :: ContractInfo -> Maybe Runtime.BlockHeader
 updatedAt ci@(ContractInfo { _runtime: { transactions } }) =
   do
-    Runtime.TxHeader tx /\ _ <- Array.last transactions
+    Runtime.TxHeader tx /\ _ <- Array.head transactions
     tx.block
     <|> createdAt ci
 
