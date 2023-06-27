@@ -23,6 +23,7 @@ import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
+import Data.BigInt.Argonaut (toString)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (instant, toDateTime, unInstant)
 import Data.Either (Either(..))
@@ -115,9 +116,9 @@ mkDepositFormComponent = do
     let
       choices = RadioButtonFieldChoices do
         let
-          toChoice idx (DepositInput _ _ _ value _) = do
+          toChoice idx (DepositInput _ _ token value _) = do
             let
-              label = show value
+              label = toString value <> " " <> show token
             radioFieldChoice (show idx) (DOOM.text label)
         { switch: true
         , choices: ArrayAL.fromNonEmptyArray $ mapWithIndex toChoice depositInputs
