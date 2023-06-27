@@ -20,7 +20,7 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
-import Contrib.Data.JSDate as JSDate
+import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
 import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
@@ -28,35 +28,31 @@ import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.DropdownButton (dropdownButton)
 import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FormControlSizing(..), StatelessBootstrapFormSpec, textInput)
-import Control.Alt (alt, (<|>))
+import Control.Alt ((<|>))
 import Control.Monad.Reader.Class (asks)
-import Data.Argonaut (decodeJson, encodeJson, stringify, toString)
+import Data.Argonaut (decodeJson, encodeJson, stringify)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.BigInt.Argonaut as BigInt
-import Data.DateTime (DateTime(..))
-import Data.DateTime.Instant (Instant, instant, toDateTime)
+import Data.DateTime (DateTime)
+import Data.DateTime.Instant (Instant, instant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either, hush)
-import Data.Foldable (any, fold, foldMap, or)
+import Data.Foldable (any, fold, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
-import Data.Formatter.DateTime (format, parseFormatString)
 import Data.Function (on)
-import Data.Int (toNumber)
-import Data.JSDate as JSDate
-import Data.List (List(..), catMaybes, concat, filter, intercalate)
+import Data.JSDate (fromDateTime) as JSDate
+import Data.List (concat, intercalate)
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (un)
-import Data.Number (fromString)
 import Data.Set as Set
 import Data.String (contains, length)
 import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -64,7 +60,7 @@ import Foreign.Object as Object
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Metadata(..), PutTransactionRequest(..), Runtime(..), ServerURL, SlotNumber(..), Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), PutTransactionRequest(..), Runtime(..), ServerURL, SlotNumber(..), Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import React.Basic (fragment)
@@ -165,6 +161,7 @@ mkForm onFieldValueChange = evalBuilder' ado
 actionIconSizing :: String
 actionIconSizing = " h4"
 
+runLiteTags :: Tags -> Array String
 runLiteTags (Tags metadata) = case Map.lookup runLiteTag metadata >>= decodeJson >>> hush of
   Just obj ->
       Array.filter ((_ > 2) <<< length) -- ignoring short tags
