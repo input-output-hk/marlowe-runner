@@ -480,11 +480,17 @@ stateToDetailedDescription state = case state of
     [ DOM.p {} $ DOOM.text "NOT IMPLEMENTED YET"
     ]
   Machine.FetchingRequiredWalletContext { errors: Nothing } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "We are fetching the required wallet context."
-    , DOM.p {} $ DOOM.text "marlowe-runtime requires information about wallet addresses so it can pick UTxO to pay for the initial transaction."
-    , DOM.p {} $ DOOM.text $
-        "To gain the address set from the wallet we use CIP-30 `getUsedAddresses` method and reencoding them from lower "
-          <> "level cardano CBOR hex into Bech32 (`addr_test...`)."
+    [ DOM.p {}
+        [ DOOM.text "We are currently fetching the required wallet context for creating the Marlowe Contract on chain." ]
+    , DOM.p {}
+        [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
+        , DOM.code {} [ DOOM.text "getUsedAddresses" ]
+        , DOOM.text " method from CIP-30. The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
+        , DOM.code {} [ DOOM.text "addr_test..." ]
+        , DOOM.text ")."
+        ]
+    , DOM.p {}
+        [ DOOM.text "Please wait while we fetch the wallet context. This process may take a few moments." ]
     ]
   Machine.FetchingRequiredWalletContext { errors: Just error } -> DOOM.div_
     [ DOM.p {} $ DOOM.text "It seems that the provided wallet is lacking addresses or failed to execute the method:"

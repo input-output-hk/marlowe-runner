@@ -19,6 +19,7 @@ import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.React.MarloweGraph (marloweGraph)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), FieldLayout(..), LabelSpacing(..), booleanField, choiceField, intInput, radioFieldChoice, selectFieldChoice)
+import Contrib.ReactSyntaxHighlighter (jsonSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Data.Array.ArrayAL as ArrayAL
@@ -453,20 +454,23 @@ fetchingRequiredWalletContextDetails possibleOnNext onDismiss possibleWalletResp
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
-        -- | Let's describe that we are
-          [ DOM.p {} $ DOOM.text "We are fetching the required wallet context."
-          , DOM.p {} $ DOOM.text "marlowe-runtime requires information about wallet addresses so it can pick UTxO to pay for the initial transaction."
-          , DOM.p {} $ DOOM.text $
-              "To gain the address set from the wallet we use CIP-30 `getUsedAddresses` method and reencoding them from lower "
-                <> "level cardano CBOR hex into Bech32 (`addr_test...`)."
+          -- | Let's describe that we are
+          [ DOM.p { className: "h3" } $ DOOM.text "We are fetching the required wallet context."
+          , DOM.p {}
+              [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
+              , DOM.code {} [ DOOM.text "getUsedAddresses" ]
+              , DOOM.text " method from CIP-30. The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
+              , DOM.code {} [ DOOM.text "addr_test..." ]
+              , DOOM.text ")."
+              ]
           ]
       , DOM.div { className: "col-6" } $ case possibleWalletResponse of
           Nothing ->
             -- FIXME: loader
-            DOM.p {} $ DOOM.text "No response yet."
+            DOM.p { className: "h3" } $ DOOM.text "No response yet."
           Just walletResponse -> fragment
-            [ DOM.p {} $ DOOM.text "Wallet response:"
-            , DOM.p {} $ DOOM.text $ unsafeStringify walletResponse
+            [ DOM.p { className: "h3" } $ DOOM.text "Wallet response:"
+            , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify walletResponse
             ]
       ]
     footer = fragment
@@ -497,13 +501,6 @@ fetchingRequiredWalletContextDetails possibleOnNext onDismiss possibleWalletResp
           [ DOM.p {}
               [ DOOM.text "We are currently fetching the required wallet context for interacting with the contract." ]
           , DOM.p {}
-              [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
-              , DOM.code {} [ DOOM.text "getUsedAddresses" ]
-              , DOOM.text " method from CIP-30. The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
-              , DOM.code {} [ DOOM.text "addr_test..." ]
-              , DOOM.text ")."
-              ]
-          , DOM.p {}
               [ DOOM.text "This information is essential for confirming your participation in the contract and facilitating the necessary transactions." ]
           , DOM.p {}
               [ DOOM.text "Please wait while we fetch the wallet context. This process may take a few moments." ]
@@ -518,16 +515,17 @@ creatingTxDetails possibleOnNext onDismiss runtimeRequest possibleRuntimeRespons
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
-        [ DOM.p {} $ DOOM.text "We are creating the initial transaction."
-        , DOM.p {} $ DOOM.text "We are sending the following request headers to the API:"
-        , DOM.p {} $ DOOM.text $ unsafeStringify runtimeRequest
-        ]
+          [ DOM.p { className: "h3" } $ DOOM.text "We are creating the initial transaction."
+          , DOM.p {} $ DOOM.text "We are sending the following request headers to the API:"
+          , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeRequest
+          ]
       , DOM.div { className: "col-6" } $ case possibleRuntimeResponse of
           Nothing -> -- FIXME: loader
+
             DOM.p {} $ DOOM.text "No response yet."
           Just runtimeResponse -> fragment
-            [ DOM.p {} $ DOOM.text "API response:"
-            , DOM.p {} $ DOOM.text $ unsafeStringify runtimeResponse
+            [ DOM.p { className: "h3" } $ DOOM.text "API response:"
+            , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeResponse
             ]
       ]
     footer = fragment
@@ -561,10 +559,11 @@ signingTransaction possibleOnNext onDismiss possibleWalletResponse = do
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" } $ case possibleWalletResponse of
           Nothing -> -- FIXME: loader
+
             DOM.p {} $ DOOM.text "No response yet."
           Just runtimeResponse -> fragment
-            [ DOM.p {} $ DOOM.text "API response:"
-            , DOM.p {} $ DOOM.text $ unsafeStringify runtimeResponse
+            [ DOM.p { className: "h3" } $ DOOM.text "API response:"
+            , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeResponse
             ]
       ]
     footer = fragment
@@ -597,15 +596,16 @@ submittingTransaction onDismiss runtimeRequest possibleRuntimeResponse = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
-        [ DOM.p {} $ DOOM.text "We submitting the final transaction"
-        , DOM.p {} $ DOOM.text $ unsafeStringify runtimeRequest
-        ]
+          [ DOM.p { className: "h3" } $ DOOM.text "We are submitting the final transaction"
+          , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeRequest
+          ]
       , DOM.div { className: "col-6" } $ case possibleRuntimeResponse of
           Nothing -> -- FIXME: loader
+
             DOM.p {} $ DOOM.text "No response yet."
           Just runtimeResponse -> fragment
-            [ DOM.p {} $ DOOM.text "API response:"
-            , DOM.p {} $ DOOM.text $ unsafeStringify runtimeResponse
+            [ DOM.p { className: "h3" } $ DOOM.text "API response:"
+            , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeResponse
             ]
       ]
     footer = fragment
@@ -626,12 +626,12 @@ inputApplied onNext = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
-        [ DOM.p {} $ DOOM.text "Input applied successfully?"
-        ]
+          [ DOM.p { className: "h3" } $ DOOM.text "Input applied successfully?"
+          ]
       , DOM.div { className: "col-6" } $ fragment
-            [ DOM.p {} $ DOOM.text "API response:"
-            , DOM.p {} $ DOOM.text $ unsafeStringify "201"
-            ]
+          [ DOM.p { className: "h3" } $ DOOM.text "API response:"
+          , DOM.p {} $ DOOM.text $ unsafeStringify "201"
+          ]
       ]
     footer = fragment
       [ DOM.button
