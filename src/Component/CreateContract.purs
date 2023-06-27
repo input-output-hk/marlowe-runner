@@ -89,15 +89,6 @@ mkContractFormSpec :: (Maybe V1.Contract /\ AutoRun) -> StatelessBootstrapFormSp
 mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormSpecBuilder.evalBuilder Nothing $ ado
   contract <- StatelessFormSpecBuilders.textArea
     { missingError: "Please provide contract terms JSON value"
-    , helpText: Just $ DOOM.div_
-        [ DOOM.text "Please provide a contract in a JSON format."
-        , DOOM.br {}
-        , DOOM.text "To generate it you can use a Marlowe library for your language of choice (for example "
-        , DOM.a { href: "https://github.com/input-output-hk/marlowe-ts-sdk", target: "_blank" } $ DOOM.text "marlowe-ts-sdk)"
-        , DOOM.text " or use "
-        , DOM.a { href: "https://play.marlowe.iohk.io/", target: "_blank" } $ DOOM.text "Marlowe Playground"
-        , DOOM.text " (after creating a contract in the simulator you can use \"Download JSON\" button)."
-        ]
     , initial: case possibleInitialContract of
         Nothing -> ""
         Just initialContract -> stringifyWithIndent 2 $ encodeJson initialContract
