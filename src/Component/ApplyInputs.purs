@@ -490,8 +490,23 @@ fetchingRequiredWalletContextDetails possibleOnNext onDismiss possibleWalletResp
       ]
 
   BodyLayout.component
-    { title: "Apply Inputs | Fetching Wallet Context"
-    , description: DOOM.text "Fetching Wallet Context description"
+    { title: "Fetching Wallet Context"
+    , description:
+        DOM.div {}
+          [ DOM.p {}
+              [ DOOM.text "We are currently fetching the required wallet context for interacting with the contract." ]
+          , DOM.p {}
+              [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
+              , DOM.code {} [ DOOM.text "getUsedAddresses" ]
+              , DOOM.text " method from CIP-30. The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
+              , DOM.code {} [ DOOM.text "addr_test..." ]
+              , DOOM.text ")."
+              ]
+          , DOM.p {}
+              [ DOOM.text "This information is essential for confirming your participation in the contract and facilitating the necessary transactions." ]
+          , DOM.p {}
+              [ DOOM.text "Please wait while we fetch the wallet context. This process may take a few moments." ]
+          ]
     , content: wrappedContentWithFooter body footer
     }
 
