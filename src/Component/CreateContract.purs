@@ -89,13 +89,6 @@ mkContractFormSpec :: (Maybe V1.Contract /\ AutoRun) -> StatelessBootstrapFormSp
 mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormSpecBuilder.evalBuilder Nothing $ ado
   contract <- StatelessFormSpecBuilders.textArea
     { missingError: "Please provide contract terms JSON value"
-    , helpText: Just $ DOOM.div_
-        [ DOOM.text "Please provide a contract in a JSON format. To generate it you can use a Marlowe library for your language of choice (for example "
-        , DOM.a { href: "https://github.com/input-output-hk/marlowe-ts-sdk", target: "_blank" } $ DOOM.text "marlowe-ts-sdk)"
-        , DOOM.text " or use "
-        , DOM.a { href: "https://play.marlowe.iohk.io/", target: "_blank" } $ DOOM.text "the playground"
-        , DOOM.text " to generate it (after creating a contract in the simulator you can use \"Download JSON\" button):"
-        ]
     , initial: case possibleInitialContract of
         Nothing -> ""
         Just initialContract -> stringifyWithIndent 2 $ encodeJson initialContract
@@ -118,8 +111,9 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
     , validator: liftFn case _ of
         Nothing -> Tags Map.empty
         Just tags ->
-          (Tags $ Map.singleton runLiteTag
-             (encodeJson $ map (encodeJson <<< trim) $ split (Pattern ",") tags))
+          ( Tags $ Map.singleton runLiteTag
+              (encodeJson $ map (encodeJson <<< trim) $ split (Pattern ",") tags)
+          )
     }
 
   autoRun <- AutoRun <$> do
@@ -149,12 +143,11 @@ mkRolesConfigForm roleNames cardanoMultiplatformLib = FormSpecBuilder.evalBuilde
     , label: Just $ DOOM.text roleName
     , touched: false
     , validator: requiredV' $ Validator.liftFnMMaybe (const $ pure [ "Invalid address" ]) \str -> do
-       bech32FromString cardanoMultiplatformLib str
+        bech32FromString cardanoMultiplatformLib str
     }
   in (roleName /\ (RoleTokenSimple address))
 
 type ClientError' = ClientError PostContractsError
-
 
 foreign import _loadFile :: File -> Promise (Nullable String)
 
@@ -193,14 +186,13 @@ mkLoadFileButtonComponent =
 
     pure $ DOOM.input { type: "file", onChange: handler_ onChange, ref }
 
-
 machineProps (AutoRun autoRun) connectedWallet cardanoMultiplatformLib runtime = do
   let
     env = { connectedWallet, cardanoMultiplatformLib, runtime }
   { initialState: Machine.initialState
   , step: Machine.step
-  , driver: if autoRun
-      then Machine.driver env
+  , driver:
+      if autoRun then Machine.driver env
       else const Nothing
   , output: identity
   }
@@ -221,7 +213,7 @@ type RoleProps =
 mkRoleTokensComponent :: MkComponentM (RoleProps -> JSX)
 mkRoleTokensComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-  liftEffect $ component "RoleTokensAssignment" \{ onDismiss , onSuccess, roleNames } -> React.do
+  liftEffect $ component "RoleTokensAssignment" \{ onDismiss, onSuccess, roleNames } -> React.do
     let
       formSpec = mkRolesConfigForm roleNames cardanoMultiplatformLib
 
@@ -305,7 +297,6 @@ mkComponent = do
       , validationDebounce: Seconds 0.5
       }
 
-
     possibleWalletInfo <- React.useContext walletInfoCtx
     React.useEffect (_.changeAddress <<< un WalletContext <<< snd <$> possibleWalletInfo) $ do
       case possibleWalletInfo of
@@ -355,23 +346,26 @@ mkComponent = do
         let
           onSuccess' :: RolesConfig -> Effect Unit
           onSuccess' rolesConfig =
-            let action = Machine.DefineRoleTokensSucceeded rolesConfig
-            in applyAction action
+            let
+              action = Machine.DefineRoleTokensSucceeded rolesConfig
+            in
+              applyAction action
 
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: roleTokenComponent { onDismiss: pure unit, onSuccess : onSuccess', connectedWallet , roleNames }
+          , content: roleTokenComponent { onDismiss: pure unit, onSuccess: onSuccess', connectedWallet, roleNames }
           }
       Machine.ContractCreated { contract, createTxResponse } -> do
         let
-          { links: { contract: contractEndpoint }} = createTxResponse
+          { links: { contract: contractEndpoint } } = createTxResponse
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
           , content: wrappedContentWithFooter
               do marloweYaml contract
-              do DOM.button
+              do
+                DOM.button
                   { className: "btn btn-primary"
                   , onClick: handler_ (onSuccess contractEndpoint)
                   }
@@ -387,22 +381,21 @@ mkComponent = do
             _ -> Nothing
 
           body = fragment
-              [ do
+            [ do
+                let
+                  StepIndex index = (machineStateToStepIndex machineState)
+                if index < machineStepsCardinality then do
                   let
-                    StepIndex index = (machineStateToStepIndex machineState)
-                  if index < machineStepsCardinality
-                  then do
-                    let
-                      stepPercent = Int.ceil $ (Int.toNumber (index - 1)/ Int.toNumber (machineStepsCardinality - 1)) * 100.0
-                      style = css { width: show stepPercent <> "%" }
-                    DOM.div { className: "progress mb-3" } $ do
-                        DOOM.div { className: "progress-bar", style, children: [] }
-                  else mempty
-              , case currentRun of
-                  Just (Manual true) -> do
-                    DOM.div { className: "d-flex justify-content-center" } $ spinner Nothing
-                  _ -> DOOM.text "REQUEST / RESPONSE"
-              ]
+                    stepPercent = Int.ceil $ (Int.toNumber (index - 1) / Int.toNumber (machineStepsCardinality - 1)) * 100.0
+                    style = css { width: show stepPercent <> "%" }
+                  DOM.div { className: "progress mb-3" } $ do
+                    DOOM.div { className: "progress-bar", style, children: [] }
+                else mempty
+            , case currentRun of
+                Just (Manual true) -> do
+                  DOM.div { className: "d-flex justify-content-center" } $ spinner Nothing
+                _ -> DOOM.text "REQUEST / RESPONSE"
+            ]
 
           formActions = case possibleRequest of
             Nothing -> mempty
@@ -419,12 +412,12 @@ mkComponent = do
                       Just (Manual b) -> b
                       _ -> false
                   , onClick: handler_ do
-                    setCurrentRun (Just $ Manual true)
-                    launchAff_ do
-                      action <- request
-                      liftEffect $ do
-                        applyAction action
-                        setCurrentRun (Just $ Manual false)
+                      setCurrentRun (Just $ Manual true)
+                      launchAff_ do
+                        action <- request
+                        liftEffect $ do
+                          applyAction action
+                          setCurrentRun (Just $ Manual false)
                   }
                   [ R.text "Run" ]
               ]
@@ -467,8 +460,21 @@ machineStateToStepIndex state = StepIndex $ case state of
 stateToDetailedDescription :: Machine.State -> JSX
 stateToDetailedDescription state = case state of
   Machine.DefiningContract -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "We are in the initial state, we are waiting for the user to trigger the contract creation process."
-    , DOM.p {} $ DOOM.text "When we get the correct contract value (JSON) we gonna use it as a part of the request to the marlowe-runtime."
+    [ DOM.p {} $ DOOM.text "We are currently in the initial state, awaiting the user to initiate the contract creation process."
+    , DOM.p {} $ DOOM.text "When we receive the correct contract value in JSON format, it will be utilized as part of the request to the Marlowe runtime"
+    , DOM.p {} $ DOOM.text "As a user, you have two options for providing the contract:"
+    , DOM.ul {}
+        [ DOM.li {} $ DOOM.text "Enter a valid contract in JSON format in the input field to the right"
+        , DOM.li {} $ DOOM.text "Upload a contract JSON file using the \"Upload\" button."
+        ]
+    , DOM.p { className: "h3 fw-bold py-3" } $ DOOM.text "How to Provide a Contract in JSON Format:"
+    , DOM.p {}
+        [ DOOM.text "Please provide a contract in a JSON format. To generate it, you can use a Marlowe library for your language of choice (for example, "
+        , DOM.a { href: "https://github.com/input-output-hk/marlowe-ts-sdk", target: "_blank", className: "white-color" } [ DOOM.text " marlowe-ts-sdk" ]
+        , DOOM.text "), or you can use the "
+        , DOM.a { href: "https://play.marlowe.iohk.io/#/", target: "_blank", className: "white-color" } [ DOOM.text " Marlowe Playground" ]
+        , DOOM.text " to generate it. After creating a contract in the simulator within the Marlowe Playground, you can use the \"Download JSON\" button to obtain the contract in JSON format. Once you have the JSON file, you can either enter it in the input field to the right or upload it using the \"Upload\" button."
+        ]
     ]
   Machine.DefiningRoleTokens {} -> DOOM.div_
     [ DOM.p {} $ DOOM.text "NOT IMPLEMENTED YET"
@@ -535,13 +541,16 @@ stateToDescription state = case state of
 
 three :: BigInt
 three = BigInt.fromInt 3
+
 four :: BigInt
 four = BigInt.fromInt 4
 
-mkInitialContracts :: Bech32 -> Effect
-  { -- brianContract :: V1.Contract
-    multiChoiceTest :: V1.Contract
-  }
+mkInitialContracts
+  :: Bech32
+  -> Effect
+       { -- brianContract :: V1.Contract
+         multiChoiceTest :: V1.Contract
+       }
 mkInitialContracts bech32 = do
   nowMilliseconds <- unInstant <$> now
   let
