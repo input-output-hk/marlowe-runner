@@ -385,7 +385,7 @@ mkContractDetailsComponent = do
       contractSection =
         tabs { fill: true, justify: true, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
           let
-            renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto"} children
+            renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
           [ renderTab
               { eventKey: eventKey "graph"
               , title: DOOM.span_
@@ -433,7 +433,15 @@ mkContractDetailsComponent = do
         ]
     pure $ BodyLayout.component
       { title: "Apply Input"
-      , description: DOOM.text "Contract Details"
+      , description: DOM.div {}
+          [ DOM.p {} [ DOOM.text "This page allows contract participants to interact with the contract and take actions to progress through it. On the right side of the page, you will see a representation of the contract state as it currently exists on the blockchain. The page is divided into three tabs: Source Graph, Source Code, and Contract State. Each tab provides a different view of the contract." ]
+          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Graph" ]
+          , DOM.p {} [ DOOM.text "The Source Graph tab provides a visual representation of the contract. It displays the contract as a graph, with nodes representing the different states and actions of the contract. The paths that have already been executed (transactions) are highlighted, allowing you to see the progression of the contract over time." ]
+          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Code" ]
+          , DOM.p {} [ DOOM.text "In the Source Code tab, you can view the remaining part of the contract that is on the blockchain. This includes the logic and conditions that are yet to be executed. It's a textual representation of the contract, allowing you to understand the contract's structure and logic." ]
+          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Contract State" ]
+          , DOM.p {} [ DOOM.text "In the Contract State tab, you can view the current status of the participant's account, as well as the chosen values and variables that have been set within the contract (using 'let' statements). This tab provides a snapshot of the contract's current state and the participant's interaction with it." ]
+          ]
       , content: wrappedContentWithFooter body footer
       }
 
