@@ -163,9 +163,9 @@ actionIconSizing = " h4"
 
 runLiteTags :: Tags -> Array String
 runLiteTags (Tags metadata) = case Map.lookup runLiteTag metadata >>= decodeJson >>> hush of
-  Just obj ->
+  Just arr ->
       Array.filter ((_ > 2) <<< length) -- ignoring short tags
-      $ Object.values obj
+      $ arr
   Nothing -> []
 
 mkContractList :: MkComponentM (Props -> JSX)

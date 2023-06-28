@@ -301,9 +301,7 @@ instance EncodeJson Tags where
 instance DecodeJson Tags where
   decodeJson json = do
     (obj :: Object Json) <- decodeJson json
-    let
-      (arr :: Array (String /\ Json)) = Object.toUnfoldable obj
-    pure <<< Tags <<< Map.fromFoldable $ arr
+    pure <<< Tags <<< Map.fromFoldableWithIndex $ obj
 
 type ContractHeadersRowBase r =
   ( contractId :: TxOutRef
