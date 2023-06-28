@@ -6,6 +6,7 @@ import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
 import Component.ApplyInputs.Machine as ApplyInputs.Machine
+import Component.BodyLayout (descriptionLink)
 import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
 import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle

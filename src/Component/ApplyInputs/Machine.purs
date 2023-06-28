@@ -335,7 +335,7 @@ requestToAffAction = case _ of
       case possibleWalletAddresses of
         Left err -> pure $ FetchRequiredWalletContextFailed $ show err
         Right (WalletContext { changeAddress: Just changeAddress, usedAddresses }) -> liftEffect $ do
-          invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-5) * 60 * 1000))
+          invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
           invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
           let
             { contract, state } = marloweContext

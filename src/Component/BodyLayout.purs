@@ -27,3 +27,6 @@ component { title, description, content } =
             ]
       , DOM.div { className: "col-9 px-0 overflow-auto vh-100 pt-59px pb-71px" } content
       ]
+
+descriptionLink :: { icon :: String, href :: String, label :: String } -> JSX
+descriptionLink { icon, href, label } = DOM.a { href, target: "_blank", className: "white-color" } [ DOOM.i { className: "ms-2 me-1 h6 " <> icon }, DOOM.text label ]

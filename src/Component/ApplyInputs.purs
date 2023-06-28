@@ -6,7 +6,7 @@ import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..))
 import Component.ApplyInputs.Machine as Machine
-import Component.BodyLayout (wrappedContentWithFooter)
+import Component.BodyLayout (descriptionLink, wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, toIChoice, toIDeposit)
 import Component.MarloweYaml (marloweStateYaml, marloweYaml)
@@ -18,6 +18,7 @@ import Contrib.Polyform.FormSpecBuilder (evalBuilder')
 import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.React.MarloweGraph (marloweGraph)
+import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), FieldLayout(..), LabelSpacing(..), booleanField, choiceField, intInput, radioFieldChoice, selectFieldChoice)
 import Contrib.ReactSyntaxHighlighter (jsonSyntaxHighlighter)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
@@ -27,6 +28,7 @@ import Data.Array.NonEmpty (NonEmptyArray)
 import Data.BigInt.Argonaut (toString)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (instant, toDateTime, unInstant)
+import Data.Decimal as Decimal
 import Data.Either (Either(..))
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int as Int
@@ -119,7 +121,17 @@ mkDepositFormComponent = do
         let
           toChoice idx (DepositInput _ _ token value _) = do
             let
-              label = toString value <> " " <> show token
+              label = "Deposit " <>  case token of
+                V1.Token "" "" -> do
+                  let
+                    possibleDecimal = do
+                      million <- Decimal.fromString "1000000"
+                      lovelace <- Decimal.fromString $ BigInt.toString value
+                      pure $ lovelace / million
+                  case possibleDecimal of
+                    Just value' -> Decimal.toString value' <> " ₳"
+                    Nothing -> toString value <> " of Lovelace"
+                V1.Token currencySymbol name -> toString value <> " of " <> " currency " <> currencySymbol <> " of token " <> name
             radioFieldChoice (show idx) (DOOM.text label)
         { switch: true
         , choices: ArrayAL.fromNonEmptyArray $ mapWithIndex toChoice depositInputs
@@ -153,7 +165,13 @@ mkDepositFormComponent = do
         fields = renderFormSpec formSpec formState
         body = DOM.div { className: "form-group" } fields
         actions = fragment
-          [ DOM.button
+          [ link
+              { label: DOOM.text "Cancel"
+              , onClick: onDismiss
+              , showBorders: true
+              , extraClassNames: "me-3"
+              }
+          , DOM.button
               do
                 let
                   disabled = case result of
@@ -165,8 +183,13 @@ mkDepositFormComponent = do
                 }
               [ R.text "Submit" ]
           ]
-      { title: "Perform deposit"
-      , description: DOOM.text "We are creating the initial transaction."
+      { title: "Select a Deposit to Perform"
+      , description: fragment
+        [ DOM.p {}
+          [ DOOM.text "On the right, you can view all the deposits available for performance at this stage." ]
+        , DOM.p {}
+          [ DOOM.text "While it's relatively uncommon to have multiple deposit choices at a given point in the contract, it remains a feasible and potentially useful option in certain cases." ]
+        ]
       , content: wrappedContentWithFooter body actions
       }
 
@@ -436,7 +459,7 @@ mkContractDetailsComponent = do
     pure $ BodyLayout.component
       { title: "Apply Input"
       , description: DOM.div {}
-          [ DOM.p {} [ DOOM.text "This page allows contract participants to interact with the contract and take actions to progress through it. On the right side of the page, you will see a representation of the contract state as it currently exists on the blockchain. The page is divided into three tabs: Source Graph, Source Code, and Contract State. Each tab provides a different view of the contract." ]
+          [ DOM.p {} [ DOOM.text "This page allows contract participants to interact with the contract and take actions to progress through it. On the right side of the page, you will see a representation of the contract state as it currently exists on the blockchain." ]
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Graph" ]
           , DOM.p {} [ DOOM.text "The Source Graph tab provides a visual representation of the contract. It displays the contract as a graph, with nodes representing the different states and actions of the contract. The paths that have already been executed (transactions) are highlighted, allowing you to see the progression of the contract over time." ]
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Code" ]
@@ -444,7 +467,7 @@ mkContractDetailsComponent = do
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Contract State" ]
           , DOM.p {} [ DOOM.text "In the Contract State tab, you can view the current status of the participant's account, as well as the chosen values and variables that have been set within the contract (using 'let' statements). This tab provides a snapshot of the contract's current state and the participant's interaction with it." ]
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Marlowe Explorer" ]
-          , DOM.p {} [ DOOM.text "To view the state of the contract on the Cardano blockchain, visit the ", DOM.a { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", target: "_blank", className: "white-color" } [ DOOM.text "Marlowe Explorer" ], DOOM.text "." ]
+          , DOM.p {} [ DOOM.text "To view more details the state of the contract on the Cardano blockchain, you can visit the", descriptionLink { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", icon: "bi-globe2", label: "Marlowe Explorer" }, DOOM.text "." ]
           ]
       , content: wrappedContentWithFooter body footer
       }
@@ -455,11 +478,12 @@ fetchingRequiredWalletContextDetails possibleOnNext onDismiss possibleWalletResp
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
           -- | Let's describe that we are
-          [ DOM.p { className: "h3" } $ DOOM.text "We are fetching the required wallet context."
-          , DOM.p {}
+          [ DOM.p {}
               [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
               , DOM.code {} [ DOOM.text "getUsedAddresses" ]
-              , DOOM.text " method from CIP-30. The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
+              , DOOM.text " method from "
+              , descriptionLink { label: "CIP-30", href: "https://github.com/cardano-foundation/CIPs/tree/master/CIP-0030", icon: "bi-github" }
+              , DOOM.text ". The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
               , DOM.code {} [ DOOM.text "addr_test..." ]
               , DOOM.text ")."
               ]
@@ -498,25 +522,27 @@ fetchingRequiredWalletContextDetails possibleOnNext onDismiss possibleWalletResp
     { title: "Fetching Wallet Context"
     , description:
         DOM.div {}
-          [ DOM.p {}
-              [ DOOM.text "We are currently fetching the required wallet context for interacting with the contract." ]
-          , DOM.p {}
-              [ DOOM.text "This information is essential for confirming your participation in the contract and facilitating the necessary transactions." ]
-          , DOM.p {}
-              [ DOOM.text "Please wait while we fetch the wallet context. This process may take a few moments." ]
-          ]
+            [ DOM.p {}
+                [ DOOM.text "We are currently fetching the required wallet context for interacting with the contract. This information is essential for confirming your participation in the contract and facilitating the necessary transactions." ]
+            , DOM.p {}
+              [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
+              , DOM.code {} [ DOOM.text "getUsedAddresses" ]
+              , DOOM.text " method from "
+              , descriptionLink { label: "CIP-30", href: "https://github.com/cardano-foundation/CIPs/tree/master/CIP-0030", icon: "bi-github" }
+              ]
+            ]
     , content: wrappedContentWithFooter body footer
     }
 
 -- Now we want to to describe the interaction with the API where runtimeRequest is
 -- a { headers: Map String String, body: JSON }.
 -- We really want to provide the detailed informatin (headers and payoload)
+creatingTxDetails :: forall a1531 a1573. Maybe (Effect Unit) -> Effect Unit -> a1531 -> Maybe a1573 -> JSX
 creatingTxDetails possibleOnNext onDismiss runtimeRequest possibleRuntimeResponse = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
-          [ DOM.p { className: "h3" } $ DOOM.text "We are creating the initial transaction."
-          , DOM.p {} $ DOOM.text "We are sending the following request headers to the API:"
+          [ DOM.p { className: "h3" } $ DOOM.text "API request:"
           , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeRequest
           ]
       , DOM.div { className: "col-6" } $ case possibleRuntimeResponse of
@@ -549,18 +575,31 @@ creatingTxDetails possibleOnNext onDismiss runtimeRequest possibleRuntimeRespons
             [ R.text "Next" ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Apply Inputs | Creating Transaction"
-    , description: DOOM.text "We are creating the initial transaction."
+    { title: "Creating Transaction"
+    , description: DOOM.div_
+        [ DOM.p {} [ DOOM.text "We use the Marlowe Runtime to request a transaction that will apply the chosen input." ]
+        , DOM.p {} [ DOOM.text "In order to build the required transaction we use Marlowe Runtime REST API. We encode the input which we wish to apply and also provide the addresses which we were able to collect in the previous step from the wallet. The addresses are re-encoded from the lower-level Cardano CBOR hex format into Bech32 format (", DOM.code {} [ DOOM.text "addr_test..." ], DOOM.text ") and sent to the backend as part of the request." ]
+        , DOM.p {} [ DOOM.text "On the transction level this application of input is carried out by providing a redeemer, which encodes the chosen input and supplies it to the Marlowe script to execute the contract step(s). The transaction outputs must fulfill the requirements of the effects of this input application. Specifically, they need to handle all payouts if any are made, or deposit the required deposit, or finalize the contract and payout all the money according to the accounting state."]
+        ]
     , content: wrappedContentWithFooter body footer
     }
 
+type Href = String
+
+-- DOM.a { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", target: "_blank", className: "white-color" } [ DOOM.i { className: "ms-1 h6 bi-globe2" }, DOOM.text "  Marlowe Explorer" ]
+
+
+signingTransaction :: forall res. Maybe (Effect Unit) -> Effect Unit -> Maybe res -> JSX
 signingTransaction possibleOnNext onDismiss possibleWalletResponse = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" } $ case possibleWalletResponse of
-          Nothing -> -- FIXME: loader
-
-            DOM.p {} $ DOOM.text "No response yet."
+          Nothing ->
+            DOM.div
+              { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
+              }
+              $ loadingSpinnerLogo
+                  {}
           Just runtimeResponse -> fragment
             [ DOM.p { className: "h3" } $ DOOM.text "API response:"
             , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeResponse
@@ -587,11 +626,27 @@ signingTransaction possibleOnNext onDismiss possibleWalletResponse = do
             [ R.text "Next" ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Apply Inputs | Creating Transaction"
-    , description: DOOM.text "We are singning the transaction."
+    { title: "Signing transaction"
+    , description: fragment
+        [ DOM.p {} [ DOOM.text "We are now signing the transaction with the wallet. While the wallet currently does not provide detailed information about the Marlowe contract within the transaction, all transaction details, including the contract, are readily accessible and can be decoded for verification:" ]
+        , DOM.ul {}
+          [ DOM.li {}
+            [ DOOM.text "A consistent Marlowe validator is used across all transactions. As the UTxO with Marlowe is available on the chain, it can be cheaply referenced - please check "
+            , descriptionLink { icon: "bi-github", href: "https://github.com/cardano-foundation/CIPs/tree/master/CIP-0031", label: "CIP-0031" }
+            , DOOM.text " for more details."
+            ]
+          , DOM.li {}
+            [ DOOM.text "The Marlowe contract, along with its state, is encoded in the datum of the UTxO with the validator."
+            ]
+          , DOM.li {}
+            [ DOOM.text "The value on the UTxO should represent the amount of money that is locked in the contract."
+            ]
+          ]
+        ]
     , content: wrappedContentWithFooter body footer
     }
 
+submittingTransaction :: forall req res. Effect Unit -> req -> Maybe res -> JSX
 submittingTransaction onDismiss runtimeRequest possibleRuntimeResponse = do
   let
     body = DOM.div { className: "row" }
@@ -617,8 +672,11 @@ submittingTransaction onDismiss runtimeRequest possibleRuntimeResponse = do
           }
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Apply Inputs | Submitting Transaction"
-    , description: DOOM.text "We are submitting the final signed transaction."
+    { title: "Submitting transaction signatures"
+    , description: fragment
+      [ DOM.p {} [ DOOM.text "We are submitting the signatures for the transaction to the Marlowe Runtime now using its REST API." ]
+      , DOM.p {} [ DOOM.text "Marlowe Runtime will verify the signatures and if they are correct, it will attach them to the transaction and submit the transaction to the blockchain." ]
+      ]
     , content: wrappedContentWithFooter body footer
     }
 
@@ -626,7 +684,7 @@ inputApplied onNext = do
   let
     body = DOM.div { className: "row" }
       [ DOM.div { className: "col-6" }
-          [ DOM.p { className: "h3" } $ DOOM.text "Input applied successfully?"
+          [ DOM.p { className: "h3" } $ DOOM.text "Input applied successfully"
           ]
       , DOM.div { className: "col-6" } $ fragment
           [ DOM.p { className: "h3" } $ DOOM.text "API response:"
@@ -642,7 +700,7 @@ inputApplied onNext = do
           [ R.text "Ok" ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Apply Inputs | Submitting Transaction"
+    { title: "Inputs applied successfully"
     , description: DOOM.text "We are submitting the final signed transaction."
     , content: wrappedContentWithFooter body footer
     }
@@ -659,7 +717,7 @@ shouldShowPrevStep :: PreviewMode -> Boolean
 shouldShowPrevStep (DetailedFlow { showPrevStep }) = showPrevStep
 shouldShowPrevStep SimplifiedFlow = false
 
-showPossibleErrorAndDismiss title body onDismiss errors = do
+showPossibleErrorAndDismiss title description body onDismiss errors = do
   let
     body' = case errors of
       Just errors -> fragment
@@ -678,7 +736,7 @@ showPossibleErrorAndDismiss title body onDismiss errors = do
         ]
       Nothing -> mempty
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Apply Inputs | Submitting Transaction"
+    { title
     , description: DOOM.text "We are submitting the final signed transaction."
     , content: wrappedContentWithFooter body' footer
     }
@@ -735,9 +793,13 @@ mkComponent = do
       Machine.FetchingRequiredWalletContext { errors } -> case previewFlow of
         DetailedFlow _ -> fetchingRequiredWalletContextDetails Nothing onDismiss Nothing
         SimplifiedFlow -> do
-          let
-            body = DOOM.text "Auto fetching... (progress bar?)"
-          showPossibleErrorAndDismiss "Fetching wallet context" body onDismiss errors
+          DOM.div {}
+            [ DOM.div
+              { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
+              } $ loadingSpinnerLogo {}
+            , contractDetailsComponent { marloweContext, onSuccess: const $ pure unit, onDismiss }
+            ]
+          -- showPossibleErrorAndDismiss "Fetching wallet context" body onDismiss errors
 
       Machine.ChoosingInputType {allInputsChoices, requiredWalletContext} -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
@@ -821,39 +883,20 @@ mkComponent = do
             notifyFormComponent { notifyInput, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
           AdvanceContract cont ->
             advanceFormComponent { contract: cont, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
-      Machine.CreatingTx { allInputsChoices, errors } -> case previewFlow of
-        DetailedFlow _ -> do
-          creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
-            Just err -> Just $ err
-            Nothing -> Nothing
-        SimplifiedFlow -> do
-          let
-            body = DOOM.text "Auto creating tx..."
-          showPossibleErrorAndDismiss "Creating Transaction" body onDismiss errors
-        -- SimplifiedFlow -> BodyLayout.component
-        --   { title: "Creating transaction"
-        --   , description: DOOM.text "We are creating the initial transaction."
-        --   , content: DOOM.text "Auto creating tx... (progress bar?)"
-        --   }
+      Machine.CreatingTx { allInputsChoices, errors } ->
+        creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
+          Just err -> Just $ err
+          Nothing -> Nothing
       Machine.SigningTx { createTxResponse, errors } -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
           creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
-        DetailedFlow _ ->
-          signingTransaction Nothing onDismiss Nothing
-        SimplifiedFlow -> do
-          let
-            body = DOOM.text "Auto signing tx... (progress bar?)"
-          showPossibleErrorAndDismiss "Signing Transaction" body onDismiss errors
+        _ ->
+          signingTransaction Nothing onDismiss errors
       Machine.SubmittingTx { txWitnessSet, errors } -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
           signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
-        DetailedFlow _ ->
+        _ ->
           submittingTransaction onDismiss "Final request placeholder" $ errors
-        SimplifiedFlow -> BodyLayout.component
-          { title: "Submitting transaction"
-          , description: DOOM.text "We are submitting the initial transaction."
-          , content: DOOM.text "Auto submitting tx... (progress bar?)"
-          }
       Machine.InputApplied { } -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
           submittingTransaction onDismiss "Final request placeholder" (Just "201")
