@@ -381,6 +381,37 @@ type ContractDetailsProps =
   , onSuccess :: AutoRun -> Effect Unit
   }
 
+-- contractSection :: V1.Contract -> State -> JSX
+contractSection contract state =
+  tabs { fill: true, justify: true, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
+    let
+      renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
+    [ renderTab
+        { eventKey: eventKey "graph"
+        , title: DOOM.span_
+            [ Icons.toJSX $ unsafeIcon "diagram-2"
+            , DOOM.text " Source graph"
+            ]
+        }
+        [ marloweGraph { contract: contract } ]
+    , renderTab
+        { eventKey: eventKey "source"
+        , title: DOOM.span_
+            [ Icons.toJSX $ unsafeIcon "filetype-yml"
+            , DOOM.text " Source code"
+            ]
+        }
+        [ marloweYaml contract ]
+    , renderTab
+        { eventKey: eventKey "state"
+        , title: DOOM.span_
+            [ Icons.toJSX $ unsafeIcon "bank"
+            , DOOM.text " Contract state"
+            ]
+        }
+        [ marloweStateYaml state ]
+    ]
+
 mkContractDetailsComponent :: MkComponentM (ContractDetailsProps -> JSX)
 mkContractDetailsComponent = do
   let
@@ -407,59 +438,36 @@ mkContractDetailsComponent = do
       }
 
     let
-      contractSection =
-        tabs { fill: true, justify: true, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
-          let
-            renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
-          [ renderTab
-              { eventKey: eventKey "graph"
-              , title: DOOM.span_
-                  [ Icons.toJSX $ unsafeIcon "diagram-2"
-                  , DOOM.text " Source graph"
-                  ]
-              }
-            [ marloweGraph { contract: contract } ]
-          , renderTab
-              { eventKey: eventKey "source"
-              , title: DOOM.span_
-                  [ Icons.toJSX $ unsafeIcon "filetype-yml"
-                  , DOOM.text " Source code"
-                  ]
-              }
-              [ marloweYaml contract ]
-          , renderTab
-              { eventKey: eventKey "state"
-              , title: DOOM.span_
-                  [ Icons.toJSX $ unsafeIcon "bank"
-                  , DOOM.text " Contract state"
-                  ]
-              }
-              [ marloweStateYaml state ]
-          ]
       fields = renderFormSpec autoRunFormSpec formState
       body = fragment $
-        [ contractSection
+        [ contractSection contract state
         , DOOM.hr {}
         ]
-        <>  fields
+          <> fields
       footer = fragment
-        [ link
-            { label: DOOM.text "Cancel"
-            , onClick: onDismiss
-            , showBorders: true
-            , extraClassNames: "me-3"
-            }
-        , DOM.button
-            { className: "btn btn-primary"
-            , onClick: onSubmit'
-            , disabled: false
-            }
-            [ R.text "Submit" ]
+        [ DOM.div { className: "row" } $
+            [ DOM.div { className: "col-6 text-start" } $
+                [ link
+                    { label: DOOM.text "Cancel"
+                    , onClick: onDismiss
+                    , showBorders: true
+                    , extraClassNames: "me-3"
+                    }
+                ]
+            , DOM.div { className: "col-6 text-end" } $
+                [ DOM.button
+                    { className: "btn btn-primary"
+                    , onClick: onSubmit'
+                    , disabled: false
+                    }
+                    [ R.text "Submit" ]
+                ]
+            ]
         ]
     pure $ BodyLayout.component
       { title: "Apply Input"
       , description: DOM.div {}
-          [ DOM.p {} [ DOOM.text "This page allows contract participants to interact with the contract and take actions to progress through it. On the right side of the page, you will see a representation of the contract state as it currently exists on the blockchain." ]
+          [ DOM.p {} [ DOOM.text "This page allows contract participants to interact with the contract and take actions to progress through it. On the right side of the page, you will see a representation of the contract state as it currently exists on the blockchain. The page is divided into three tabs: Source Graph, Source Code, and Contract State. Each tab provides a different view of the contract." ]
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Graph" ]
           , DOM.p {} [ DOOM.text "The Source Graph tab provides a visual representation of the contract. It displays the contract as a graph, with nodes representing the different states and actions of the contract. The paths that have already been executed (transactions) are highlighted, allowing you to see the progression of the contract over time." ]
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Code" ]
@@ -467,7 +475,7 @@ mkContractDetailsComponent = do
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Contract State" ]
           , DOM.p {} [ DOOM.text "In the Contract State tab, you can view the current status of the participant's account, as well as the chosen values and variables that have been set within the contract (using 'let' statements). This tab provides a snapshot of the contract's current state and the participant's interaction with it." ]
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Marlowe Explorer" ]
-          , DOM.p {} [ DOOM.text "To view more details the state of the contract on the Cardano blockchain, you can visit the", descriptionLink { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", icon: "bi-globe2", label: "Marlowe Explorer" }, DOOM.text "." ]
+          , DOM.p {} [ DOOM.text "To view the state of the contract on the Cardano blockchain, visit the ", DOM.a { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", target: "_blank", className: "white-color" } [ DOOM.text "Marlowe Explorer" ], DOOM.text "." ]
           ]
       , content: wrappedContentWithFooter body footer
       }
@@ -779,77 +787,83 @@ mkComponent = do
         SimplifiedFlow -> pure unit
 
     pure $ case machine.state of
-      Machine.PresentingContractDetails { } -> do
+      Machine.PresentingContractDetails {} -> do
         let
           onStepSuccess (AutoRun autoRun) = do
             machine.applyAction $ Machine.FetchRequiredWalletContext { autoRun: AutoRun true, marloweContext, transactionsEndpoint }
             traceM "AUTO RUN:"
             traceM autoRun
-            if autoRun
-              then setPreviewFlow SimplifiedFlow
-              else setPreviewFlow $ DetailedFlow { showPrevStep: true }
+            if autoRun then setPreviewFlow SimplifiedFlow
+            else setPreviewFlow $ DetailedFlow { showPrevStep: true }
 
         contractDetailsComponent { marloweContext, onSuccess: onStepSuccess, onDismiss }
       Machine.FetchingRequiredWalletContext { errors } -> case previewFlow of
         DetailedFlow _ -> fetchingRequiredWalletContextDetails Nothing onDismiss Nothing
-        SimplifiedFlow -> do
-          DOM.div {}
-            [ DOM.div
-              { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
-              } $ loadingSpinnerLogo {}
-            , contractDetailsComponent { marloweContext, onSuccess: const $ pure unit, onDismiss }
-            ]
-          -- showPossibleErrorAndDismiss "Fetching wallet context" body onDismiss errors
+        SimplifiedFlow ->
+          do
+            let
+              body = fragment $
+                [ contractSection marloweContext.contract marloweContext.state
+                , DOOM.hr {}
+                ]
+            showPossibleErrorAndDismiss "Fetching wallet context" body onDismiss errors
 
-      Machine.ChoosingInputType {allInputsChoices, requiredWalletContext} -> case previewFlow of
+      Machine.ChoosingInputType { allInputsChoices, requiredWalletContext } -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
           fetchingRequiredWalletContextDetails (Just setNextFlow) onDismiss $ Just requiredWalletContext
         _ -> do
           let
-            body = DOM.div { className: "row" }
-              [ DOM.div { className: "col-12" } $ marloweYaml marloweContext.contract ]
+            body = fragment $
+              [ contractSection marloweContext.contract marloweContext.state
+              ]
 
             footer = DOM.div { className: "row" }
-              [ DOM.div { className: "col-3 text-center" } $
-                  DOM.button
-                    { className: "btn btn-primary"
-                    , disabled: not $ Machine.canDeposit allInputsChoices
-                    , onClick: handler_ $ case allInputsChoices of
-                        Right { deposits: Just deposits } ->
-                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.DepositInputs deposits)
-                        _ -> pure unit
-                    }
-                    [ R.text "Deposit" ]
-              , DOM.div { className: "col-3 text-center" } $
-                  DOM.button
-                    { className: "btn btn-primary"
-                    , disabled: not $ Machine.canChoose allInputsChoices
-                    , onClick: handler_ $ case allInputsChoices of
-                        Right { choices: Just choices } ->
-                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.ChoiceInputs choices)
-                        _ -> pure unit
-                    }
-                    [ R.text "Choice" ]
-              , DOM.div { className: "col-3 text-center" } $
-                  DOM.button
-                    { className: "btn btn-primary"
-                    , disabled: not $ Machine.canNotify allInputsChoices
-                    , onClick: handler_ $ case allInputsChoices of
-                        Right { notify: Just notify } ->
-                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.SpecificNotifyInput notify)
-                        _ -> pure unit
-                    }
-                    [ R.text "Notify" ]
-              , DOM.div { className: "col-3 text-center" } $
-                  DOM.button
-                    { className: "btn btn-primary"
-                    , disabled: not $ Machine.canAdvance allInputsChoices
-                    , onClick: handler_ $ case allInputsChoices of
-                        Left advanceContinuation ->
-                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.AdvanceContract advanceContinuation)
-                        _ -> pure unit
-                    }
-                    [ R.text "Advance" ]
+              [ DOM.div { className: "col-6 text-start" } $
+                  [ link
+                      { label: DOOM.text "Cancel"
+                      , onClick: onDismiss
+                      , showBorders: true
+                      , extraClassNames: "me-3"
+                      }
+                  ]
+              , DOM.div { className: "col-6 text-end" } $
+                  [ DOM.button
+                      { className: "btn btn-primary me-2"
+                      , disabled: not $ Machine.canDeposit allInputsChoices
+                      , onClick: handler_ $ case allInputsChoices of
+                          Right { deposits: Just deposits } ->
+                            machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.DepositInputs deposits)
+                          _ -> pure unit
+                      }
+                      [ R.text "Deposit" ]
+                  , DOM.button
+                      { className: "btn btn-primary me-2"
+                      , disabled: not $ Machine.canChoose allInputsChoices
+                      , onClick: handler_ $ case allInputsChoices of
+                          Right { choices: Just choices } ->
+                            machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.ChoiceInputs choices)
+                          _ -> pure unit
+                      }
+                      [ R.text "Choice" ]
+                  , DOM.button
+                      { className: "btn btn-primary me-2"
+                      , disabled: not $ Machine.canNotify allInputsChoices
+                      , onClick: handler_ $ case allInputsChoices of
+                          Right { notify: Just notify } ->
+                            machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.SpecificNotifyInput notify)
+                          _ -> pure unit
+                      }
+                      [ R.text "Notify" ]
+                  , DOM.button
+                      { className: "btn btn-primary me-2"
+                      , disabled: not $ Machine.canAdvance allInputsChoices
+                      , onClick: handler_ $ case allInputsChoices of
+                          Left advanceContinuation ->
+                            machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.AdvanceContract advanceContinuation)
+                          _ -> pure unit
+                      }
+                      [ R.text "Advance" ]
+                  ]
               ]
           BodyLayout.component
             { title: "Select Input Type"
@@ -876,173 +890,190 @@ mkComponent = do
             machine.applyAction <<< Machine.PickInputSucceeded $ input
         case inputChoices of
           DepositInputs depositInputs ->
-            depositFormComponent { depositInputs, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just}
+            depositFormComponent { depositInputs, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
           ChoiceInputs choiceInputs ->
-            choiceFormComponent { choiceInputs, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just}
+            choiceFormComponent { choiceInputs, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
           SpecificNotifyInput notifyInput ->
             notifyFormComponent { notifyInput, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
           AdvanceContract cont ->
             advanceFormComponent { contract: cont, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
-      Machine.CreatingTx { allInputsChoices, errors } ->
-        creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
-          Just err -> Just $ err
-          Nothing -> Nothing
+      Machine.CreatingTx { allInputsChoices, errors } -> case previewFlow of
+        DetailedFlow _ -> do
+          creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
+            Just err -> Just $ err
+            Nothing -> Nothing
+        SimplifiedFlow -> do
+          let
+            body = DOOM.text "Auto creating tx..."
+          showPossibleErrorAndDismiss "Creating Transaction" body onDismiss errors
+      -- SimplifiedFlow -> BodyLayout.component
+      --   { title: "Creating transaction"
+      --   , description: DOOM.text "We are creating the initial transaction."
+      --   , content: DOOM.text "Auto creating tx... (progress bar?)"
+      --   }
       Machine.SigningTx { createTxResponse, errors } -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
           creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
-        _ ->
-          signingTransaction Nothing onDismiss errors
+        DetailedFlow _ ->
+          signingTransaction Nothing onDismiss Nothing
+        SimplifiedFlow -> do
+          let
+            body = DOOM.text "Auto signing tx... (progress bar?)"
+          showPossibleErrorAndDismiss "Signing Transaction" body onDismiss errors
       Machine.SubmittingTx { txWitnessSet, errors } -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
           signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
-        _ ->
+        DetailedFlow _ ->
           submittingTransaction onDismiss "Final request placeholder" $ errors
-      Machine.InputApplied { } -> case previewFlow of
+        SimplifiedFlow -> BodyLayout.component
+          { title: "Submitting transaction"
+          , description: DOOM.text "We are submitting the initial transaction."
+          , content: DOOM.text "Auto submitting tx... (progress bar?)"
+          }
+      Machine.InputApplied {} -> case previewFlow of
         DetailedFlow { showPrevStep: true } -> do
           submittingTransaction onDismiss "Final request placeholder" (Just "201")
         _ ->
           inputApplied onDismiss
 
+--     let
+--       body = DOM.div { className: "row" }
+--         [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
+--         ]
 
-    --     let
-    --       body = DOM.div { className: "row" }
-    --         [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
-    --         ]
+--       footer = DOM.div { className: "row" }
+--         [ DOM.div { className: "col-3 text-center" } $
+--             DOM.button
+--               { className: "btn btn-primary"
+--               , disabled: isNothing possibleDeposits || isJust possibleNextTimeoutAdvance
+--               , onClick: handler_ $ case possibleDeposits of
+--                   Just deposits -> setStep (Creating $ PerformingDeposit deposits)
+--                   Nothing -> pure unit
+--               }
+--               [ R.text "Deposit" ]
+--         , DOM.div { className: "col-3 text-center" } $
+--             DOM.button
+--               { className: "btn btn-primary"
+--               , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
+--               , onClick: handler_ $ case possibleChoiceInputs of
+--                   Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
+--                   Nothing -> pure unit
+--               }
+--               [ R.text "Choice" ]
+--         , DOM.div { className: "col-3 text-center" } $
+--             DOM.button
+--               { className: "btn btn-primary"
+--               , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
+--               , onClick: handler_ $ case possibleNotifyInputs of
+--                   Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
+--                   Nothing -> pure unit
+--               }
+--               [ R.text "Notify" ]
+--         , DOM.div { className: "col-3 text-center" } $
+--             DOM.button
+--               { className: "btn btn-primary"
+--               , disabled: isNothing possibleNextTimeoutAdvance
+--               , onClick: handler_ $ case possibleNextTimeoutAdvance of
+--                   Just cont -> setStep (Creating $ PerformingAdvance cont)
+--                   Nothing -> pure unit
+--               }
+--               [ R.text "Advance" ]
+--         ]
 
-    --       footer = DOM.div { className: "row" }
-    --         [ DOM.div { className: "col-3 text-center" } $
-    --             DOM.button
-    --               { className: "btn btn-primary"
-    --               , disabled: isNothing possibleDeposits || isJust possibleNextTimeoutAdvance
-    --               , onClick: handler_ $ case possibleDeposits of
-    --                   Just deposits -> setStep (Creating $ PerformingDeposit deposits)
-    --                   Nothing -> pure unit
-    --               }
-    --               [ R.text "Deposit" ]
-    --         , DOM.div { className: "col-3 text-center" } $
-    --             DOM.button
-    --               { className: "btn btn-primary"
-    --               , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
-    --               , onClick: handler_ $ case possibleChoiceInputs of
-    --                   Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
-    --                   Nothing -> pure unit
-    --               }
-    --               [ R.text "Choice" ]
-    --         , DOM.div { className: "col-3 text-center" } $
-    --             DOM.button
-    --               { className: "btn btn-primary"
-    --               , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
-    --               , onClick: handler_ $ case possibleNotifyInputs of
-    --                   Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
-    --                   Nothing -> pure unit
-    --               }
-    --               [ R.text "Notify" ]
-    --         , DOM.div { className: "col-3 text-center" } $
-    --             DOM.button
-    --               { className: "btn btn-primary"
-    --               , disabled: isNothing possibleNextTimeoutAdvance
-    --               , onClick: handler_ $ case possibleNextTimeoutAdvance of
-    --                   Just cont -> setStep (Creating $ PerformingAdvance cont)
-    --                   Nothing -> pure unit
-    --               }
-    --               [ R.text "Advance" ]
-    --         ]
+--     if inModal then modal
+--       { title: R.text "Select input type"
+--       , onDismiss
+--       , body
+--       , footer
+--       , size: Modal.ExtraLarge
+--       }
+--     else
+--       body
 
-    --     if inModal then modal
-    --       { title: R.text "Select input type"
-    --       , onDismiss
-    --       , body
-    --       , footer
-    --       , size: Modal.ExtraLarge
-    --       }
-    --     else
-    --       body
+-- step /\ setStep <- useState' (Creating SelectingInputType)
+-- let
 
+--   possibleDeposits = do
+--     let
+--       dps = nextDeposit environment state contract
+--     NonEmpty.fromArray $ dps
 
-    -- step /\ setStep <- useState' (Creating SelectingInputType)
-    -- let
+--   possibleChoiceInputs = do
+--     let
+--       cis = nextChoice environment state contract
+--     NonEmpty.fromArray $ cis
 
-    --   possibleDeposits = do
-    --     let
-    --       dps = nextDeposit environment state contract
-    --     NonEmpty.fromArray $ dps
+--   possibleNotifyInputs = do
+--     let
+--       cis = nextNotify environment state contract
+--     NonEmpty.fromArray $ cis
 
-    --   possibleChoiceInputs = do
-    --     let
-    --       cis = nextChoice environment state contract
-    --     NonEmpty.fromArray $ cis
+--   possibleNextTimeoutAdvance = nextTimeoutAdvance environment contract
 
-    --   possibleNotifyInputs = do
-    --     let
-    --       cis = nextNotify environment state contract
-    --     NonEmpty.fromArray $ cis
+-- pure $ case step of
+--   Creating SelectingInputType -> do
+--     let
+--       body = DOM.div { className: "row" }
+--         [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
+--         ]
 
-    --   possibleNextTimeoutAdvance = nextTimeoutAdvance environment contract
+--       footer = DOM.div { className: "row" }
+--         [ DOM.div { className: "col-3 text-center" } $
+--             DOM.button
+--               { className: "btn btn-primary"
+--               , disabled: isNothing possibleDeposits || isJust possibleNextTimeoutAdvance
+--               , onClick: handler_ $ case possibleDeposits of
+--                   Just deposits -> setStep (Creating $ PerformingDeposit deposits)
+--                   Nothing -> pure unit
+--               }
+--               [ R.text "Deposit" ]
+--         , DOM.div { className: "col-3 text-center" } $
+--             DOM.button
+--               { className: "btn btn-primary"
+--               , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
+--               , onClick: handler_ $ case possibleChoiceInputs of
+--                   Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
+--                   Nothing -> pure unit
+--               }
+--               [ R.text "Choice" ]
+--         , DOM.div { className: "col-3 text-center" } $
+--             DOM.button
+--               { className: "btn btn-primary"
+--               , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
+--               , onClick: handler_ $ case possibleNotifyInputs of
+--                   Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
+--                   Nothing -> pure unit
+--               }
+--               [ R.text "Notify" ]
+--         , DOM.div { className: "col-3 text-center" } $
+--             DOM.button
+--               { className: "btn btn-primary"
+--               , disabled: isNothing possibleNextTimeoutAdvance
+--               , onClick: handler_ $ case possibleNextTimeoutAdvance of
+--                   Just cont -> setStep (Creating $ PerformingAdvance cont)
+--                   Nothing -> pure unit
+--               }
+--               [ R.text "Advance" ]
+--         ]
 
-    -- pure $ case step of
-    --   Creating SelectingInputType -> do
-    --     let
-    --       body = DOM.div { className: "row" }
-    --         [ DOM.div { className: "col-12" } $ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys }
-    --         ]
-
-    --       footer = DOM.div { className: "row" }
-    --         [ DOM.div { className: "col-3 text-center" } $
-    --             DOM.button
-    --               { className: "btn btn-primary"
-    --               , disabled: isNothing possibleDeposits || isJust possibleNextTimeoutAdvance
-    --               , onClick: handler_ $ case possibleDeposits of
-    --                   Just deposits -> setStep (Creating $ PerformingDeposit deposits)
-    --                   Nothing -> pure unit
-    --               }
-    --               [ R.text "Deposit" ]
-    --         , DOM.div { className: "col-3 text-center" } $
-    --             DOM.button
-    --               { className: "btn btn-primary"
-    --               , disabled: isNothing possibleChoiceInputs || isJust possibleNextTimeoutAdvance
-    --               , onClick: handler_ $ case possibleChoiceInputs of
-    --                   Just choiceInputs -> setStep (Creating $ PerformingChoice choiceInputs)
-    --                   Nothing -> pure unit
-    --               }
-    --               [ R.text "Choice" ]
-    --         , DOM.div { className: "col-3 text-center" } $
-    --             DOM.button
-    --               { className: "btn btn-primary"
-    --               , disabled: isNothing possibleNotifyInputs || isJust possibleNextTimeoutAdvance
-    --               , onClick: handler_ $ case possibleNotifyInputs of
-    --                   Just notifyInputs -> setStep (Creating $ PerformingNotify notifyInputs)
-    --                   Nothing -> pure unit
-    --               }
-    --               [ R.text "Notify" ]
-    --         , DOM.div { className: "col-3 text-center" } $
-    --             DOM.button
-    --               { className: "btn btn-primary"
-    --               , disabled: isNothing possibleNextTimeoutAdvance
-    --               , onClick: handler_ $ case possibleNextTimeoutAdvance of
-    --                   Just cont -> setStep (Creating $ PerformingAdvance cont)
-    --                   Nothing -> pure unit
-    --               }
-    --               [ R.text "Advance" ]
-    --         ]
-
-    --     if inModal then modal
-    --       { title: R.text "Select input type"
-    --       , onDismiss
-    --       , body
-    --       , footer
-    --       , size: Modal.ExtraLarge
-    --       }
-    --     else
-    --       body
-    --   Creating (PerformingDeposit deposits) -> do
-    --     depositFormComponent { deposits, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-    --   Creating (PerformingNotify notifyInputs) -> do
-    --     notifyFormComponent { notifyInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-    --   Creating (PerformingChoice choiceInputs) -> do
-    --     choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-    --   Creating (PerformingAdvance cont) -> do
-    --     advanceFormComponent { contract: cont, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
-    --   _ -> DOM.div { className: "row" } [ R.text "TEST" ]
+--     if inModal then modal
+--       { title: R.text "Select input type"
+--       , onDismiss
+--       , body
+--       , footer
+--       , size: Modal.ExtraLarge
+--       }
+--     else
+--       body
+--   Creating (PerformingDeposit deposits) -> do
+--     depositFormComponent { deposits, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+--   Creating (PerformingNotify notifyInputs) -> do
+--     notifyFormComponent { notifyInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+--   Creating (PerformingChoice choiceInputs) -> do
+--     choiceFormComponent { choiceInputs, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+--   Creating (PerformingAdvance cont) -> do
+--     advanceFormComponent { contract: cont, connectedWallet, timeInterval, transactionsEndpoint, onDismiss, onSuccess }
+--   _ -> DOM.div { className: "row" } [ R.text "TEST" ]
 
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"

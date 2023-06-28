@@ -9,9 +9,9 @@ import React.Basic.Hooks (JSX)
 
 wrappedContentWithFooter :: JSX -> JSX -> JSX
 wrappedContentWithFooter body footer = fragment
-  [ DOM.div { className: "p-3" } body
+  [ DOM.div { className: "p-3 mt-auto" } body
   , DOOM.hr {}
-  , DOM.div { className: "p-3 text-end" } footer
+  , DOM.div { className: "p-3 mt-auto" } footer
   ]
 
 -- | At the end it could be stateful because we can make the sidebar collapsible.
@@ -20,12 +20,11 @@ component { title, description, content } =
   DOM.div { className: "container-fluid overflow-hidden" } $ do
     DOM.div { className: "row" }
       [ DOM.div { className: "col-3 background-color-primary white-color overflow-auto vh-100 px-0 pt-59px pb-71px" } $
-          DOM.div { className: "p-3"}
-            [
-              DOM.h3 { className: "h3 pb-3 fw-bold" } $ DOOM.text title
+          DOM.div { className: "p-3" }
+            [ DOM.h3 { className: "h3 pb-3 fw-bold" } $ DOOM.text title
             , description
             ]
-      , DOM.div { className: "col-9 px-0 overflow-auto vh-100 pt-59px pb-71px" } content
+      , DOM.div { className: "col-9 px-0 overflow-auto vh-100 pt-59px pb-71px d-flex flex-column" } content
       ]
 
 descriptionLink :: { icon :: String, href :: String, label :: String } -> JSX
