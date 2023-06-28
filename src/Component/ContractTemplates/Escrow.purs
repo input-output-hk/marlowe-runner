@@ -207,10 +207,10 @@ mkEscrowForm cardanoMultiplatformLib = FormSpecBuilder.evalBuilder Nothing $ ado
     , label: Just $ DOOM.text "Price"
     , touched: false
     }
-  mediationDeadline <- dateTimeField (Just $ DOOM.text "Mediation timeout") (Just $ DOOM.text "MEDIATOR timoeut help") reqValidator'
-  complaintDeadline <- dateTimeField (Just $ DOOM.text "Complaint Deadline timeout") (Just $ DOOM.text "COMPLAINT timoeut help") reqValidator'
-  complaintResponseDeadline <- dateTimeField (Just $ DOOM.text "Complaint Response Deadline timeout") (Just $ DOOM.text "COMPLAINT RESPONSE timoeut help") reqValidator'
-  paymentDeadline <- dateTimeField (Just $ DOOM.text "Payment Deadline timeout") (Just $ DOOM.text "PAYMENT timoeut help") reqValidator'
+  mediationDeadline <- dateTimeField (Just $ DOOM.text "Mediation timeout") (Just $ DOOM.text "MEDIATOR timeout help") reqValidator'
+  complaintDeadline <- dateTimeField (Just $ DOOM.text "Complaint Deadline timeout") (Just $ DOOM.text "COMPLAINT timeout help") reqValidator'
+  complaintResponseDeadline <- dateTimeField (Just $ DOOM.text "Complaint Response Deadline timeout") (Just $ DOOM.text "COMPLAINT RESPONSE timeout help") reqValidator'
+  paymentDeadline <- dateTimeField (Just $ DOOM.text "Payment Deadline timeout") (Just $ DOOM.text "PAYMENT timeout help") reqValidator'
 
   -- mediatorParty <- roleTokenUsageField cardanoMultiplatformLib (Just $ DOOM.text "Mediator") (Just $ DOOM.text "Use role token")
   -- buyerParty <- roleTokenUsageField cardanoMultiplatformLib (Just $ DOOM.text "Buyer") (Just $ DOOM.text "Use role token")

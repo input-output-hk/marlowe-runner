@@ -141,8 +141,8 @@ swapFormSpec = evalBuilder' $ ado
     , validator: reqValidator'
     }
 
-  tokenADepositDeadline <- dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timoeut help") reqValidator'
-  tokenBDepositDeadline <- dateTimeField (Just $ DOOM.text "Token B Deposit timeout") (Just $ DOOM.text "Token B timoeut help") reqValidator'
+  tokenADepositDeadline <- dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timeout help") reqValidator'
+  tokenBDepositDeadline <- dateTimeField (Just $ DOOM.text "Token B Deposit timeout") (Just $ DOOM.text "Token B timeout help") reqValidator'
   in
     { tokenAAmount: BigInt.fromInt tokenAAmount
     , tokenAName: tokenAName
