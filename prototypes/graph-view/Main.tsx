@@ -1,5 +1,5 @@
 import * as React from "react"
-// import { createRoot } from "react-dom/client"
+import { createRoot } from "react-dom/client"
 import {
   ReactFlow,
   Node,
@@ -109,14 +109,24 @@ type ContractNodeType
   | { let: ValueId, be: Value }
   | { assert: Observation }
 
+const PATH_TAKEN = Symbol("PATH_TAKEN")
+const PATH_FUTURE = Symbol("PATH_FUTURE")
+const PATH_PRUNED = Symbol("PATH_PRUNED")
+
+type PathState = typeof PATH_TAKEN | typeof PATH_FUTURE | typeof PATH_PRUNED
+
 type ContractNodeData = {
   type: ContractNodeType,
-  disabled: boolean,
+  state: PathState
+}
+
+type ContractEdgeData = {
+  state: PathState
 }
 
 const nodeTypes: NodeTypes = {
-  ContractNode({ data: { type, disabled } }: { data: ContractNodeData }): JSX.Element {
-    const style_: React.CSSProperties = { ...contractNodeStyle, opacity: disabled ? "30%" : "100%" }
+  ContractNode({ data: { type, state } }: { data: ContractNodeData }): JSX.Element {
+    const style_: React.CSSProperties = { ...contractNodeStyle, opacity: state === PATH_PRUNED ? "30%" : "100%" }
     if (type === "close")
       return <div style={style_}>
         Close
@@ -204,15 +214,11 @@ const nodeTypes: NodeTypes = {
   }
 }
 
-type ContractEdgeData = {
-  disabled: boolean
-}
-
 const edgeTypes: EdgeTypes = {
   ContractEdge({ data, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, markerEnd, style = {} }: EdgeProps<ContractEdgeData>): JSX.Element {
     const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
     const style_: React.CSSProperties =
-      data && data.disabled
+      data && data.state === PATH_PRUNED
         ? { ...style, strokeOpacity: "30%" }
         : {
           ...style, strokeOpacity: "100%",
@@ -230,7 +236,7 @@ type ContractPathHistory = ReadonlyArray<number | null>
 const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number } => {
   if (contract === "close")
     return {
-      nodes: [{ id, position: { x, y }, data: { type: "close", disabled: false }, type: "ContractNode" }],
+      nodes: [{ id, position: { x, y }, data: { type: "close", state: PATH_TAKEN }, type: "ContractNode" }],
       edges: [],
       max_y: y,
     }
@@ -244,15 +250,15 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET, indices)
     return {
       nodes: [
-        ...then_nodes.map(node => index === 0 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
-        ...else_nodes.map(node => index === 1 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        ...then_nodes.map(node => index === 0 || index === undefined ? node : { ...node, data: { ...node.data, state: PATH_PRUNED as PathState } }),
+        ...else_nodes.map(node => index === 1 || index === undefined ? node : { ...node, data: { ...node.data, state: PATH_PRUNED as PathState } }),
+        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
       ],
       edges: [
-        ...then_edges.map(edge => index === 0 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
-        ...else_edges.map(edge => index === 1 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
-        { id: `then-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { disabled: !(index === 0 || index === undefined) } },
-        { id: `else-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { disabled: !(index === 1 || index === undefined) } },
+        ...then_edges.map(edge => index === 0 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, state: PATH_PRUNED as PathState } }),
+        ...else_edges.map(edge => index === 1 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, state: PATH_PRUNED as PathState } }),
+        { id: `then-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { state: index === 0 || index === undefined ? PATH_TAKEN : PATH_PRUNED } },
+        { id: `else-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { state: index === 1 || index === undefined ? PATH_TAKEN : PATH_PRUNED } },
       ],
       max_y,
     }
@@ -265,11 +271,11 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PATH_TAKEN } },
       ],
       max_y,
     }
@@ -282,11 +288,11 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PATH_TAKEN } },
       ],
       max_y,
     }
@@ -299,11 +305,11 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PATH_TAKEN } },
       ],
       max_y,
     }
@@ -318,13 +324,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
         const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, indices)
         return {
           nodes: [
-            ...nodes.map(node => index === i || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
+            ...nodes.map(node => index === i || index === undefined ? node : { ...node, data: { ...node.data, state: PATH_PRUNED as PathState } }),
             ...acc.nodes,
           ],
           edges: [
-            ...edges.map(edge => index === i || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
+            ...edges.map(edge => index === i || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, state: PATH_PRUNED as PathState } }),
             ...acc.edges,
-            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { disabled: !(index === i || index === undefined) } },
+            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { state: index === i || index === undefined ? PATH_TAKEN : PATH_PRUNED } },
           ],
           max_y
         }
@@ -332,7 +338,7 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       return acc
     }, {
       nodes: [
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PATH_TAKEN as PathState }, type: "ContractNode" },
       ],
       edges: [],
       max_y: y - Y_OFFSET
@@ -341,13 +347,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, indices)
     return {
       nodes: [
-        ...timeout_graph.nodes.map(node => index === null || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
+        ...timeout_graph.nodes.map(node => index === null || index === undefined ? node : { ...node, data: { ...node.data, state: PATH_PRUNED as PathState } }),
         ...nodes,
       ],
       edges: [
-        ...timeout_graph.edges.map(edge => index === null || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
+        ...timeout_graph.edges.map(edge => index === null || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, state: PATH_PRUNED as PathState } }),
         ...edges,
-        { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { disabled: !(index === null || index === undefined) } },
+        { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { state: index === null || index === undefined ? PATH_TAKEN : PATH_PRUNED } },
       ],
       max_y: timeout_graph.max_y
     }
@@ -369,62 +375,62 @@ export const MarloweGraphView = ({ contract, path }: { contract: Contract, path?
   </div>
 }
 
-// const contract: Contract = {
-//   when: [
-//     {
-//       case: {
-//         deposits: 500,
-//         party: { role_token: "Party A" },
-//         of_token: { currency_symbol: "", token_name: "" },
-//         into_account: { role_token: "Party B" }
-//       },
-//       then: { if: true, then: "close", else: "close" }
-//     },
-//     {
-//       case: { notify_if: false },
-//       then: { assert: true, then: "close" }
-//     },
-//     {
-//       case: {
-//         for_choice:
-//         {
-//           choice_name: "The way",
-//           choice_owner: { role_token: "Party C" }
-//         },
-//         choose_between: [
-//           { from: 1, to: 3 },
-//           { from: 5, to: 8 }
-//         ]
-//       },
-//       merkleized_then: "huey-dewey-louie"
-//     },
-//     {
-//       case: { notify_if: true },
-//       then: { let: "x", be: 13, then: "close" }
-//     }
-//   ],
-//   timout: 1985,
-//   timeout_continuation: {
-//     if: true,
-//     then: {
-//       if: false,
-//       then: "close",
-//       else: {
-//         pay: 1234,
-//         token: { currency_symbol: "", token_name: "" },
-//         to: { party: { role_token: "Owner" } },
-//         from_account: { role_token: "Participant" },
-//         then: "close",
-//       }
-//     },
-//     else: { let: "x", be: 13, then: { assert: true, then: "close" } },
-//   }
-// }
+const contract: Contract = {
+  when: [
+    {
+      case: {
+        deposits: 500,
+        party: { role_token: "Party A" },
+        of_token: { currency_symbol: "", token_name: "" },
+        into_account: { role_token: "Party B" }
+      },
+      then: { if: true, then: "close", else: "close" }
+    },
+    {
+      case: { notify_if: false },
+      then: { assert: true, then: "close" }
+    },
+    {
+      case: {
+        for_choice:
+        {
+          choice_name: "The way",
+          choice_owner: { role_token: "Party C" }
+        },
+        choose_between: [
+          { from: 1, to: 3 },
+          { from: 5, to: 8 }
+        ]
+      },
+      merkleized_then: "huey-dewey-louie"
+    },
+    {
+      case: { notify_if: true },
+      then: { let: "x", be: 13, then: "close" }
+    }
+  ],
+  timout: 1985,
+  timeout_continuation: {
+    if: true,
+    then: {
+      if: false,
+      then: "close",
+      else: {
+        pay: 1234,
+        token: { currency_symbol: "", token_name: "" },
+        to: { party: { role_token: "Owner" } },
+        from_account: { role_token: "Participant" },
+        then: "close",
+      }
+    },
+    else: { let: "x", be: 13, then: { assert: true, then: "close" } },
+  }
+}
 
-// const root = createRoot(document.getElementById("app") as HTMLElement)
+const root = createRoot(document.getElementById("app") as HTMLElement)
 
 // root.render(<MarloweGraphView contract={contract} path={[]} />)
-// root.render(<MarloweGraphView contract={contract} path={[null, 0, 1]} />)
+root.render(<MarloweGraphView contract={contract} path={[null, 0, 1]} />)
 
 // https://reactflow.dev/docs/concepts/terms-and-definitions
 // https://reactflow.dev/docs/guides/custom-nodes
