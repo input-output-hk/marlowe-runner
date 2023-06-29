@@ -126,7 +126,10 @@ type ContractEdgeData = {
 
 const nodeTypes: NodeTypes = {
   ContractNode({ data: { type, state } }: { data: ContractNodeData }): JSX.Element {
-    const style_: React.CSSProperties = { ...contractNodeStyle, opacity: state === PATH_PRUNED ? "30%" : "100%" }
+    const style_: React.CSSProperties =
+      state === PATH_PRUNED ? { ...contractNodeStyle, opacity: "30%" } :
+        state === PATH_TAKEN ? { ...contractNodeStyle, borderWidth: "2px" } :
+          contractNodeStyle
     if (type === "close")
       return <div style={style_}>
         Close
@@ -218,20 +221,26 @@ const edgeTypes: EdgeTypes = {
   ContractEdge({ data, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, markerEnd, style = {} }: EdgeProps<ContractEdgeData>): JSX.Element {
     const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
     const style_: React.CSSProperties =
-      data && data.state === PATH_PRUNED
-        ? { ...style, strokeOpacity: "30%" }
-        : {
-          ...style, strokeOpacity: "100%",
-          strokeWidth: 3,
+      data && data.state === PATH_PRUNED ? { ...style, strokeOpacity: "30%" } :
+        data && data.state === PATH_TAKEN ? {
+          ...style,
+          strokeWidth: 2,
+          stroke: "black",
           // strokeDasharray: "5",
           // strokeDashoffset: "0",
           // animation: "edgeflow 1000ms linear infinite",
-        }
+        } : style
     return <BaseEdge path={edgePath} markerEnd={markerEnd} style={style_} />
   }
 }
 
 type ContractPathHistory = ReadonlyArray<number | null>
+
+const nodeWithState = (node: Node<ContractNodeData>, state: PathState): Node<ContractNodeData> =>
+  ({ ...node, data: { ...node.data, state } })
+
+const edgeWithState = (edge: Edge<ContractEdgeData>, state: PathState): Edge<ContractEdgeData> =>
+  ({ ...edge, data: edge.data && { ...edge.data, state } })
 
 const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number } => {
   if (contract === "close")
@@ -250,15 +259,15 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET, indices)
     return {
       nodes: [
-        ...then_nodes.map(node => index === 0 || index === undefined ? node : { ...node, data: { ...node.data, state: PATH_PRUNED as PathState } }),
-        ...else_nodes.map(node => index === 1 || index === undefined ? node : { ...node, data: { ...node.data, state: PATH_PRUNED as PathState } }),
+        ...then_nodes.map(node => index === 0 ? node : index === undefined ? nodeWithState(node, PATH_FUTURE) : nodeWithState(node, PATH_PRUNED)),
+        ...else_nodes.map(node => index === 1 ? node : index === undefined ? nodeWithState(node, PATH_FUTURE) : nodeWithState(node, PATH_PRUNED)),
         { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
       ],
       edges: [
-        ...then_edges.map(edge => index === 0 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, state: PATH_PRUNED as PathState } }),
-        ...else_edges.map(edge => index === 1 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, state: PATH_PRUNED as PathState } }),
-        { id: `then-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { state: index === 0 || index === undefined ? PATH_TAKEN : PATH_PRUNED } },
-        { id: `else-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { state: index === 1 || index === undefined ? PATH_TAKEN : PATH_PRUNED } },
+        ...then_edges.map(edge => index === 0 ? edge : index === undefined ? edgeWithState(edge, PATH_FUTURE) : edgeWithState(edge, PATH_PRUNED)),
+        ...else_edges.map(edge => index === 1 ? edge : index === undefined ? edgeWithState(edge, PATH_FUTURE) : edgeWithState(edge, PATH_PRUNED)),
+        { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { state: index === 0 ? PATH_TAKEN : index === undefined ? PATH_FUTURE : PATH_PRUNED } },
+        { id: `else-${else_id}-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { state: index === 1 ? PATH_TAKEN : index === undefined ? PATH_FUTURE : PATH_PRUNED } },
       ],
       max_y,
     }
@@ -324,13 +333,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
         const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, indices)
         return {
           nodes: [
-            ...nodes.map(node => index === i || index === undefined ? node : { ...node, data: { ...node.data, state: PATH_PRUNED as PathState } }),
+            ...nodes.map(node => index === i ? node : index === undefined ? nodeWithState(node, PATH_FUTURE) : nodeWithState(node, PATH_PRUNED)),
             ...acc.nodes,
           ],
           edges: [
-            ...edges.map(edge => index === i || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, state: PATH_PRUNED as PathState } }),
+            ...edges.map(edge => index === i ? edge : index === undefined ? edgeWithState(edge, PATH_FUTURE) : edgeWithState(edge, PATH_PRUNED)),
             ...acc.edges,
-            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { state: index === i || index === undefined ? PATH_TAKEN : PATH_PRUNED } },
+            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { state: index === i ? PATH_TAKEN : index === undefined ? PATH_FUTURE : PATH_PRUNED } },
           ],
           max_y
         }
@@ -338,7 +347,7 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       return acc
     }, {
       nodes: [
-        { id, position: { x, y }, data: { type, state: PATH_TAKEN as PathState }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
       ],
       edges: [],
       max_y: y - Y_OFFSET
@@ -347,13 +356,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, indices)
     return {
       nodes: [
-        ...timeout_graph.nodes.map(node => index === null || index === undefined ? node : { ...node, data: { ...node.data, state: PATH_PRUNED as PathState } }),
+        ...timeout_graph.nodes.map(node => index === null ? node : index === undefined ? nodeWithState(node, PATH_FUTURE) : nodeWithState(node, PATH_PRUNED)),
         ...nodes,
       ],
       edges: [
-        ...timeout_graph.edges.map(edge => index === null || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, state: PATH_PRUNED as PathState } }),
+        ...timeout_graph.edges.map(edge => index === null ? edge : index === undefined ? edgeWithState(edge, PATH_FUTURE) : edgeWithState(edge, PATH_PRUNED)),
         ...edges,
-        { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { state: index === null || index === undefined ? PATH_TAKEN : PATH_PRUNED } },
+        { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { state: index === null ? PATH_TAKEN : index === undefined ? PATH_FUTURE : PATH_PRUNED } },
       ],
       max_y: timeout_graph.max_y
     }
@@ -388,7 +397,21 @@ const contract: Contract = {
     },
     {
       case: { notify_if: false },
-      then: { assert: true, then: "close" }
+      then: {
+        when: [
+          {
+            case: {
+              deposits: 200,
+              party: { role_token: "Party A" },
+              of_token: { currency_symbol: "", token_name: "" },
+              into_account: { role_token: "Party B" }
+            },
+            then: { if: true, then: { assert: true, then: "close" }, else: "close" }
+          },
+        ],
+        timout: 2001,
+        timeout_continuation: "close"
+      }
     },
     {
       case: {
@@ -430,7 +453,7 @@ const contract: Contract = {
 const root = createRoot(document.getElementById("app") as HTMLElement)
 
 // root.render(<MarloweGraphView contract={contract} path={[]} />)
-root.render(<MarloweGraphView contract={contract} path={[null, 0, 1]} />)
+root.render(<MarloweGraphView contract={contract} path={[1, 0]} />)
 
 // https://reactflow.dev/docs/concepts/terms-and-definitions
 // https://reactflow.dev/docs/guides/custom-nodes
