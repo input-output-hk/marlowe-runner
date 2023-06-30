@@ -338,6 +338,7 @@ mkChoiceFormComponent = do
 type NotifyFormComponentProps =
   { notifyInput :: NotifyInput
   , connectedWallet :: WalletInfo Wallet.Api
+  , marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
   , onSuccess :: Effect Unit
   }
@@ -348,23 +349,46 @@ mkNotifyFormComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ notifyInput, connectedWallet, onDismiss, onSuccess } -> React.do
+  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ notifyInput, connectedWallet, marloweContext, onDismiss, onSuccess } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     pure $ BodyLayout.component do
       let
-        body = DOOM.text ""
+        body = DOOM.div_ $
+          [ contractSection marloweContext.contract marloweContext.state
+          , DOOM.hr {}
+          ] 
         actions = fragment
-          [ DOM.button
-              { className: "btn btn-primary"
-              , onClick: handler_ onSuccess
-              , disabled: false
-              }
-              [ R.text "Submit" ]
+          [ DOM.div { className: "row" } $
+              [ DOM.div { className: "col-6 text-start" } $
+                  [ link
+                      { label: DOOM.text "Cancel"
+                      , onClick: onDismiss
+                      , showBorders: true
+                      , extraClassNames: "me-3"
+                      }
+                  ]
+              , DOM.div { className: "col-6 text-end" } $
+                  [ DOM.button
+                      do
+                        let
+                          disabled = case result of
+                            Just (V (Right _) /\ _) -> false
+                            _ -> true
+                        { className: "btn btn-primary"
+                        , onClick: onSubmit'
+                        , disabled
+                        }
+                      [ R.text "Submit" ]
+                  ]
+              ]
           ]
-      { title: "Perform notify"
-      , description: DOOM.text "Perform notify description"
+      { title: "Perform a Notify Action"
+      , description: DOM.div {}
+          [ DOM.p { className: "white-color h5 pb-3"} [ DOOM.text "The Notify action in Marlowe is used to continue the execution of the contract when a certain condition is satisfied. It essentially acts as a gatekeeper, ensuring that the contract only proceeds when the specified observations hold true. " ]]
+          [ DOM.p { className: "white-color h5 pb-3"} [ DOOM.text "This is useful for creating contracts that have conditional flows, where the next steps depend on certain criteria being met. By performing a Notify action, you are signaling that the required conditions are fulfilled and the contract can move forward to the next state." ]]
       , content: wrappedContentWithFooter body actions
       }
+
 
 type AdvanceFormComponentProps =
   { contract :: V1.Contract
@@ -921,7 +945,7 @@ mkComponent = do
           ChoiceInputs choiceInputs ->
             choiceFormComponent { choiceInputs, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
           SpecificNotifyInput notifyInput ->
-            notifyFormComponent { notifyInput, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
+            notifyFormComponent { notifyInput, connectedWallet, marloweContext onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
           AdvanceContract cont ->
             advanceFormComponent { contract: cont, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
       Machine.CreatingTx { allInputsChoices, errors } -> case previewFlow of
