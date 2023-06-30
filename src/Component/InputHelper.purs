@@ -17,7 +17,7 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Language.Marlowe.Core.V1.Folds (MapStep(..), foldMapContract)
 import Language.Marlowe.Core.V1.Semantics (applyCases, evalObservation, reduceContractStep) as V1
 import Language.Marlowe.Core.V1.Semantics (evalObservation, evalValue, reduceContractUntilQuiescent)
-import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId(..), Contract(..), Environment(..), Observation(..), Party(..), Payee(..), State, TimeInterval(..), Token, TokenName, Value(..))
+import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId(..), Contract(..), Environment(..), Observation(..), Party(..), Payee(..), State, TimeInterval(..), Token, TokenName, Value(..), Address)
 import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State, TimeInterval) as V1
 
 data DepositInput = DepositInput AccountId Party Token BigInt.BigInt (Maybe Contract)
@@ -141,6 +141,52 @@ rolesInContract = Array.nub <<< foldMapContract
   rolesContract (If _ _ _) = []
   rolesContract (Let _ _ _) = []
   rolesContract (Assert _ _) = []
+
+addressesInContract :: Contract -> Array Address
+addressesInContract = Array.nub <<< foldMapContract
+  ( MapStep
+      { mapCase: addressesCases
+      , mapContract: addressesContract
+      , mapObservation: addressesObservation
+      , mapValue: addressesValue
+      }
+  )
+  where
+  addressesObservation :: Observation -> Array TokenName
+  addressesObservation (ChoseSomething (ChoiceId _ (Address t))) = [ t ]
+  addressesObservation _ = []
+
+  addressesValue :: Value -> Array TokenName
+  addressesValue (AvailableMoney (Address t) _) = [ t ]
+  addressesValue (ChoiceValue (ChoiceId _ (Address t))) = [ t ]
+  addressesValue _ = []
+
+  addressesCases :: Case -> Array TokenName
+  addressesCases (Case (Deposit (Address t1) (Address t2) _ _) _) = [ t1, t2 ]
+  addressesCases (Case (Deposit (Address t1) _ _ _) _) = [ t1 ]
+  addressesCases (Case (Deposit _ (Address t2) _ _) _) = [ t2 ]
+  addressesCases (Case (Deposit _ _ _ _) _) = []
+  addressesCases (Case (Choice (ChoiceId _ (Address t)) _) _) = [ t ]
+  addressesCases (Case (Choice _ _) _) = []
+  addressesCases (Case (Notify _) _) = []
+  addressesCases (MerkleizedCase (Deposit (Address t1) (Address t2) _ _) _) = [ t1, t2 ]
+  addressesCases (MerkleizedCase (Deposit (Address t1) _ _ _) _) = [ t1 ]
+  addressesCases (MerkleizedCase (Deposit _ (Address t2) _ _) _) = [ t2 ]
+  addressesCases (MerkleizedCase (Deposit _ _ _ _) _) = []
+  addressesCases (MerkleizedCase (Choice (ChoiceId _ (Address t)) _) _) = [ t ]
+  addressesCases (MerkleizedCase (Choice _ _) _) = []
+  addressesCases (MerkleizedCase (Notify _) _) = []
+
+  addressesContract :: Contract -> Array TokenName
+  addressesContract Close = []
+  addressesContract (When _ _ _) = []
+  addressesContract (Pay (Address t1) (Party (Address t2)) _ _ _) = [ t1, t2 ]
+  addressesContract (Pay (Address t) _ _ _ _) = [ t ]
+  addressesContract (Pay _ (Party (Address t)) _ _ _) = [ t ]
+  addressesContract (Pay _ _ _ _ _) = []
+  addressesContract (If _ _ _) = []
+  addressesContract (Let _ _ _) = []
+  addressesContract (Assert _ _) = []
 
 -- computePath :: [InputContent /\ TimeInterval] → Contract → State → [Maybe Int]
 -- computePath inputs contract state = foldr step 
