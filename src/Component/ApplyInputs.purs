@@ -356,7 +356,7 @@ mkNotifyFormComponent = do
         body = DOOM.div_ $
           [ contractSection marloweContext.contract marloweContext.state
           , DOOM.hr {}
-          ] 
+          ]
         actions = fragment
           [ DOM.div { className: "row" } $
               [ DOM.div { className: "col-6 text-start" } $
@@ -369,49 +369,63 @@ mkNotifyFormComponent = do
                   ]
               , DOM.div { className: "col-6 text-end" } $
                   [ DOM.button
-                      do
-                        let
-                          disabled = case result of
-                            Just (V (Right _) /\ _) -> false
-                            _ -> true
-                        { className: "btn btn-primary"
-                        , onClick: onSubmit'
-                        , disabled
-                        }
+                      { className: "btn btn-primary"
+                      , onClick: handler_ onSuccess
+                      , disabled: false
+                      }
                       [ R.text "Submit" ]
                   ]
               ]
           ]
+
       { title: "Perform a Notify Action"
       , description: DOM.div {}
-          [ DOM.p { className: "white-color h5 pb-3"} [ DOOM.text "The Notify action in Marlowe is used to continue the execution of the contract when a certain condition is satisfied. It essentially acts as a gatekeeper, ensuring that the contract only proceeds when the specified observations hold true. " ]]
-          [ DOM.p { className: "white-color h5 pb-3"} [ DOOM.text "This is useful for creating contracts that have conditional flows, where the next steps depend on certain criteria being met. By performing a Notify action, you are signaling that the required conditions are fulfilled and the contract can move forward to the next state." ]]
+          [ DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "The Notify action in Marlowe is used to continue the execution of the contract when a certain condition is satisfied. It essentially acts as a gatekeeper, ensuring that the contract only proceeds when the specified observations hold true. " ]
+          , DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "This is useful for creating contracts that have conditional flows, where the next steps depend on certain criteria being met. By performing a Notify action, you are signaling that the required conditions are fulfilled and the contract can move forward to the next state." ]
+          ]
       , content: wrappedContentWithFooter body actions
       }
 
-
 type AdvanceFormComponentProps =
-  { contract :: V1.Contract
+  { marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
   , onSuccess :: Effect Unit
   }
 
 mkAdvanceFormComponent :: MkComponentM (AdvanceFormComponentProps -> JSX)
 mkAdvanceFormComponent = do
-  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ contract, onDismiss, onSuccess } -> React.do
+  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ marloweContext, onDismiss, onSuccess } -> React.do
     pure $ BodyLayout.component do
       let
-        body = DOOM.text ""
-        actions = fragment
-          [ DOM.button
-              { className: "btn btn-primary"
-              , onClick: handler_ onSuccess
-              , disabled: false
-              }
-              [ R.text "Submit" ]
+        body = DOOM.div_ $
+          [ contractSection marloweContext.contract marloweContext.state
+          , DOOM.hr {}
           ]
-      { title: "Advance contract"
-      , description: DOOM.text "Advance Contract description"
+        actions = fragment
+          [ DOM.div { className: "row" } $
+              [ DOM.div { className: "col-6 text-start" } $
+                  [ link
+                      { label: DOOM.text "Cancel"
+                      , onClick: onDismiss
+                      , showBorders: true
+                      , extraClassNames: "me-3"
+                      }
+                  ]
+              , DOM.div { className: "col-6 text-end" } $
+                  [ DOM.button
+                      { className: "btn btn-primary"
+                      , onClick: handler_ onSuccess
+                      , disabled: false
+                      }
+                      [ R.text "Submit" ]
+                  ]
+              ]
+          ]
+      { title: "Advance the Contract"
+      , description: DOM.div {}
+          [ DOM.p { className: "white-color h5 pb-5" } [ DOOM.text "Advancing the contract is a crucial action in Marlowe that moves the contract forward to its next state. This action is used when the contract is waiting for something to happen and needs to be manually pushed forward. It's like turning the page to the next chapter in a book. " ]
+          , DOM.p { className: "white-color h5 pb-5" } [ DOOM.text "This can be particularly useful in situations where the contract is waiting for an external data feed or an event to occur. By advancing the contract, you are ensuring that the contract stays on course and progresses through its intended sequence of states and actions." ]
+          ]
       , content: wrappedContentWithFooter body actions
       }
 
@@ -945,9 +959,9 @@ mkComponent = do
           ChoiceInputs choiceInputs ->
             choiceFormComponent { choiceInputs, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
           SpecificNotifyInput notifyInput ->
-            notifyFormComponent { notifyInput, connectedWallet, marloweContext onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
+            notifyFormComponent { notifyInput, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
           AdvanceContract cont ->
-            advanceFormComponent { contract: cont, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
+            advanceFormComponent { marloweContext, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
       Machine.CreatingTx { allInputsChoices, errors } -> case previewFlow of
         DetailedFlow _ -> do
           creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
