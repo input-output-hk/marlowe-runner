@@ -2,7 +2,7 @@ module Component.App where
 
 import Prelude
 
-import CardanoMultiplatformLib (Bech32, bech32ToString)
+import CardanoMultiplatformLib (bech32ToString)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
