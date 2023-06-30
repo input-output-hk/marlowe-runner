@@ -106,16 +106,47 @@ submit witnesses serverUrl contractEndpoint = do
     req = PutTransactionRequest textEnvelope
   put' serverUrl contractEndpoint req
 
+contractSection contract state =
+  tabs { fill: true, justify: true, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
+    let
+      renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
+    [ renderTab
+        { eventKey: eventKey "graph"
+        , title: DOOM.span_
+            [ Icons.toJSX $ unsafeIcon "diagram-2"
+            , DOOM.text " Source graph"
+            ]
+        }
+        [ marloweGraph { contract: contract } ]
+    , renderTab
+        { eventKey: eventKey "source"
+        , title: DOOM.span_
+            [ Icons.toJSX $ unsafeIcon "filetype-yml"
+            , DOOM.text " Source code"
+            ]
+        }
+        [ marloweYaml contract ]
+    , renderTab
+        { eventKey: eventKey "state"
+        , title: DOOM.span_
+            [ Icons.toJSX $ unsafeIcon "bank"
+            , DOOM.text " Contract state"
+            ]
+        }
+        [ marloweStateYaml state ]
+    ]
+
 type DepositFormComponentProps =
   { depositInputs :: NonEmptyArray DepositInput
   , connectedWallet :: WalletInfo Wallet.Api
+  , marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
   , onSuccess :: V1.Input -> Effect Unit
   }
 
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
 mkDepositFormComponent = do
-  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ depositInputs, onDismiss, onSuccess } -> React.do
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ depositInputs, onDismiss, marloweContext, onSuccess } -> React.do
     let
       choices = RadioButtonFieldChoices do
         let
@@ -163,26 +194,36 @@ mkDepositFormComponent = do
     pure $ BodyLayout.component do
       let
         fields = renderFormSpec formSpec formState
-        body = DOM.div { className: "form-group" } fields
+        body = fragment $
+          [ contractSection marloweContext.contract marloweContext.state
+          , DOOM.hr {}
+          ] <> [ DOM.div { className: "form-group" } fields ]
         actions = fragment
-          [ link
-              { label: DOOM.text "Cancel"
-              , onClick: onDismiss
-              , showBorders: true
-              , extraClassNames: "me-3"
-              }
-          , DOM.button
-              do
-                let
-                  disabled = case result of
-                    Just (V (Right _) /\ _) -> false
-                    _ -> true
-                { className: "btn btn-primary"
-                , onClick: onSubmit'
-                , disabled
-                }
-              [ R.text "Submit" ]
+          [ DOM.div { className: "row" } $
+              [ DOM.div { className: "col-6 text-start" } $
+                  [ link
+                      { label: DOOM.text "Cancel"
+                      , onClick: onDismiss
+                      , showBorders: true
+                      , extraClassNames: "me-3"
+                      }
+                  ]
+              , DOM.div { className: "col-6 text-end" } $
+                  [ DOM.button
+                      do
+                        let
+                          disabled = case result of
+                            Just (V (Right _) /\ _) -> false
+                            _ -> true
+                        { className: "btn btn-primary"
+                        , onClick: onSubmit'
+                        , disabled
+                        }
+                      [ R.text "Submit" ]
+                  ]
+              ]
           ]
+
       { title: "Select a Deposit to Perform"
       , description: fragment
           [ DOM.p {}
@@ -196,6 +237,7 @@ mkDepositFormComponent = do
 type ChoiceFormComponentProps =
   { choiceInputs :: NonEmptyArray ChoiceInput
   , connectedWallet :: WalletInfo Wallet.Api
+  , marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
   , onSuccess :: V1.Input -> Effect Unit
   }
@@ -206,7 +248,7 @@ mkChoiceFormComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ choiceInputs, connectedWallet, onDismiss, onSuccess } -> React.do
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ choiceInputs, connectedWallet, marloweContext, onDismiss, onSuccess } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     -- type ChoiceFieldProps validatorM a =
     --   { choices :: ChoiceFieldChoices
@@ -254,29 +296,42 @@ mkChoiceFormComponent = do
       let
         fields = renderFormSpec formSpec formState
         body = DOOM.div_ $
-          [ DOM.div { className: "form-group" } fields ]
-            <> case partialFormResult of
-              Just (ChoiceInput _ _ (Just cont)) ->
-                [ DOOM.hr {}
-                , DOOM.text $ show cont
-                ]
-              _ -> mempty
-
+          [ contractSection marloweContext.contract marloweContext.state
+          , DOOM.hr {}
+          ] <> [ DOM.div { className: "form-group" } fields ]
         actions = fragment
-          [ DOM.button
-              do
-                let
-                  disabled = case result of
-                    Just (V (Right _) /\ _) -> false
-                    _ -> true
-                { className: "btn btn-primary"
-                , onClick: onSubmit'
-                , disabled
-                }
-              [ R.text "Submit" ]
+          [ DOM.div { className: "row" } $
+              [ DOM.div { className: "col-6 text-start" } $
+                  [ link
+                      { label: DOOM.text "Cancel"
+                      , onClick: onDismiss
+                      , showBorders: true
+                      , extraClassNames: "me-3"
+                      }
+                  ]
+              , DOM.div { className: "col-6 text-end" } $
+                  [ DOM.button
+                      do
+                        let
+                          disabled = case result of
+                            Just (V (Right _) /\ _) -> false
+                            _ -> true
+                        { className: "btn btn-primary"
+                        , onClick: onSubmit'
+                        , disabled
+                        }
+                      [ R.text "Submit" ]
+                  ]
+              ]
           ]
-      { title: "Perform choice"
-      , description: DOOM.text "Perform choice description"
+
+      { title: "Apply a Choice"
+      , description: DOM.div {}
+          [ DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "Select a choice from the dropdown menu to proceed. Each choice represents a decision that a participant can make at a particular point in the contract." ]
+          , DOM.p
+              { className: "white-color h5 pb-3" }
+              [ DOOM.text "Keep in mind that the choices available are defined within the Marlowe contract and may have different consequences or lead to different outcomes. Make sure you understand the implications of each choice before making a selection." ]
+          ]
       , content: wrappedContentWithFooter body actions
       }
 
@@ -382,35 +437,6 @@ type ContractDetailsProps =
   }
 
 -- contractSection :: V1.Contract -> State -> JSX
-contractSection contract state =
-  tabs { fill: true, justify: true, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
-    let
-      renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
-    [ renderTab
-        { eventKey: eventKey "graph"
-        , title: DOOM.span_
-            [ Icons.toJSX $ unsafeIcon "diagram-2"
-            , DOOM.text " Source graph"
-            ]
-        }
-        [ marloweGraph { contract: contract } ]
-    , renderTab
-        { eventKey: eventKey "source"
-        , title: DOOM.span_
-            [ Icons.toJSX $ unsafeIcon "filetype-yml"
-            , DOOM.text " Source code"
-            ]
-        }
-        [ marloweYaml contract ]
-    , renderTab
-        { eventKey: eventKey "state"
-        , title: DOOM.span_
-            [ Icons.toJSX $ unsafeIcon "bank"
-            , DOOM.text " Contract state"
-            ]
-        }
-        [ marloweStateYaml state ]
-    ]
 
 mkContractDetailsComponent :: MkComponentM (ContractDetailsProps -> JSX)
 mkContractDetailsComponent = do
@@ -485,22 +511,13 @@ fetchingRequiredWalletContextDetails marloweContext possibleOnNext onDismiss pos
   let
 
     statusHtml = DOM.div { className: "row" }
-      [ DOM.div { className: "col-6" }
-          -- | Let's describe that we are
-          [ DOM.p {}
-              [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
-              , DOM.code {} [ DOOM.text "getUsedAddresses" ]
-              , DOOM.text " method from "
-              , descriptionLink { label: "CIP-30", href: "https://github.com/cardano-foundation/CIPs/tree/master/CIP-0030", icon: "bi-github" }
-              , DOOM.text ". The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
-              , DOM.code {} [ DOOM.text "addr_test..." ]
-              , DOOM.text ")."
-              ]
-          ]
-      , DOM.div { className: "col-6" } $ case possibleWalletResponse of
+      [ DOM.div { className: "col-12" } $ case possibleWalletResponse of
           Nothing ->
-            -- FIXME: loader
-            DOM.p { className: "h3" } $ DOOM.text "No response yet."
+            DOM.div
+              { className: "w-100 d-flex justify-content-center align-items-center"
+              }
+              $ loadingSpinnerLogo
+                  {}
           Just walletResponse -> fragment
             [ DOM.p { className: "h3" } $ DOOM.text "Wallet response:"
             , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify walletResponse
@@ -900,9 +917,9 @@ mkComponent = do
             machine.applyAction <<< Machine.PickInputSucceeded $ input
         case inputChoices of
           DepositInputs depositInputs ->
-            depositFormComponent { depositInputs, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
+            depositFormComponent { depositInputs, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
           ChoiceInputs choiceInputs ->
-            choiceFormComponent { choiceInputs, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
+            choiceFormComponent { choiceInputs, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
           SpecificNotifyInput notifyInput ->
             notifyFormComponent { notifyInput, connectedWallet, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
           AdvanceContract cont ->
