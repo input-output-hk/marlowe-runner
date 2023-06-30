@@ -9,7 +9,7 @@ import React.Basic.Hooks (JSX)
 
 wrappedContentWithFooter :: JSX -> JSX -> JSX
 wrappedContentWithFooter body footer = fragment
-  [ DOM.div { className: "p-3 mt-auto" } body
+  [ DOM.div { className: "p-3" } body
   , DOOM.hr {}
   , DOM.div { className: "p-3 mt-auto" } footer
   ]
