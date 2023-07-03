@@ -75,13 +75,24 @@ type Case
   = { case: Action, then: Contract }
   | { case: Action, merkleized_then: string }
 
+enum PathState {
+  Taken = 0,
+  Future = 1,
+  Pruned = 2,
+}
+
+interface ContractNodeEvents {
+  onClick?(state: PathState): void
+  onMouseOver?(state: PathState): void
+}
+
 type Contract
   = "close"
-  | { pay: Value, token: Token, to: Payee, from_account: AccountId, then: Contract }
-  | { if: Observation, then: Contract, else: Contract }
-  | { when: Case[], timout: Timeout, timeout_continuation: Contract }
-  | { let: ValueId, be: Value, then: Contract }
-  | { assert: Observation, then: Contract }
+  | { nodeEvents?: ContractNodeEvents, pay: Value, token: Token, to: Payee, from_account: AccountId, then: Contract, }
+  | { nodeEvents?: ContractNodeEvents, if: Observation, then: Contract, else: Contract, }
+  | { nodeEvents?: ContractNodeEvents, when: Case[], timout: Timeout, timeout_continuation: Contract, }
+  | { nodeEvents?: ContractNodeEvents, let: ValueId, be: Value, then: Contract, }
+  | { nodeEvents?: ContractNodeEvents, assert: Observation, then: Contract, }
 
 const X_OFFSET = 200
 const Y_OFFSET = 40
@@ -103,17 +114,11 @@ const contractNodeStyle: React.CSSProperties = {
 
 type ContractNodeType
   = "close"
-  | { pay: Value, token: Token, to: Payee, from_account: AccountId }
-  | { if: Observation }
-  | { when: ({ case: Action } | { case: Action, merkleized_then: string })[], timout: Timeout }
-  | { let: ValueId, be: Value }
-  | { assert: Observation }
-
-const PATH_TAKEN = Symbol("PATH_TAKEN")
-const PATH_FUTURE = Symbol("PATH_FUTURE")
-const PATH_PRUNED = Symbol("PATH_PRUNED")
-
-type PathState = typeof PATH_TAKEN | typeof PATH_FUTURE | typeof PATH_PRUNED
+  | { nodeEvents?: ContractNodeEvents, pay: Value, token: Token, to: Payee, from_account: AccountId }
+  | { nodeEvents?: ContractNodeEvents, if: Observation }
+  | { nodeEvents?: ContractNodeEvents, when: ({ case: Action } | { case: Action, merkleized_then: string })[], timout: Timeout }
+  | { nodeEvents?: ContractNodeEvents, let: ValueId, be: Value }
+  | { nodeEvents?: ContractNodeEvents, assert: Observation }
 
 type ContractNodeData = {
   type: ContractNodeType,
@@ -127,8 +132,8 @@ type ContractEdgeData = {
 const nodeTypes: NodeTypes = {
   ContractNode({ data: { type, state } }: { data: ContractNodeData }): JSX.Element {
     const style_: React.CSSProperties =
-      state === PATH_PRUNED ? { ...contractNodeStyle, opacity: "30%" } :
-        state === PATH_TAKEN ? { ...contractNodeStyle, borderWidth: "2px" } :
+      state === PathState.Pruned ? { ...contractNodeStyle, opacity: "30%" } :
+        state === PathState.Taken ? { ...contractNodeStyle, borderWidth: "2px" } :
           contractNodeStyle
     if (type === "close")
       return <div style={style_}>
@@ -136,8 +141,11 @@ const nodeTypes: NodeTypes = {
         <Handle type="target" position={Position.Left} />
       </div>
 
+    const onClick = () => type.nodeEvents?.onClick && type.nodeEvents.onClick(state)
+    const onMouseOver = () => type.nodeEvents?.onMouseOver && type.nodeEvents.onMouseOver(state)
+
     if ("if" in type)
-      return <div style={style_}>
+      return <div style={style_} onClick={onClick} onMouseOver={onMouseOver}>
         If (...)
         <Handle type="target" position={Position.Left} id="continuation" />
         <Handle type="source" position={Position.Right} style={{ top: "8px" }} id="then" />
@@ -145,21 +153,21 @@ const nodeTypes: NodeTypes = {
       </div>
 
     if ("pay" in type)
-      return <div style={style_}>
+      return <div style={style_} onClick={onClick} onMouseOver={onMouseOver}>
         Pay (...)
         <Handle type="target" position={Position.Left} id="continuation" />
         <Handle type="source" position={Position.Right} id="then" />
       </div>
 
     if ("let" in type)
-      return <div style={style_}>
+      return <div style={style_} onClick={onClick} onMouseOver={onMouseOver}>
         Let (...)
         <Handle type="target" position={Position.Left} id="continuation" />
         <Handle type="source" position={Position.Right} id="then" />
       </div>
 
     if ("assert" in type)
-      return <div style={style_}>
+      return <div style={style_} onClick={onClick} onMouseOver={onMouseOver}>
         Assert (...)
         <Handle type="target" position={Position.Left} id="continuation" />
         <Handle type="source" position={Position.Right} id="then" />
@@ -173,7 +181,7 @@ const nodeTypes: NodeTypes = {
         justifyContent: "space-around",
         paddingLeft: "5px",
       }
-      return <div style={style}>
+      return <div style={style} onClick={onClick} onMouseOver={onMouseOver}>
         <div>When</div>
         {type.when.map((x, i) => {
           if ("merkleized_then" in x) {
@@ -221,8 +229,8 @@ const edgeTypes: EdgeTypes = {
   ContractEdge({ data, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, markerEnd, style = {} }: EdgeProps<ContractEdgeData>): JSX.Element {
     const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
     const style_: React.CSSProperties =
-      data && data.state === PATH_PRUNED ? { ...style, strokeOpacity: "30%" } :
-        data && data.state === PATH_TAKEN ? {
+      data && data.state === PathState.Pruned ? { ...style, strokeOpacity: "30%" } :
+        data && data.state === PathState.Taken ? {
           ...style,
           strokeWidth: 2,
           stroke: "black",
@@ -245,7 +253,7 @@ const edgeWithState = (edge: Edge<ContractEdgeData>, state: PathState): Edge<Con
 const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number } => {
   if (contract === "close")
     return {
-      nodes: [{ id, position: { x, y }, data: { type: "close", state: PATH_TAKEN }, type: "ContractNode" }],
+      nodes: [{ id, position: { x, y }, data: { type: "close", state: PathState.Taken }, type: "ContractNode" }],
       edges: [],
       max_y: y,
     }
@@ -259,15 +267,15 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET, indices)
     return {
       nodes: [
-        ...then_nodes.map(node => index === 0 ? node : index === undefined ? nodeWithState(node, PATH_FUTURE) : nodeWithState(node, PATH_PRUNED)),
-        ...else_nodes.map(node => index === 1 ? node : index === undefined ? nodeWithState(node, PATH_FUTURE) : nodeWithState(node, PATH_PRUNED)),
-        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
+        ...then_nodes.map(node => index === 0 ? node : index === undefined ? nodeWithState(node, PathState.Future) : nodeWithState(node, PathState.Pruned)),
+        ...else_nodes.map(node => index === 1 ? node : index === undefined ? nodeWithState(node, PathState.Future) : nodeWithState(node, PathState.Pruned)),
+        { id, position: { x, y }, data: { type, state: PathState.Taken }, type: "ContractNode" },
       ],
       edges: [
-        ...then_edges.map(edge => index === 0 ? edge : index === undefined ? edgeWithState(edge, PATH_FUTURE) : edgeWithState(edge, PATH_PRUNED)),
-        ...else_edges.map(edge => index === 1 ? edge : index === undefined ? edgeWithState(edge, PATH_FUTURE) : edgeWithState(edge, PATH_PRUNED)),
-        { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { state: index === 0 ? PATH_TAKEN : index === undefined ? PATH_FUTURE : PATH_PRUNED } },
-        { id: `else-${else_id}-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { state: index === 1 ? PATH_TAKEN : index === undefined ? PATH_FUTURE : PATH_PRUNED } },
+        ...then_edges.map(edge => index === 0 ? edge : index === undefined ? edgeWithState(edge, PathState.Future) : edgeWithState(edge, PathState.Pruned)),
+        ...else_edges.map(edge => index === 1 ? edge : index === undefined ? edgeWithState(edge, PathState.Future) : edgeWithState(edge, PathState.Pruned)),
+        { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { state: index === 0 ? PathState.Taken : index === undefined ? PathState.Future : PathState.Pruned } },
+        { id: `else-${else_id}-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { state: index === 1 ? PathState.Taken : index === undefined ? PathState.Future : PathState.Pruned } },
       ],
       max_y,
     }
@@ -280,11 +288,11 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PathState.Taken }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PATH_TAKEN } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PathState.Taken } },
       ],
       max_y,
     }
@@ -297,11 +305,11 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PathState.Taken }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PATH_TAKEN } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PathState.Taken } },
       ],
       max_y,
     }
@@ -314,11 +322,11 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PathState.Taken }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PATH_TAKEN } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { state: PathState.Taken } },
       ],
       max_y,
     }
@@ -333,13 +341,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
         const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, indices)
         return {
           nodes: [
-            ...nodes.map(node => index === i ? node : index === undefined ? nodeWithState(node, PATH_FUTURE) : nodeWithState(node, PATH_PRUNED)),
+            ...nodes.map(node => index === i ? node : index === undefined ? nodeWithState(node, PathState.Future) : nodeWithState(node, PathState.Pruned)),
             ...acc.nodes,
           ],
           edges: [
-            ...edges.map(edge => index === i ? edge : index === undefined ? edgeWithState(edge, PATH_FUTURE) : edgeWithState(edge, PATH_PRUNED)),
+            ...edges.map(edge => index === i ? edge : index === undefined ? edgeWithState(edge, PathState.Future) : edgeWithState(edge, PathState.Pruned)),
             ...acc.edges,
-            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { state: index === i ? PATH_TAKEN : index === undefined ? PATH_FUTURE : PATH_PRUNED } },
+            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { state: index === i ? PathState.Taken : index === undefined ? PathState.Future : PathState.Pruned } },
           ],
           max_y
         }
@@ -347,7 +355,7 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       return acc
     }, {
       nodes: [
-        { id, position: { x, y }, data: { type, state: PATH_TAKEN }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, state: PathState.Taken }, type: "ContractNode" },
       ],
       edges: [],
       max_y: y - Y_OFFSET
@@ -356,13 +364,13 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, indices)
     return {
       nodes: [
-        ...timeout_graph.nodes.map(node => index === null ? node : index === undefined ? nodeWithState(node, PATH_FUTURE) : nodeWithState(node, PATH_PRUNED)),
+        ...timeout_graph.nodes.map(node => index === null ? node : index === undefined ? nodeWithState(node, PathState.Future) : nodeWithState(node, PathState.Pruned)),
         ...nodes,
       ],
       edges: [
-        ...timeout_graph.edges.map(edge => index === null ? edge : index === undefined ? edgeWithState(edge, PATH_FUTURE) : edgeWithState(edge, PATH_PRUNED)),
+        ...timeout_graph.edges.map(edge => index === null ? edge : index === undefined ? edgeWithState(edge, PathState.Future) : edgeWithState(edge, PathState.Pruned)),
         ...edges,
-        { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { state: index === null ? PATH_TAKEN : index === undefined ? PATH_FUTURE : PATH_PRUNED } },
+        { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { state: index === null ? PathState.Taken : index === undefined ? PathState.Future : PathState.Pruned } },
       ],
       max_y: timeout_graph.max_y
     }
@@ -410,7 +418,12 @@ const contract: Contract = {
           },
         ],
         timout: 2001,
-        timeout_continuation: "close"
+        timeout_continuation: "close",
+        nodeEvents: {
+          onClick(state) {
+            console.log(`hey ho: ${state}`)
+          },
+        }
       }
     },
     {
