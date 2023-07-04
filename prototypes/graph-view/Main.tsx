@@ -82,8 +82,8 @@ enum PathState {
 }
 
 interface ContractNodeEvents {
-  onClick?(state: PathState): void
-  onMouseOver?(state: PathState): void
+  onClick?(state: PathState, e: React.MouseEvent<HTMLDivElement, MouseEvent>): void
+  onMouseOver?(state: PathState, e: React.MouseEvent<HTMLDivElement, MouseEvent>): void
 }
 
 type Contract
@@ -141,8 +141,11 @@ const nodeTypes: NodeTypes = {
         <Handle type="target" position={Position.Left} />
       </div>
 
-    const onClick = () => type.nodeEvents?.onClick && type.nodeEvents.onClick(state)
-    const onMouseOver = () => type.nodeEvents?.onMouseOver && type.nodeEvents.onMouseOver(state)
+    const onClick = (e: React.MouseEvent<HTMLDivElement, MouseEvent>): void =>
+      type.nodeEvents?.onClick && type.nodeEvents.onClick(state, e)
+
+    const onMouseOver = (e: React.MouseEvent<HTMLDivElement, MouseEvent>): void =>
+      type.nodeEvents?.onMouseOver && type.nodeEvents.onMouseOver(state, e)
 
     if ("if" in type)
       return <div style={style_} onClick={onClick} onMouseOver={onMouseOver}>
