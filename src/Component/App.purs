@@ -2,12 +2,14 @@ module Component.App where
 
 import Prelude
 
+import CardanoMultiplatformLib (bech32ToString)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (mkContractList)
 import Component.Footer (footer)
 import Component.Footer as Footer
+import Component.InputHelper (addressesInContract)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
@@ -348,7 +350,7 @@ updateAppContractInfoMap :: AppContractInfoMap -> Maybe WalletContext -> Contrac
 updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext, map: prev }) walletContext updates = do
   let
     walletChanged = prevWalletContext /= walletContext
-    usedAddresses = fromMaybe [] $ _.usedAddresses <<< un WalletContext <$> walletContext
+    (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <<< un WalletContext <$> walletContext
 
     map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
       let
@@ -364,8 +366,17 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
             , initialState: V1.emptyState -- FIXME: No initial state on the API LEVEL?
             }
 
-      case contractId `Map.lookup` prev of
-        Just (ContractInfo contractInfo) -> do
+      let
+        keepContract =
+          case marloweInfo of
+            Just (MarloweInfo { initialContract })
+              | (not $ Array.null $ Array.intersect usedAddresses (addressesInContract initialContract)) -> Just true
+            Just _ -> Just false
+            _ -> Nothing
+
+      case contractId `Map.lookup` prev, keepContract of
+        _, Just false -> Nothing
+        Just (ContractInfo contractInfo), Just true -> do
           pure $ ContractInfo $ contractInfo
             { marloweInfo = marloweInfo
             , _runtime
@@ -373,9 +384,8 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
                 , transactions = transactions
                 }
             }
-        Nothing -> do
-          let
-            Runtime.ContractHeader { contractId } = contractHeader
+        Nothing, _ -> do
+          let Runtime.ContractHeader { contractId } = contractHeader
           pure $ ContractInfo $
             { contractId
             , endpoints
@@ -383,5 +393,5 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
             , tags
             , _runtime: { contractHeader, transactions }
             }
+        _,_ -> Nothing
   AppContractInfoMap { walletContext, map }
-
