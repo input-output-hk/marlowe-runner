@@ -375,8 +375,7 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
             _ -> Nothing
 
       case contractId `Map.lookup` prev, keepContract of
-        _, Just false -> Nothing
-        Just (ContractInfo contractInfo), Just true -> do
+        Just (ContractInfo contractInfo), _ -> do
           pure $ ContractInfo $ contractInfo
             { marloweInfo = marloweInfo
             , _runtime
