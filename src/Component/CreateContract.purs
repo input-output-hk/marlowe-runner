@@ -315,25 +315,32 @@ mkComponent = do
         let
           fields = StatelessFormSpec.renderFormSpec formSpec formState
           formBody = DOM.div { className: "form-group" } fields
-          formActions = DOOM.fragment
-            [ link
-                { label: DOOM.text "Cancel"
-                , onClick: onDismiss
-                , showBorders: true
-                , extraClassNames: "me-3"
-                }
-            , DOM.button
-                do
-                  let
-                    disabled = case result of
-                      Just (V (Right _) /\ _) -> false
-                      _ -> true
-                  { className: "btn btn-primary"
-                  , onClick: onSubmit'
-                  , disabled
-                  }
-                [ R.text "Submit" ]
+          formActions = fragment
+            [ DOM.div { className: "row" } $
+                [ DOM.div { className: "col-6 text-start" } $
+                    [ link
+                        { label: DOOM.text "Cancel"
+                        , onClick: onDismiss
+                        , showBorders: true
+                        , extraClassNames: "me-3"
+                        }
+                    ]
+                , DOM.div { className: "col-6 text-end" } $
+                    [ DOM.button
+                        do
+                          let
+                            disabled = case result of
+                              Just (V (Right _) /\ _) -> false
+                              _ -> true
+                          { className: "btn btn-primary"
+                          , onClick: onSubmit'
+                          , disabled
+                          }
+                        [ R.text "Submit" ]
+                    ]
+                ]
             ]
+
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
@@ -365,11 +372,17 @@ mkComponent = do
           , content: wrappedContentWithFooter
               do marloweYaml contract
               do
-                DOM.button
-                  { className: "btn btn-primary"
-                  , onClick: handler_ (onSuccess contractEndpoint)
-                  }
-                  [ R.text "Ok" ]
+                DOOM.fragment
+                  [ DOM.div { className: "row" } $
+                      [ DOM.div { className: "col-12 text-end" } $
+                          [ DOM.button
+                              { className: "btn btn-primary"
+                              , onClick: handler_ (onSuccess contractEndpoint)
+                              }
+                              [ R.text "Done" ]
+                          ]
+                      ]
+                  ]
           }
 
       machineState -> do
@@ -400,26 +413,32 @@ mkComponent = do
           formActions = case possibleRequest of
             Nothing -> mempty
             Just request -> DOOM.fragment
-              [ link
-                  { label: DOOM.text "Cancel"
-                  , onClick: onDismiss
-                  , showBorders: true
-                  , extraClassNames: "me-3"
-                  }
-              , DOM.button
-                  { className: "btn btn-primary"
-                  , disabled: case currentRun of
-                      Just (Manual b) -> b
-                      _ -> false
-                  , onClick: handler_ do
-                      setCurrentRun (Just $ Manual true)
-                      launchAff_ do
-                        action <- request
-                        liftEffect $ do
-                          applyAction action
-                          setCurrentRun (Just $ Manual false)
-                  }
-                  [ R.text "Run" ]
+              [ DOM.div { className: "row" } $
+                  [ DOM.div { className: "col-6 text-start" } $
+                      [ link
+                          { label: DOOM.text "Cancel"
+                          , onClick: onDismiss
+                          , showBorders: true
+                          , extraClassNames: "me-3"
+                          }
+                      ]
+                  , DOM.div { className: "col-6 text-end" } $
+                      [ DOM.button
+                          { className: "btn btn-primary"
+                          , disabled: case currentRun of
+                              Just (Manual b) -> b
+                              _ -> false
+                          , onClick: handler_ do
+                              setCurrentRun (Just $ Manual true)
+                              launchAff_ do
+                                action <- request
+                                liftEffect $ do
+                                  applyAction action
+                                  setCurrentRun (Just $ Manual false)
+                          }
+                          [ R.text "Run" ]
+                      ]
+                  ]
               ]
         BodyLayout.component
           { title: stateToTitle submissionState
