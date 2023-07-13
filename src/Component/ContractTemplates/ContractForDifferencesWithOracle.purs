@@ -250,23 +250,29 @@ mkComponent = do
         Nothing -> DOM.div { className: "form-group" } fields
         Just contract -> marloweYaml contract
       formActions = fragment
-        [ link
-            { label: DOOM.text "Cancel"
-            , onClick: onDismiss
-            , showBorders: true
-            , extraClassNames: "me-3"
-            }
-        , DOM.button
-            do
-              let
-                disabled = case result of
-                  Just (V (Right _) /\ _) -> false
-                  _ -> true
-              { className: "btn btn-primary"
-              , onClick: onSubmit'
-              , disabled
-              }
-            [ DOOM.text "Submit" ]
+        [ DOM.div { className: "row" } $
+            [ DOM.div { className: "col-6 text-start" } $
+                [ link
+                    { label: DOOM.text "Cancel"
+                    , onClick: onDismiss
+                    , showBorders: true
+                    , extraClassNames: "me-3"
+                    }
+                ]
+            , DOM.div { className: "col-6 text-end" } $
+                [ DOM.button
+                    do
+                      let
+                        disabled = case result of
+                          Just (V (Right _) /\ _) -> false
+                          _ -> true
+                      { className: "btn btn-primary"
+                      , onClick: onSubmit'
+                      , disabled
+                      }
+                    [ DOOM.text "Submit" ]
+                ]
+            ]
         ]
     pure $ BodyLayout.component
       { title: "Contract For Differences With Oracle"
