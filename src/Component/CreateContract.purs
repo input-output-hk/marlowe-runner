@@ -522,7 +522,8 @@ stateToDetailedDescription state = case state of
     , DOM.p {} $ DOOM.text error
     ]
   Machine.CreatingTx { errors: Nothing } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "We are using the marlowe-runtime to create the initial transaction."
+    [ DOM.p {} $ DOOM.text "Utilizing the Marlowe-runtime, this interface enables you to generate an initial transaction. The generated transaction needs to be signed using the wallet you've connected. By doing so, you are authorizing and verifying the transaction's intent and ensuring its secure execution."
+    , DOM.p {} $ DOOM.text "Please review all the details carefully before proceeding with the transaction confirmation."
     ]
   Machine.CreatingTx { reqWalletContext, errors: Just error } -> DOOM.div_
     [ DOM.p {} $ DOOM.text "It seems that the marlowe-runtime failed to create the initial transaction:"
@@ -531,21 +532,24 @@ stateToDetailedDescription state = case state of
     , DOM.p {} $ DOOM.text $ unsafeStringify reqWalletContext
     ]
   Machine.SigningTx { errors: Nothing } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "We are signing the initial transaction."
+    [ DOM.p {} $ DOOM.text "You are currently in the process of digitally signing your initial transaction. This step is critical in validating the transaction's authenticity, confirming that it has indeed originated from you. By signing, you are ensuring the transaction's integrity and non-repudiation."
+    , DOM.p {} $ DOOM.text "Carefully review all details to confirm they are correct before finalizing your signature."
     ]
   Machine.SigningTx { errors: Just error } -> DOOM.div_
     [ DOM.p {} $ DOOM.text "It seems that the wallet failed to sign the initial transaction:"
     , DOM.p {} $ DOOM.text error
     ]
   Machine.SubmittigTx { errors: Nothing } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "We are submitting the initial transaction."
+    [ DOM.p {} $ DOOM.text "You have now reached the transaction submission phase. Having signed your initial transaction, it's time to submit it into the system for processing. This step essentially sends the transaction to the network where it's queued for inclusion in the blockchain. Please ensure all details are correct. Once submitted, the transaction is irreversible and will be permanently recorded."
+    , DOM.p {} $ DOOM.text "Your transaction journey is almost complete. Press 'Submit' when you are ready."
     ]
   Machine.SubmittigTx { errors: Just error } -> DOOM.div_
     [ DOM.p {} $ DOOM.text "It seems that the marlowe-runtime failed to submit the initial transaction:"
     , DOM.p {} $ DOOM.text error
     ]
   Machine.ContractCreated _ -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "The contract was created successfully."
+    [ DOM.p {} $ DOOM.text "Congratulations! Your contract has been successfully created and recorded on the blockchain. This marks the successful completion of your transaction, now encapsulated into a secure, immutable contract. From here, the contract's terms will govern the further actions and transactions. You may want to keep a record of the contract details for future reference. Remember, the blockchain's nature of immutability makes this contract permanent and transparent."
+    , DOM.p {} $ DOOM.text "Thank you for using our platform, and feel free to create more contracts as needed."
     ]
 
 -- | Let's use error information and other details of the state to describe the sitution.
