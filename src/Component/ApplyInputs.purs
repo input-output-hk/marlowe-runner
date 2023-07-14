@@ -629,24 +629,30 @@ creatingTxDetails possibleOnNext onDismiss runtimeRequest possibleRuntimeRespons
             ]
       ]
     footer = fragment
-      [ link
-          { label: DOOM.text "Cancel"
-          , onClick: onDismiss
-          , showBorders: true
-          , extraClassNames: "me-3"
-          }
-      , case possibleOnNext of
-          Nothing -> DOM.button
-            { className: "btn btn-primary"
-            , disabled: true
-            }
-            [ R.text "Dismiss" ]
-          Just onNext -> DOM.button
-            { className: "btn btn-primary"
-            , onClick: handler_ onNext
-            , disabled: false
-            }
-            [ R.text "Next" ]
+      [ DOM.div { className: "row" } $
+          [ DOM.div { className: "col-6 text-start" } $
+              [ link
+                  { label: DOOM.text "Cancel"
+                  , onClick: onDismiss
+                  , showBorders: true
+                  , extraClassNames: "me-3"
+                  }
+              ]
+          , DOM.div { className: "col-6 text-end" } $
+              [ case possibleOnNext of
+                  Nothing -> DOM.button
+                    { className: "btn btn-primary"
+                    , disabled: true
+                    }
+                    [ R.text "Dismiss" ]
+                  Just onNext -> DOM.button
+                    { className: "btn btn-primary"
+                    , onClick: handler_ onNext
+                    , disabled: false
+                    }
+                    [ R.text "Next" ]
+              ]
+          ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
     { title: "Creating Transaction"
