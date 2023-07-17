@@ -9,7 +9,7 @@ import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (mkContractList)
 import Component.Footer (footer)
 import Component.Footer as Footer
-import Component.InputHelper (addressesInContract)
+import Component.InputHelper (addressesInContract, rolesInContract)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
@@ -28,7 +28,7 @@ import Data.Foldable (length)
 import Data.List (List)
 import Data.List as List
 import Data.Map (Map)
-import Data.Map (catMaybes, empty, lookup) as Map
+import Data.Map (catMaybes, empty, lookup, keys) as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid as Monoid
 import Data.Newtype (un)
@@ -350,7 +350,9 @@ updateAppContractInfoMap :: AppContractInfoMap -> Maybe WalletContext -> Contrac
 updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext, map: prev }) walletContext updates = do
   let
     walletChanged = prevWalletContext /= walletContext
-    (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <<< un WalletContext <$> walletContext
+    walletCtx = un WalletContext <$> walletContext
+    (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <$> walletCtx
+    (tokens :: Array String) = fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< _.balance <$> walletCtx
 
     map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
       let
@@ -370,7 +372,8 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
         keepContract =
           case marloweInfo of
             Just (MarloweInfo { initialContract })
-              | (not $ Array.null $ Array.intersect usedAddresses (addressesInContract initialContract)) -> Just true
+              | (not $ Array.null $ Array.intersect usedAddresses (addressesInContract initialContract))
+                || (not $ Array.null $ Array.intersect tokens (rolesInContract initialContract)) -> Just true
             Just _ -> Just false
             _ -> Nothing
 
