@@ -6,7 +6,6 @@ import CardanoMultiplatformLib (CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
 import Component.ApplyInputs.Machine as ApplyInputs.Machine
-import Component.BodyLayout (descriptionLink)
 import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
 import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle
@@ -14,7 +13,6 @@ import Component.ContractTemplates.Escrow as Escrow
 import Component.ContractTemplates.Swap as Swap
 import Component.CreateContract (runLiteTag)
 import Component.CreateContract as CreateContract
-import Component.InputHelper (rolesInContract)
 import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, Slotting(..), WalletInfo)
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
@@ -57,11 +55,10 @@ import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Foreign.Object as Object
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), PutTransactionRequest(..), Runtime(..), ServerURL, SlotNumber(..), Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Payout(..), PutTransactionRequest(..), Runtime(..), ServerURL, SlotNumber(..), Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import React.Basic (fragment)
@@ -462,12 +459,11 @@ mkContractList = do
                                             }
                                           _, _ -> mempty
                                     , case marloweInfo, possibleWalletContext of
-                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, initialContract, state: _ }), Just { balance } -> do
+                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance } -> do
                                           let
-                                            rolesFromContract = rolesInContract initialContract
                                             balance' = Map.filterKeys (eq currencySymbol) balance
                                             roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance'
-                                          case Array.uncons (Array.intersect roleTokens rolesFromContract) of
+                                          case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
                                             Just { head, tail } ->
                                               linkWithIcon
                                                 { icon: unsafeIcon $ "cash-coin warning-color" <> actionIconSizing

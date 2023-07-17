@@ -366,6 +366,7 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
             , state: contractState'.state
             , currentContract: contractState'.currentContract
             , initialState: V1.emptyState -- FIXME: No initial state on the API LEVEL?
+            , unclaimedPayouts: contractState'.unclaimedPayouts
             }
 
       let

@@ -19,7 +19,7 @@ import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, getResource') as Runtime
 import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
 import Marlowe.Runtime.Web.Types (BlockHeader, ContractEndpoint, ContractHeader(..), ContractId, TransactionEndpoint, TransactionsEndpoint, Tx(..), TxHeader(..)) as Runtime
-import Marlowe.Runtime.Web.Types (ServerURL, Tags)
+import Marlowe.Runtime.Web.Types (Payout(..), ServerURL, Tags)
 
 data UserContractRole
   = ContractParty
@@ -42,6 +42,7 @@ newtype MarloweInfo = MarloweInfo
   , currencySymbol :: Maybe V1.CurrencySymbol
   , state :: Maybe V1.State
   , currentContract :: Maybe V1.Contract
+  , unclaimedPayouts :: Array Payout
   }
 
 derive instance Eq MarloweInfo
