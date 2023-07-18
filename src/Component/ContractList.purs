@@ -30,6 +30,7 @@ import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FormCo
 import Control.Alt ((<|>))
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (decodeJson, encodeJson, stringify)
+import Data.Array (null)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.BigInt.Argonaut as BigInt
@@ -223,10 +224,11 @@ mkContractList = do
       --           then sortedContracts
       --           else Array.reverse sortedContracts
 
-      isLoadingContracts :: Boolean
-      isLoadingContracts = case possibleContracts'' of
-        Nothing -> true
-        Just contracts -> any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts
+      -- isLoadingContracts :: Boolean
+      -- isLoadingContracts = case possibleContracts'' of
+      --   Nothing -> true
+      --   Just [] -> true
+      --   Just contracts -> any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts
 
     pure $
       case possibleModalAction, connectedWallet of
@@ -298,15 +300,7 @@ mkContractList = do
               , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
               ]
           , content: React.fragment
-              [ if isLoadingContracts then
-                  DOM.div
-                    { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
-                    }
-                    $ loadingSpinnerLogo
-                        {}
-                else
-                  mempty
-              , DOM.div { className: "row p-4" } do
+              [ DOM.div { className: "row p-4" } do
                   let
                     disabled = isNothing connectedWallet
                     newContractButton = buttonWithIcon
@@ -364,9 +358,7 @@ mkContractList = do
                         buttons
                   ]
               , case possibleContracts'' of
-                  Nothing -> mempty
-                  Just contracts -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
-
+                  Just contracts | not (null contracts) -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
                     [ table { striped: Table.striped.boolean true, hover: true }
                         [ DOM.thead {} do
                             let
@@ -477,6 +469,13 @@ mkContractList = do
                                 ]
                         ]
                     ]
+                  _ ->
+                    DOM.div
+                      -- { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
+                      { className: "col-12 position-relative d-flex justify-content-center align-items-center blur-bg z-index-sticky"
+                      }
+                      $ loadingSpinnerLogo
+                          {}
               ]
           }
         _, _ -> mempty

@@ -345,16 +345,14 @@ mkApp = do
         , footer (Footer.Fixed true)
         ]
 
--- TODO: Currently we ignore role tokens.
 updateAppContractInfoMap :: AppContractInfoMap -> Maybe WalletContext -> ContractWithTransactionsMap -> AppContractInfoMap
-updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext, map: prev }) walletContext updates = do
+updateAppContractInfoMap (AppContractInfoMap { map: prev }) walletContext updates = do
   let
-    walletChanged = prevWalletContext /= walletContext
     walletCtx = un WalletContext <$> walletContext
     (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <$> walletCtx
     (tokens :: Array String) = fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< _.balance <$> walletCtx
 
-    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
+    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
       let
         marloweInfo = do
           Runtime.ContractState contractState' <- contractState
@@ -379,7 +377,7 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
             _ -> Nothing
 
       case contractId `Map.lookup` prev, keepContract of
-        Just (ContractInfo contractInfo), _ -> do
+        Just (ContractInfo contractInfo), Just true -> do
           pure $ ContractInfo $ contractInfo
             { marloweInfo = marloweInfo
             , _runtime
@@ -387,7 +385,7 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
                 , transactions = transactions
                 }
             }
-        Nothing, _ -> do
+        Nothing, Just true -> do
           let Runtime.ContractHeader { contractId } = contractHeader
           pure $ ContractInfo $
             { contractId
@@ -396,5 +394,5 @@ updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext,
             , tags
             , _runtime: { contractHeader, transactions }
             }
-        _,_ -> Nothing
+        _, _ -> Nothing
   AppContractInfoMap { walletContext, map }
