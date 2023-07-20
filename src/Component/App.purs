@@ -13,13 +13,15 @@ import Component.InputHelper (addressesInContract, rolesInContract)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
-import Component.Types (ContractInfo(..), MessageContent(Success, Info), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
+import Component.Types (ContractInfo(..), MessageContent(Success, Info), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..), Network(..))
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Widgets (link, linkWithIcon)
 import Contrib.Data.Map (New(..), Old(..), additions, deletions) as Map
 import Contrib.Halogen.Subscription (MinInterval(..))
 import Contrib.Halogen.Subscription (bindEffect, foldMapThrottle) as Subscription
 import Contrib.React.Svg (svgImg)
+import Contrib.ReactBootstrap.DropdownButton (dropdownButton)
+import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader.Class (asks)
 import Data.Array as Array
@@ -42,16 +44,18 @@ import Effect.Aff (Aff, error, killFiber, launchAff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Effect.Now (now)
+import Effect.Uncurried (mkEffectFn1)
 import Halogen.Subscription (Emitter) as Subscription
 import Language.Marlowe.Core.V1.Semantics as V1
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsEvent, ContractWithTransactionsMap, ContractWithTransactionsStream(..))
 import Marlowe.Runtime.Web.Types (PolicyId(..))
 import Marlowe.Runtime.Web.Types as Runtime
-import React.Basic (JSX)
+import React.Basic (JSX, fragment)
 import React.Basic as ReactContext
 import React.Basic.DOM (div, img, span_, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
+import React.Basic.Events (EventHandler, handler, handler_)
 import React.Basic.Hooks (component, provider, readRef, useEffect, useEffectOnce, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
@@ -146,11 +150,15 @@ mkApp = do
   msgHub@(MessageHub msgHubProps) <- asks _.msgHub
 
   about <- asks _.aboutMarkdown
+  availableNetworks <- asks _.availableNetworks
 
   liftEffect $ component "App" \_ -> React.do
     possibleWalletInfo /\ setWalletInfo <- useState' Nothing
     let
       walletInfoName = _.name <<< un WalletInfo <$> possibleWalletInfo
+
+      initialNetwork :: Maybe Network
+      initialNetwork = Array.head availableNetworks
 
     possibleWalletInfoRef <- useStateRef walletInfoName possibleWalletInfo
     possibleWalletContext /\ setWalletContext <- useState' Nothing
@@ -181,6 +189,7 @@ mkApp = do
     configuringWallet /\ setConfiguringWallet <- useState' false
     checkingNotifications /\ setCheckingNotifications <- useState' false
     displayOption /\ setDisplayOption <- useState' Default
+    currentNetwork /\ setCurrentNetwork <- useState' initialNetwork
 
     -- We are ignoring contract events for now and we update the whole contractInfo set.
     upstreamVersion <- useEmitter' initialVersion (Subscription.bindEffect (const now) throttledEmitter)
@@ -212,7 +221,6 @@ mkApp = do
             <> (if additionsNumber == 0 then "" else show additionsNumber <> " contracts discovered")
             <> "."
 
-
       setContractMap (newVersion /\ new)
       pure $ pure unit
 
@@ -233,6 +241,26 @@ mkApp = do
     let
       AppContractInfoMap { map: contracts } = contractMap
 
+      dropdownItems = availableNetworks <#> \networkRecord ->
+        let
+          (Network network) = networkRecord
+        in
+          dropdownItem { onClick: mkEffectFn1 \_ -> setCurrentNetwork $ Just networkRecord } [ DOOM.text network.name ]
+
+      networkSelectionButton = case currentNetwork of
+        Nothing -> mempty
+        Just network ->
+          let
+            (Network network') = network
+          in
+            dropdownButton
+              { className: "d-inline-block"
+              , title: fragment
+                  [ Icons.toJSX $ unsafeIcon "globe h5 me-1"
+                  , DOOM.text network'.name
+                  ]
+              }
+              dropdownItems
     pure $ case possibleWalletInfo of
       Nothing -> landingPage { setWalletInfo: setWalletInfo <<< Just }
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
@@ -242,7 +270,8 @@ mkApp = do
                   [ svgImg { src: marloweLogoUrl } ]
               , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
                   [ DOM.ul { className: "navbar-nav gap-2" }
-                      [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
+                      [ DOM.li { className: "nav-item" } [ networkSelectionButton ]
+                      , DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
                           [ linkWithIcon
                               { icon: if List.null msgs then unsafeIcon "bell-slash disabled-color h5" else unsafeIcon "bell-fill primary-color h5"
                               , label: mempty
@@ -345,14 +374,16 @@ mkApp = do
         , footer (Footer.Fixed true)
         ]
 
+-- TODO: Currently we ignore role tokens.
 updateAppContractInfoMap :: AppContractInfoMap -> Maybe WalletContext -> ContractWithTransactionsMap -> AppContractInfoMap
-updateAppContractInfoMap (AppContractInfoMap { map: prev }) walletContext updates = do
+updateAppContractInfoMap (AppContractInfoMap { walletContext: prevWalletContext, map: prev }) walletContext updates = do
   let
+    walletChanged = prevWalletContext /= walletContext
     walletCtx = un WalletContext <$> walletContext
     (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <$> walletCtx
     (tokens :: Array String) = fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< _.balance <$> walletCtx
 
-    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
+    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, block, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
       let
         marloweInfo = do
           Runtime.ContractState contractState' <- contractState
@@ -372,12 +403,12 @@ updateAppContractInfoMap (AppContractInfoMap { map: prev }) walletContext update
           case marloweInfo of
             Just (MarloweInfo { initialContract })
               | (not $ Array.null $ Array.intersect usedAddresses (addressesInContract initialContract))
-                || (not $ Array.null $ Array.intersect tokens (rolesInContract initialContract)) -> Just true
+                  || (not $ Array.null $ Array.intersect tokens (rolesInContract initialContract)) -> Just true
             Just _ -> Just false
             _ -> Nothing
 
       case contractId `Map.lookup` prev, keepContract of
-        Just (ContractInfo contractInfo), Just true -> do
+        Just (ContractInfo contractInfo), _ -> do
           pure $ ContractInfo $ contractInfo
             { marloweInfo = marloweInfo
             , _runtime
@@ -385,7 +416,7 @@ updateAppContractInfoMap (AppContractInfoMap { map: prev }) walletContext update
                 , transactions = transactions
                 }
             }
-        Nothing, Just true -> do
+        Nothing, _ -> do
           let Runtime.ContractHeader { contractId } = contractHeader
           pure $ ContractInfo $
             { contractId

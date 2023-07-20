@@ -1,11 +1,14 @@
-module Main where
+module Main
+  ( Config
+  , decodeConfig
+  ) where
 
 import Prelude
 
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.App (mkApp)
 import Component.MessageHub (mkMessageHub)
-import Component.Types (Slotting(..))
+import Component.Types (Slotting(..), Network(..))
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
 import Contrib.JsonBigInt (fromJson)
@@ -43,6 +46,7 @@ type Config =
   { marloweWebServerUrl :: ServerURL
   , develMode :: Boolean
   , network :: String
+  , availableNetworks :: Array Network
   , aboutMarkdown :: String
   }
 
@@ -52,11 +56,17 @@ decodeConfig json = do
   marloweWebServerUrl <- obj .: "marloweWebServerUrl"
   develMode <- obj .: "develMode"
   network <- obj .: "network"
+  -- availableNetworks <- obj .: "availableNetworks"
   aboutMarkdown <- obj .: "aboutMarkdown"
   pure
     { marloweWebServerUrl: ServerURL marloweWebServerUrl
     , develMode
     , network
+    , availableNetworks:
+        [ Network { name: "preview", url: "http://preview-url" }
+        , Network { name: "preprod", url: "http://preprod-url" }
+        , Network { name: "mainnet", url: "http://mainnet-url" }
+        ]
     , aboutMarkdown
     }
 
@@ -76,8 +86,8 @@ main configJson = do
     -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
     slotting =
       case config.network of
-        "mainnet" -> Slotting { slotLength: BigInt.fromInt 1000 , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
-        _ -> Slotting { slotLength: BigInt.fromInt 1000 , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
+        "mainnet" -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
+        _ -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
 
   doc :: HTMLDocument <- document =<< window
   container :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<
@@ -108,6 +118,7 @@ main configJson = do
             , msgHub
             , runtime
             , aboutMarkdown: config.aboutMarkdown
+            , availableNetworks: config.availableNetworks
             , slotting
             }
 

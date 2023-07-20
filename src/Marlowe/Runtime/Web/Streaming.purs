@@ -99,7 +99,6 @@ contracts (PollingInterval pollingInterval) (RequestInterval requestInterval) fi
   let
     range = Nothing
 
-  let
     start = forever do
       liftEffect $ Ref.write 0 pageNumberRef
       void $ AVar.tryTake contractsAVar

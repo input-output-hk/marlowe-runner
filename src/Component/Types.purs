@@ -8,6 +8,7 @@ module Component.Types
   , MessageContent(..)
   , WalletInfo(..)
   , Slotting(..)
+  , Network(..)
   , module Exports
   ) where
 
@@ -58,8 +59,13 @@ newtype MessageHub = MessageHub
   }
 
 newtype Slotting = Slotting
-  { slotLength :: BigInt,
-    slotZeroTime :: BigInt
+  { slotLength :: BigInt
+  , slotZeroTime :: BigInt
+  }
+
+newtype Network = Network
+  { name :: String
+  , url :: String
   }
 
 type MkContextBase r =
@@ -72,6 +78,7 @@ type MkContextBase r =
   , runtime :: Runtime
   , msgHub :: MessageHub
   , aboutMarkdown :: String
+  , availableNetworks :: Array Network
   , slotting :: Slotting
   | r
   }
