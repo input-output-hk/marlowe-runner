@@ -1,4 +1,4 @@
-# marlowe-run-lite
+# marlowe-runner
 
 ## Installation
 
