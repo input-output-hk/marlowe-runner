@@ -12,3 +12,7 @@
 .vscode
 public/app.js
 .pre-commit-config.yaml
+# E2E tests
+!e2e/yarn.lock
+e2e/node_modules
+e2e/reports
