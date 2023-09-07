@@ -80,7 +80,7 @@ updatedAt ci@(ContractInfo { _runtime: { transactions } }) =
 fetchAppliedInputs :: ServerURL -> Array Runtime.TransactionEndpoint -> Aff (V (Array (Runtime.ClientError String)) (Array ((Maybe V1.InputContent) /\ V1.TimeInterval)))
 fetchAppliedInputs serverURL transactionEndpoints = do
   results <- transactionEndpoints `flip parTraverse` \transactionEndpoint -> do
-    Runtime.getResource' serverURL transactionEndpoint {}
+    Runtime.getResource' serverURL transactionEndpoint {} {}
 
   pure $ results `foldMapFlipped` case _ of
     Left err -> V (Left [err])

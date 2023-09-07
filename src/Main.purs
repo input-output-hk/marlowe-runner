@@ -92,7 +92,8 @@ main configJson = do
           { block: Nothing } -> true
           { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
         maxPages = Just (MaxPages 1)
-      Streaming.mkContractsWithTransactions pollInterval reqInterval filterContracts maxPages config.marloweWebServerUrl
+        params = { partyAddresses: [], tags: [], partyRoles: [] }
+      Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages config.marloweWebServerUrl
 
     CardanoMultiplatformLib.importLib >>= case _ of
       Nothing -> liftEffect $ logger "Cardano serialization lib loading failed"
