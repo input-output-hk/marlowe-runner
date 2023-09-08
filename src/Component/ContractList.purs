@@ -19,6 +19,7 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
+import Contrib.Cardano as Cardano
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
@@ -451,10 +452,10 @@ mkContractList = do
                                             }
                                           _, _ -> mempty
                                     , case marloweInfo, possibleWalletContext of
-                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance } -> do
+                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
                                           let
-                                            balance' = Map.filterKeys (eq currencySymbol) balance
-                                            roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance'
+                                            balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
+                                            roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
                                           case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
                                             Just { head, tail } ->
                                               linkWithIcon

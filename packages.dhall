@@ -300,6 +300,37 @@ in  upstream
         "https://github.com/input-output-hk/purescript-cardano-multiplatform-lib.git"
         "main"
 
+  with cardano-wallet-client =
+      mkPackage
+        [ "argonaut"
+        , "arraybuffer-types"
+        , "arrays"
+        , "debug"
+        , "effect"
+        , "either"
+        , "exceptions"
+        , "foldable-traversable"
+        , "js-object"
+        , "js-promise-aff"
+        , "lists"
+        , "marlowe"
+        , "maybe"
+        , "newtype"
+        , "nullable"
+        , "ordered-collections"
+        , "partial"
+        , "prelude"
+        , "refs"
+        , "strings"
+        , "transformers"
+        , "tuples"
+        , "typelevel-prelude"
+        , "undefined-is-not-a-problem"
+        , "web-encoding"
+        ]
+        "https://github.com/input-output-hk/purescript-cardano-wallet-client.git"
+        "main"
+
   with marlowe-runtime-client =
       mkPackage
         [ "aff"

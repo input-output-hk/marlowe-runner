@@ -306,7 +306,7 @@ mkComponent = do
     possibleWalletInfo <- React.useContext walletInfoCtx
     React.useEffect (_.changeAddress <<< un WalletContext <<< snd <$> possibleWalletInfo) $ do
       case possibleWalletInfo of
-        Just (_ /\ (WalletContext { changeAddress: Just changeAddress })) -> do
+        Just (_ /\ (WalletContext { changeAddress })) -> do
           { multiChoiceTest: initialContract } <- liftEffect $ mkInitialContracts changeAddress
           case Map.lookup contractFieldId formState.fields of
             Just { touched, onChange } -> do

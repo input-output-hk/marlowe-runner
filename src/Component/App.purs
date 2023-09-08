@@ -16,6 +16,7 @@ import Component.Modal (Size(..), mkModal)
 import Component.Types (ContractInfo(..), MessageContent(Success, Info), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Widgets (link, linkWithIcon)
+import Contrib.Cardano as Cardano
 import Contrib.Data.Map (New(..), Old(..), additions, deletions) as Map
 import Contrib.Halogen.Subscription (MinInterval(..))
 import Contrib.Halogen.Subscription (bindEffect, foldMapThrottle) as Subscription
@@ -172,7 +173,7 @@ mkApp = do
           let
             action = do
               walletContext <- WalletContext.walletContext cardanoMultiplatformLib walletInfo.wallet
-              liftEffect $ setWalletContext $ Just walletContext
+              liftEffect $ setWalletContext walletContext
           action `catchError` \_ -> do
             -- FIXME: Report back (to the reporting backend) a wallet problem?
             traceM "ERROR during wallet context construction"
@@ -350,7 +351,7 @@ updateAppContractInfoMap (AppContractInfoMap { map: prev }) walletContext update
   let
     walletCtx = un WalletContext <$> walletContext
     (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <$> walletCtx
-    (tokens :: Array String) = fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< _.balance <$> walletCtx
+    (tokens :: Array String) = map Cardano.assetIdToString $ fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un Cardano.Value <<< _.balance <$> walletCtx
 
     map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
       let

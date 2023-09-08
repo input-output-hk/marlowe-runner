@@ -82,7 +82,7 @@ mkComponent = do
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
 
-        Just (V (Right { role }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
+        Just (V (Right { role }) /\ _), Just { changeAddress, usedAddresses } -> do
           let
             withdrawalContext = WithdrawalContext
               { wallet: { changeAddress, usedAddresses }

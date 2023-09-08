@@ -334,7 +334,8 @@ requestToAffAction = case _ of
       possibleWalletAddresses <- (Right <$> walletContext cardanoMultiplatformLib wallet) `catchError` (pure <<< Left)
       case possibleWalletAddresses of
         Left err -> pure $ FetchRequiredWalletContextFailed $ show err
-        Right (WalletContext { changeAddress: Just changeAddress, usedAddresses }) -> liftEffect $ do
+        Right Nothing -> pure $ FetchRequiredWalletContextFailed "Wallet does not have a change address"
+        Right (Just (WalletContext { changeAddress, usedAddresses })) -> liftEffect $ do
           invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
           invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
           let
@@ -354,7 +355,6 @@ requestToAffAction = case _ of
             { requiredWalletContext: { changeAddress, usedAddresses }
             , allInputsChoices
             }
-        Right (WalletContext { changeAddress: Nothing }) -> pure $ FetchRequiredWalletContextFailed "Wallet does not have a change address"
     SignTxRequest { walletInfo, tx } -> do
       let
         WalletInfo { wallet } = walletInfo
