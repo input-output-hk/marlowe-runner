@@ -2,58 +2,52 @@ module Component.App where
 
 import Prelude
 
-import CardanoMultiplatformLib (bech32ToString)
+import CardanoMultiplatformLib.Types (Bech32)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (mkContractList)
 import Component.Footer (footer)
 import Component.Footer as Footer
-import Component.InputHelper (addressesInContract, rolesInContract)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
-import Component.Types (ContractInfo(..), MessageContent(Success, Info), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
+import Component.Types (ContractInfo(..), MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Widgets (link, linkWithIcon)
+import Contrib.Cardano (AssetId)
 import Contrib.Cardano as Cardano
-import Contrib.Data.Map (New(..), Old(..), additions, deletions) as Map
-import Contrib.Halogen.Subscription (MinInterval(..))
-import Contrib.Halogen.Subscription (bindEffect, foldMapThrottle) as Subscription
 import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
+import Control.Monad.Loops (untilJust)
 import Control.Monad.Reader.Class (asks)
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Foldable (length)
-import Data.List (List)
 import Data.List as List
 import Data.Map (Map)
-import Data.Map (catMaybes, empty, lookup, keys) as Map
+import Data.Map (catMaybes, keys) as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid as Monoid
-import Data.Newtype (un)
+import Data.Newtype (un, unwrap)
 import Data.Newtype as Newtype
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple.Nested ((/\))
 import Debug (traceM)
 import Effect (Effect)
-import Effect.Aff (Aff, error, killFiber, launchAff, launchAff_)
+import Effect.Aff (Aff, delay, forkAff, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import Effect.Now (now)
-import Halogen.Subscription (Emitter) as Subscription
-import Language.Marlowe.Core.V1.Semantics as V1
-import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsEvent, ContractWithTransactionsMap, ContractWithTransactionsStream(..))
-import Marlowe.Runtime.Web.Types (PolicyId(..))
+import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
+import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsMap, ContractWithTransactionsStream(..), MaxPages(..), PollingInterval(..), RequestInterval(..))
+import Marlowe.Runtime.Web.Streaming as Streaming
+import Marlowe.Runtime.Web.Types (BlockHeader(..), BlockNumber(..), ContractHeader(..), PolicyId(..), Runtime(..))
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX)
 import React.Basic as ReactContext
 import React.Basic.DOM (div, img, span_, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (component, provider, readRef, useEffect, useEffectOnce, useState')
+import React.Basic.Hooks (component, provider, readRef, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import ReactBootstrap.Icons (unsafeIcon)
@@ -62,7 +56,7 @@ import ReactBootstrap.Offcanvas (offcanvas)
 import ReactBootstrap.Offcanvas as Offcanvas
 import Record as Record
 import Type.Prelude (Proxy(..))
-import Utils.React.Basic.Hooks (useEmitter', useLoopAff, useStateRef, useStateRef')
+import Utils.React.Basic.Hooks (useLoopAff, useStateRef, useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 import WalletContext as WalletContext
@@ -136,17 +130,11 @@ mkApp = do
     connectWallet <- mkConnectWallet
     pure { contractListComponent, connectWallet, messageBox }
 
-  (ContractWithTransactionsStream contractStream) <- asks _.contractStream
-
-  throttledEmitter :: Subscription.Emitter (List ContractWithTransactionsEvent) <- liftEffect $
-    Subscription.foldMapThrottle (List.singleton) (MinInterval $ Milliseconds 1_000.0) contractStream.emitter
-
-  initialVersion <- liftEffect now
-
   walletInfoCtx <- asks _.walletInfoCtx
   msgHub@(MessageHub msgHubProps) <- asks _.msgHub
 
   about <- asks _.aboutMarkdown
+  Runtime runtime <- asks _.runtime
 
   liftEffect $ component "App" \_ -> React.do
     possibleWalletInfo /\ setWalletInfo <- useState' Nothing
@@ -157,10 +145,35 @@ mkApp = do
     possibleWalletContext /\ setWalletContext <- useState' Nothing
     possibleWalletContextRef <- useStateRef' possibleWalletContext
 
-    useEffectOnce do
-      -- FIXME: We should restart fetchers on exception
-      fiber <- launchAff $ contractStream.start
-      pure $ launchAff_ $ killFiber (error "Unmounting component") fiber
+    possibleContractMap /\ setContractMap <- useState' Nothing
+
+    -- TODO: use changeAddress as well
+    useAff (map (_.usedAddresses <<< unwrap) possibleWalletContext) $ do
+      let
+        walletCtx = un WalletContext <$> possibleWalletContext
+        (usedAddresses :: Array Bech32) = fromMaybe [] $ _.usedAddresses <$> walletCtx
+        (tokens :: Array AssetId) = fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un Cardano.Value <<< _.balance <$> walletCtx
+
+        reqInterval = RequestInterval (Milliseconds 50.0)
+        pollInterval = PollingInterval (Milliseconds 60_000.0)
+        filterContracts getContractResponse = case un ContractHeader getContractResponse.resource of
+          { block: Nothing } -> true
+          { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
+        maxPages = Just (MaxPages 1)
+        params = { partyAddresses: usedAddresses, partyRoles: tokens, tags: [] }
+
+      ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages runtime.serverURL
+      supervise do
+        void $ forkAff do
+          untilJust do
+            updates <- liftEffect $ contractStream.getLiveState
+            let
+              new = mkAppContractInfoMap possibleWalletContext updates
+            liftEffect $ setContractMap $ Just new
+            delay (Milliseconds 1_000.0)
+            pure Nothing
+
+        contractStream.start
 
     useLoopAff walletInfoName (Milliseconds 20_000.0) do
       pwi <- liftEffect $ readRef possibleWalletInfoRef
@@ -183,39 +196,40 @@ mkApp = do
     checkingNotifications /\ setCheckingNotifications <- useState' false
     displayOption /\ setDisplayOption <- useState' Default
 
+    -- TODO: re-introduce notifications
     -- We are ignoring contract events for now and we update the whole contractInfo set.
-    upstreamVersion <- useEmitter' initialVersion (Subscription.bindEffect (const now) throttledEmitter)
-    upstreamVersionRef <- useStateRef' upstreamVersion
-
-    -- Let's use versioning so we avoid large comparison.
-    (version /\ contractMap) /\ setContractMap <- useState' (upstreamVersion /\ AppContractInfoMap { walletContext: possibleWalletContext, map: Map.empty })
-    idRef <- useStateRef version contractMap
-
-    useEffect (upstreamVersion /\ possibleWalletContext) do
-      updates <- contractStream.getLiveState
-      old <- readRef idRef
-      newVersion <- readRef upstreamVersionRef
-      let
-        new = updateAppContractInfoMap old possibleWalletContext updates
-        _map (AppContractInfoMap { map }) = map
-
-        old' = _map old
-        new' = _map new
-
-        (additionsNumber :: Int) = length $ Map.additions (Map.Old old') (Map.New new')
-        (deletionsNumber :: Int) = length $ Map.deletions (Map.Old old') (Map.New new')
-
-      when (deletionsNumber > 0 || additionsNumber > 0) do
-        msgHubProps.add $ Info $ DOOM.text $
-          "Update: "
-            <> (if deletionsNumber == 0 then "" else show deletionsNumber <> " contracts removed")
-            <> (if deletionsNumber > 0 && additionsNumber > 0 then ", " else "")
-            <> (if additionsNumber == 0 then "" else show additionsNumber <> " contracts discovered")
-            <> "."
-
-
-      setContractMap (newVersion /\ new)
-      pure $ pure unit
+    --    upstreamVersion <- useEmitter' initialVersion (Subscription.bindEffect (const now) emitter)
+    --    upstreamVersionRef <- useStateRef' upstreamVersion
+    --
+    --    -- Let's use versioning so we avoid large comparison.
+    --    (version /\ contractMap) /\ setContractMap <- useState' (upstreamVersion /\ AppContractInfoMap { walletContext: possibleWalletContext, map: Map.empty })
+    --    idRef <- useStateRef version contractMap
+    --
+    --    useEffect (upstreamVersion /\ possibleWalletContext) do
+    --      updates <- contractStream.getLiveState
+    --      old <- readRef idRef
+    --      newVersion <- readRef upstreamVersionRef
+    --      let
+    --        new = updateAppContractInfoMap old possibleWalletContext updates
+    --        _map (AppContractInfoMap { map }) = map
+    --
+    --        old' = _map old
+    --        new' = _map new
+    --
+    --        (additionsNumber :: Int) = length $ Map.additions (Map.Old old') (Map.New new')
+    --        (deletionsNumber :: Int) = length $ Map.deletions (Map.Old old') (Map.New new')
+    --
+    --      when (deletionsNumber > 0 || additionsNumber > 0) do
+    --        msgHubProps.add $ Info $ DOOM.text $
+    --          "Update: "
+    --            <> (if deletionsNumber == 0 then "" else show deletionsNumber <> " contracts removed")
+    --            <> (if deletionsNumber > 0 && additionsNumber > 0 then ", " else "")
+    --            <> (if additionsNumber == 0 then "" else show additionsNumber <> " contracts discovered")
+    --            <> "."
+    --
+    --
+    --      setContractMap (newVersion /\ new)
+    --      pure $ pure unit
 
     -- -- This causes a lot of re renders - we avoid it for now by
     -- -- enforcing manual offcanvas toggling.
@@ -232,7 +246,9 @@ mkApp = do
         liftEffect $ setWalletInfo $ Just walletInfo
 
     let
-      AppContractInfoMap { map: contracts } = contractMap
+      possibleContracts = do
+        AppContractInfoMap { map: contracts } <- possibleContractMap
+        pure contracts
 
     pure $ case possibleWalletInfo of
       Nothing -> landingPage { setWalletInfo: setWalletInfo <<< Just }
@@ -272,9 +288,10 @@ mkApp = do
                       ]
                   ]
               ]
-        , DOM.div { className: "position-fixed mt-2 position-left-50 transform-translate-x--50 z-index-popover" } $
-            DOM.div { className: "container-xl" }
-                $ DOM.div { className: "row" } $ messagePreview msgHub
+        , DOM.div { className: "position-fixed mt-2 position-left-50 transform-translate-x--50 z-index-popover" }
+            $ DOM.div { className: "container-xl" }
+            $ DOM.div { className: "row" }
+            $ messagePreview msgHub
         , ReactContext.consumer msgHubProps.ctx \_ ->
             pure $ offcanvas
               { onHide: setCheckingNotifications false
@@ -312,11 +329,11 @@ mkApp = do
             jsx
         , do
             let
-              contractArray = Array.fromFoldable contracts
+              contractArray = Array.fromFoldable <$> possibleContracts
             subcomponents.contractListComponent
-              { possibleContracts: do
-                  if version == initialVersion then Nothing
-                  else Just contractArray
+              { possibleContracts: contractArray
+              -- if version == initialVersion then Nothing
+              -- else Just contractArray
               , connectedWallet: possibleWalletInfo
               }
         -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
@@ -346,12 +363,12 @@ mkApp = do
         , footer (Footer.Fixed true)
         ]
 
-updateAppContractInfoMap :: AppContractInfoMap -> Maybe WalletContext -> ContractWithTransactionsMap -> AppContractInfoMap
-updateAppContractInfoMap (AppContractInfoMap { map: prev }) walletContext updates = do
+mkAppContractInfoMap :: Maybe WalletContext -> ContractWithTransactionsMap -> AppContractInfoMap
+mkAppContractInfoMap walletContext updates = do
   let
-    walletCtx = un WalletContext <$> walletContext
-    (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <$> walletCtx
-    (tokens :: Array String) = map Cardano.assetIdToString $ fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un Cardano.Value <<< _.balance <$> walletCtx
+    -- walletCtx = un WalletContext <$> walletContext
+    -- (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <$> walletCtx
+    -- (tokens :: Array String) = map Cardano.assetIdToString $ fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un Cardano.Value <<< _.balance <$> walletCtx
 
     map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
       let
@@ -368,32 +385,23 @@ updateAppContractInfoMap (AppContractInfoMap { map: prev }) walletContext update
             , unclaimedPayouts: contractState'.unclaimedPayouts
             }
 
-      let
-        keepContract =
-          case marloweInfo of
-            Just (MarloweInfo { initialContract })
-              | (not $ Array.null $ Array.intersect usedAddresses (addressesInContract initialContract))
-                || (not $ Array.null $ Array.intersect tokens (rolesInContract initialContract)) -> Just true
-            Just _ -> Just false
-            _ -> Nothing
+      -- let
+      --   keepContract =
+      --     case marloweInfo of
+      --       Just (MarloweInfo { initialContract })
+      --         | (not $ Array.null $ Array.intersect usedAddresses (addressesInContract initialContract))
+      --           || (not $ Array.null $ Array.intersect tokens (rolesInContract initialContract)) -> Just true
+      --       Just _ -> Just false
+      --       _ -> Nothing
 
-      case contractId `Map.lookup` prev, keepContract of
-        Just (ContractInfo contractInfo), Just true -> do
-          pure $ ContractInfo $ contractInfo
-            { marloweInfo = marloweInfo
-            , _runtime
-                { contractHeader = contractHeader
-                , transactions = transactions
-                }
-            }
-        Nothing, Just true -> do
-          let Runtime.ContractHeader { contractId } = contractHeader
-          pure $ ContractInfo $
-            { contractId
-            , endpoints
-            , marloweInfo
-            , tags
-            , _runtime: { contractHeader, transactions }
-            }
-        _, _ -> Nothing
+      let Runtime.ContractHeader { contractId } = contractHeader
+
+      pure $ ContractInfo $
+        { contractId
+        , endpoints
+        , marloweInfo
+        , tags
+        , _runtime: { contractHeader, transactions }
+        }
+
   AppContractInfoMap { walletContext, map }

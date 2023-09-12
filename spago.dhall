@@ -37,6 +37,7 @@
   , "marlowe"
   , "marlowe-runtime-client"
   , "maybe"
+  , "monad-loops"
   , "newtype"
   , "node-buffer"
   , "node-fs-aff"
