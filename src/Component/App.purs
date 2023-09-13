@@ -15,8 +15,7 @@ import Component.Modal (Size(..), mkModal)
 import Component.Types (ContractInfo(..), MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Widgets (link, linkWithIcon)
-import Contrib.Cardano (AssetId)
-import Contrib.Cardano as Cardano
+import Contrib.Cardano (AssetId(..), NonAdaAssets(..), nonAdaAssets)
 import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Loops (untilJust)
@@ -32,6 +31,7 @@ import Data.Newtype (un)
 import Data.Newtype as Newtype
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
+import Data.Tuple (uncurry)
 import Data.Tuple.Nested ((/\))
 import Debug (traceM)
 import Effect (Effect)
@@ -153,7 +153,7 @@ mkApp = do
     useAff ((\w -> w.usedAddresses /\ w.changeAddress) <$> walletCtx) do
       let
         (usedAddresses :: Array Bech32) = fromMaybe [] $ _.usedAddresses <$> walletCtx
-        (tokens :: Array AssetId) = fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un Cardano.Value <<< _.balance <$> walletCtx
+        (tokens :: Array AssetId) = map (uncurry AssetId) <<< fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un NonAdaAssets <<< nonAdaAssets <<< _.balance <$> walletCtx
 
         reqInterval = RequestInterval (Milliseconds 50.0)
         pollInterval = PollingInterval (Milliseconds 60_000.0)
