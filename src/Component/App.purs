@@ -28,7 +28,7 @@ import Data.Map (Map)
 import Data.Map (catMaybes, keys) as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid as Monoid
-import Data.Newtype (un, unwrap)
+import Data.Newtype (un)
 import Data.Newtype as Newtype
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
@@ -147,10 +147,11 @@ mkApp = do
 
     possibleContractMap /\ setContractMap <- useState' Nothing
 
-    -- TODO: use changeAddress as well
-    useAff (map (_.usedAddresses <<< unwrap) possibleWalletContext) $ do
+    let
+      walletCtx = un WalletContext <$> possibleWalletContext
+
+    useAff ((\w -> w.usedAddresses /\ w.changeAddress) <$> walletCtx) do
       let
-        walletCtx = un WalletContext <$> possibleWalletContext
         (usedAddresses :: Array Bech32) = fromMaybe [] $ _.usedAddresses <$> walletCtx
         (tokens :: Array AssetId) = fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un Cardano.Value <<< _.balance <$> walletCtx
 
