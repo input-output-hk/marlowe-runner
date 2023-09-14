@@ -95,8 +95,8 @@ mkModal = do
       -- other handler.
       onModalDialogClicked = handler stopPropagation (const $ pure unit)
 
-      modalClassName = "modal-dialog" <> if fullscreen
-        then " modal-fullscreen"
+      modalClassName = "modal-dialog" <>
+        if fullscreen then " modal-fullscreen"
         else case size of
           Small -> " modal-sm"
           Medium -> " modal-md"

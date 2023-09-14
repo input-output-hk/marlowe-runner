@@ -212,7 +212,7 @@ addressInput
    . Monad builderM
   => MonadEffect validatorM
   => Row.Lacks "validator" props
-  => Row.Cons "validator" (AddressInputValidator validatorM) props ( validator :: AddressInputValidator validatorM | props)
+  => Row.Cons "validator" (AddressInputValidator validatorM) props (validator :: AddressInputValidator validatorM | props)
   => Defaults TextInputOptionalProps { validator :: AddressInputValidator validatorM | props } (TextInputProps validatorM (Maybe Bech32))
   => CardanoMultiplatformLib.Lib
   -> { | props }
@@ -224,6 +224,7 @@ addressInput cardanoMultiplatformLib props = do
       Just value -> liftEffect $ bech32FromString cardanoMultiplatformLib value >>= case _ of
         Nothing -> pure $ Left [ "Invalid bech32 address" ]
         Just bech32 -> pure $ Right $ Just bech32
+
     props' :: { validator :: AddressInputValidator validatorM | props }
     props' = Record.insert (Proxy :: Proxy "validator") validator props
   textInput props'

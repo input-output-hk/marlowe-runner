@@ -45,7 +45,6 @@ type FormState st err =
   | st
   }
 
-
 type FieldInitialsRow r =
   ( name :: FieldId
   , initial :: Array String
@@ -147,7 +146,6 @@ toFormValidator name fieldValidator = do
       Array.head value
   UrlEncoded.fromValidator name validator'
 
-
 input
   :: forall a doc err m st
    . Monad m
@@ -201,5 +199,4 @@ multiSelect name initial err render touched validator = StatefulFormSpec
   , validator: Validators.requiredMulti name err $ validator
   , render
   }
-
 

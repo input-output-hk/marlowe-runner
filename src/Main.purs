@@ -67,8 +67,8 @@ main configJson = do
     -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
     slotting =
       case config.network of
-        "mainnet" -> Slotting { slotLength: BigInt.fromInt 1000 , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
-        _ -> Slotting { slotLength: BigInt.fromInt 1000 , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
+        "mainnet" -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
+        _ -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
 
   doc :: HTMLDocument <- document =<< window
   container :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<

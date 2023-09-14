@@ -83,8 +83,8 @@ fetchAppliedInputs serverURL transactionEndpoints = do
     Runtime.getResource' serverURL transactionEndpoint {} {}
 
   pure $ results `foldMapFlipped` case _ of
-    Left err -> V (Left [err])
-    Right ({ payload: { resource: Runtime.Tx { inputs, invalidBefore, invalidHereafter }}}) -> do
+    Left err -> V (Left [ err ])
+    Right ({ payload: { resource: Runtime.Tx { inputs, invalidBefore, invalidHereafter } } }) -> do
       let
         -- = NormalInput InputContent
         -- | MerkleizedInput InputContent String Contract
@@ -94,5 +94,5 @@ fetchAppliedInputs serverURL transactionEndpoints = do
         timeInterval = V1.TimeInterval (Instant.fromDateTime invalidBefore) (Instant.fromDateTime invalidHereafter)
       V $ Right $ case Array.uncons inputs of
         Just _ -> inputs <#> \input -> Just (inputToInputContent input) /\ timeInterval
-        Nothing -> [Nothing /\ timeInterval]
+        Nothing -> [ Nothing /\ timeInterval ]
 

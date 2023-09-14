@@ -55,7 +55,8 @@ foreign import _DropdownItem :: ReactComponent { | DropdownItemProps () }
 _internalDropdownItem
   :: forall props
    . NoProblem.Coerce { | props } { | DropdownItemProps () }
-  => { | props } -> JSX
+  => { | props }
+  -> JSX
 _internalDropdownItem props = do
   let
     props' = NoProblem.coerce props

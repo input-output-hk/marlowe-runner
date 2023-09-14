@@ -25,44 +25,45 @@ import Unsafe.Coerce (unsafeCoerce)
 --     flip?: boolean;
 -- }
 
-
 -- Some not implemented placeholders
 
 type PropsFromToggle :: forall k. k -> k
 
-type PropsFromToggle r = ( | r)
+type PropsFromToggle r = (| r)
 
 foreign import data DropdownMenuVariant :: Type
 
 foreign import data RootCloseEvent :: Type
 
-rootCloseEvent ::
-  { click :: RootCloseEvent
-  , mousedown :: RootCloseEvent
-  }
+rootCloseEvent
+  :: { click :: RootCloseEvent
+     , mousedown :: RootCloseEvent
+     }
 rootCloseEvent =
   { click: unsafeCoerce "click"
   , mousedown: unsafeCoerce "mousedown"
   }
 
 type DropdownButtonProps r =
-  DropdownProps +
-    PropsFromToggle +
-    ( title :: JSX -- ReactNode
-    , menuRole :: Opt String
-    , renderMenuOnMount :: Opt Boolean
-    , rootCloseEvent :: Opt RootCloseEvent
-    , menuVariant :: Opt DropdownMenuVariant
-    , flip :: Opt Boolean
-    | r
-    )
+  DropdownProps
+    + PropsFromToggle
+    +
+      ( title :: JSX -- ReactNode
+      , menuRole :: Opt String
+      , renderMenuOnMount :: Opt Boolean
+      , rootCloseEvent :: Opt RootCloseEvent
+      , menuVariant :: Opt DropdownMenuVariant
+      , flip :: Opt Boolean
+      | r
+      )
 
 foreign import _DropdownButton :: ReactComponent { | DropdownButtonProps () }
 
 _internalDropdownButton
   :: forall props
    . NoProblem.Coerce { | props } { | DropdownButtonProps () }
-  => { | props } -> JSX
+  => { | props }
+  -> JSX
 _internalDropdownButton props = do
   let
     props' = NoProblem.coerce props
@@ -83,5 +84,4 @@ dropdownButton props children = do
     props' :: { children :: Array JSX | props }
     props' = Record.insert (Proxy :: Proxy "children") (toJSX children) props
   _internalDropdownButton props'
-
 

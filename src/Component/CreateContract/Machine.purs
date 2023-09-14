@@ -133,7 +133,7 @@ step state action = do
       DefineRoleTokensSucceeded rolesConfig -> FetchingRequiredWalletContext { contract, tags, rolesConfig: Just rolesConfig, errors: Nothing }
       _ -> state
     FetchingRequiredWalletContext r@{ errors: Just _ } -> case action of
-      FetchRequiredWalletContext -> FetchingRequiredWalletContext $ r{ errors = Nothing }
+      FetchRequiredWalletContext -> FetchingRequiredWalletContext $ r { errors = Nothing }
       _ -> state
     FetchingRequiredWalletContext r -> case action of
       FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }

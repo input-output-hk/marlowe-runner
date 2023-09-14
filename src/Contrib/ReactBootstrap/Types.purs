@@ -29,7 +29,6 @@ dropDirection =
   , "down": unsafeCoerce "down"
   }
 
-
 -- export type AlignDirection = 'start' | 'end';
 -- export type ResponsiveAlignProp = {
 --     sm: AlignDirection;

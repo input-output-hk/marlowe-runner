@@ -67,7 +67,6 @@ data InputChoices
   | SpecificNotifyInput NotifyInput
   | AdvanceContract V1.Contract
 
-
 newtype AutoRun = AutoRun Boolean
 
 data State
