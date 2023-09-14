@@ -24,8 +24,8 @@ spec = do
         json <- either (throwError <<< error) pure $ jsonParser jsonStr
 
         (contractsWithLinksJson :: Array Json) <- either (throwError <<< error <<< show) pure do
-            obj <- decodeJson json
-            obj .: "results"
+          obj <- decodeJson json
+          obj .: "results"
 
         for_ contractsWithLinksJson \contractWithLinksJson -> do
           let
@@ -56,8 +56,8 @@ spec = do
         jsonStr <- readTextFile UTF8 "./test/Marlowe/Runtime/Web/tx-headers.json"
         json <- either (throwError <<< error) pure $ jsonParser jsonStr
         (txHeadersJsonArr :: Array Json) <- either (throwError <<< error <<< show) pure do
-            obj <- decodeJson json
-            obj .: "results"
+          obj <- decodeJson json
+          obj .: "results"
 
         for_ txHeadersJsonArr \txHeaderJson -> do
           let

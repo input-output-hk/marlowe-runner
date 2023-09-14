@@ -113,7 +113,7 @@ useStatefulFormSpec ({ spec: StatefulFormSpec { fields, validator }, onSubmit, v
 
   useEffect debouncedQuery do
     when (not <<< null $ touched) do
-      result /\ state' <- flip runStateT state $ (runValidator  validator) debouncedQuery
+      result /\ state' <- flip runStateT state $ (runValidator validator) debouncedQuery
       setInternalStatefulFormState state'
       setValidationResult $ Just (result /\ debouncedQuery)
     pure $ pure unit

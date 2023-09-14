@@ -264,7 +264,7 @@ type ExecutionPath = List ((Maybe V1.InputContent /\ V1.TimeInterval) /\ InputEx
 executionPath :: Array ((Maybe V1.InputContent) /\ V1.TimeInterval) -> V1.Contract -> V1.State -> Either String ExecutionPath
 executionPath inputs contract state = do
   let
-    initialAcc :: { contract :: V1.Contract, state:: V1.State, executionPath :: ExecutionPath }
+    initialAcc :: { contract :: V1.Contract, state :: V1.State, executionPath :: ExecutionPath }
     initialAcc = { contract, state, executionPath: List.Nil }
 
     step acc input = do

@@ -80,11 +80,11 @@ updatedAt ci@(ContractInfo { _runtime: { transactions } }) =
 fetchAppliedInputs :: ServerURL -> Array Runtime.TransactionEndpoint -> Aff (V (Array (Runtime.ClientError String)) (Array ((Maybe V1.InputContent) /\ V1.TimeInterval)))
 fetchAppliedInputs serverURL transactionEndpoints = do
   results <- transactionEndpoints `flip parTraverse` \transactionEndpoint -> do
-    Runtime.getResource' serverURL transactionEndpoint {}
+    Runtime.getResource' serverURL transactionEndpoint {} {}
 
   pure $ results `foldMapFlipped` case _ of
-    Left err -> V (Left [err])
-    Right ({ payload: { resource: Runtime.Tx { inputs, invalidBefore, invalidHereafter }}}) -> do
+    Left err -> V (Left [ err ])
+    Right ({ payload: { resource: Runtime.Tx { inputs, invalidBefore, invalidHereafter } } }) -> do
       let
         -- = NormalInput InputContent
         -- | MerkleizedInput InputContent String Contract
@@ -94,5 +94,5 @@ fetchAppliedInputs serverURL transactionEndpoints = do
         timeInterval = V1.TimeInterval (Instant.fromDateTime invalidBefore) (Instant.fromDateTime invalidHereafter)
       V $ Right $ case Array.uncons inputs of
         Just _ -> inputs <#> \input -> Just (inputToInputContent input) /\ timeInterval
-        Nothing -> [Nothing /\ timeInterval]
+        Nothing -> [ Nothing /\ timeInterval ]
 

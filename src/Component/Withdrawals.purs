@@ -82,7 +82,7 @@ mkComponent = do
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
 
-        Just (V (Right { role }) /\ _), Just { changeAddress: Just changeAddress, usedAddresses } -> do
+        Just (V (Right { role }) /\ _), Just { changeAddress, usedAddresses } -> do
           let
             withdrawalContext = WithdrawalContext
               { wallet: { changeAddress, usedAddresses }
@@ -120,7 +120,7 @@ mkComponent = do
           -- Rather improbable path because we disable submit button if the form is invalid
           traceM "withdrawal error"
           pure unit
- 
+
     { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
       { spec: formSpec
       , onSubmit
@@ -132,18 +132,18 @@ mkComponent = do
           fields = StatelessFormSpec.renderFormSpec formSpec formState
           formBody = DOM.div { className: "form-group" } fields
           actions = fragment
-             [ DOM.button
-              do
-                let
-                  disabled = case result of
-                    Just (V (Right _) /\ _) -> false
-                    _ -> true
-                { className: "btn btn-primary"
-                , onClick: onSubmit'
-                , disabled
-                }
-              [ R.text "Submit" ]
-          ]
+            [ DOM.button
+                do
+                  let
+                    disabled = case result of
+                      Just (V (Right _) /\ _) -> false
+                      _ -> true
+                  { className: "btn btn-primary"
+                  , onClick: onSubmit'
+                  , disabled
+                  }
+                [ R.text "Submit" ]
+            ]
 
         { title: R.text "Withdrawal"
         , onDismiss

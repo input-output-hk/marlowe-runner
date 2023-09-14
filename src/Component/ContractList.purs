@@ -19,6 +19,7 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonWithIcon, linkWithIcon)
 import Component.Withdrawals as Withdrawals
+import Contrib.Cardano as Cardano
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
@@ -129,12 +130,12 @@ derive instance Eq ContractTemplate
 data ModalAction
   = NewContract
   | ContractDetails
-    { contract :: Maybe V1.Contract
-    , state :: Maybe V1.State
-    , initialContract :: V1.Contract
-    , initialState :: V1.State
-    , transactionEndpoints :: Array Runtime.TransactionEndpoint
-    }
+      { contract :: Maybe V1.Contract
+      , state :: Maybe V1.State
+      , initialContract :: V1.Contract
+      , initialState :: V1.State
+      , transactionEndpoints :: Array Runtime.TransactionEndpoint
+      }
   | ApplyInputs TransactionsEndpoint ApplyInputs.Machine.MarloweContext
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
   | ContractTemplate ContractTemplate
@@ -163,7 +164,8 @@ actionIconSizing = " h4"
 runLiteTags :: Tags -> Array String
 runLiteTags (Tags metadata) = case Map.lookup runLiteTag metadata >>= decodeJson >>> hush of
   Just arr ->
-      Array.filter ((_ > 2) <<< length) -- ignoring short tags
+    Array.filter ((_ > 2) <<< length) -- ignoring short tags
+
       $ arr
   Nothing -> []
 
@@ -220,15 +222,15 @@ mkContractList = do
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
         filtered <|> possibleContracts'
 
-      --         pure $ if ordering.orderAsc
-      --           then sortedContracts
-      --           else Array.reverse sortedContracts
+    --         pure $ if ordering.orderAsc
+    --           then sortedContracts
+    --           else Array.reverse sortedContracts
 
-      -- isLoadingContracts :: Boolean
-      -- isLoadingContracts = case possibleContracts'' of
-      --   Nothing -> true
-      --   Just [] -> true
-      --   Just contracts -> any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts
+    -- isLoadingContracts :: Boolean
+    -- isLoadingContracts = case possibleContracts'' of
+    --   Nothing -> true
+    --   Just [] -> true
+    --   Just contracts -> any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts
 
     pure $
       case possibleModalAction, connectedWallet of
@@ -270,7 +272,7 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints}), _ -> do
+        Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints }), _ -> do
           let
             onClose = resetModalAction
           contractDetails { contract, onClose, state, transactionEndpoints, initialContract, initialState }
@@ -420,8 +422,9 @@ mkContractList = do
                                           -- , disabled
                                           }
                                         [ text $ txOutRefToString contractId ]
-                                    , DOM.a { href: "#", className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset" } $
-                                        Icons.toJSX $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
+                                    , DOM.a { href: "#", className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset" }
+                                        $ Icons.toJSX
+                                        $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
                                     ]
                                 , tdCentered
                                     [ do
@@ -451,10 +454,10 @@ mkContractList = do
                                             }
                                           _, _ -> mempty
                                     , case marloweInfo, possibleWalletContext of
-                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance } -> do
+                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
                                           let
-                                            balance' = Map.filterKeys (eq currencySymbol) balance
-                                            roleTokens = List.toUnfoldable <<< concat <<< map Set.toUnfoldable <<< map Map.keys <<< Map.values $ balance'
+                                            balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
+                                            roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
                                           case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
                                             Just { head, tail } ->
                                               linkWithIcon

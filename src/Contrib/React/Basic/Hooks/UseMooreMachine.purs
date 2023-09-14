@@ -46,14 +46,14 @@ useMooreMachine
   :: forall output state action
    . MooreMachineSpec state action output
   -> React.Hook
-      (UseMooreMachine state action output)
-      { state :: state
-      , output :: output
-      , applyAction :: action -> Effect Unit
-      -- If just after the reset in the handler you have to use `applyAction` then
-      -- you can use the returned value to do it.
-      , reset :: Maybe (MooreMachineSpec state action output) -> Effect (action -> Effect Unit)
-      }
+       (UseMooreMachine state action output)
+       { state :: state
+       , output :: output
+       , applyAction :: action -> Effect Unit
+       -- If just after the reset in the handler you have to use `applyAction` then
+       -- you can use the returned value to do it.
+       , reset :: Maybe (MooreMachineSpec state action output) -> Effect (action -> Effect Unit)
+       }
 useMooreMachine initialSpec = React.coerceHook React.do
   { state: spec, version: specVersion } /\ setSpec <- useVersionedState' initialSpec
   specRef <- useStateRef specVersion spec

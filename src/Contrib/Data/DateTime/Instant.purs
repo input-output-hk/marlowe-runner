@@ -15,8 +15,8 @@ import Partial.Unsafe (unsafeCrashWith)
 
 unsafeInstant :: Milliseconds -> Instant
 unsafeInstant t = case instant t of
-    Just i -> i
-    Nothing -> unsafeCrashWith $ "Contrib.Data.DateTime.Instant.unsafeInstant: invalid instant value:" <> unsafeStringify t
+  Just i -> i
+  Nothing -> unsafeCrashWith $ "Contrib.Data.DateTime.Instant.unsafeInstant: invalid instant value:" <> unsafeStringify t
 
 unsafeInstantFromInt :: Int -> Instant
 unsafeInstantFromInt = unsafeInstant <<< Milliseconds <<< Int.toNumber

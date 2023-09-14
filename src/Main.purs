@@ -8,28 +8,19 @@ import Component.MessageHub (mkMessageHub)
 import Component.Types (Slotting(..))
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
-import Contrib.JsonBigInt (fromJson)
 import Contrib.JsonBigInt as JsonBigInt
 import Control.Monad.Reader (runReaderT)
-import Data.Argonaut (Json, decodeJson, fromString, (.:))
+import Data.Argonaut (Json, decodeJson, (.:))
 import Data.BigInt.Argonaut as BigInt
-import Data.Map as Map
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.Newtype (un)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Tuple.Nested ((/\))
-import Debug (traceM)
 import Effect (Effect)
-import Effect.Aff (Milliseconds(..), delay, launchAff_)
+import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Effect.Exception (throw)
-import Foreign.Object (Object)
-import JS.Unsafe.Stringify (unsafeStringify)
 import Marlowe.Runtime.Web as Marlowe.Runtime.Web
-import Marlowe.Runtime.Web.Streaming (MaxPages(..), PollingInterval(..), RequestInterval(..))
-import Marlowe.Runtime.Web.Streaming as Streaming
-import Marlowe.Runtime.Web.Types (BlockHeader(..), BlockNumber(..), ContractHeader(..), ServerURL(..))
-import Marlowe.Runtime.Web.Types as Runtime
+import Marlowe.Runtime.Web.Types (ServerURL(..))
 import Partial.Unsafe (unsafePartial)
 import React.Basic (createContext)
 import React.Basic.DOM.Client (createRoot, renderRoot)
@@ -76,23 +67,14 @@ main configJson = do
     -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
     slotting =
       case config.network of
-        "mainnet" -> Slotting { slotLength: BigInt.fromInt 1000 , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
-        _ -> Slotting { slotLength: BigInt.fromInt 1000 , slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
+        "mainnet" -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
+        _ -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
 
   doc :: HTMLDocument <- document =<< window
   container :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<
     (getElementById "app-root" $ toNonElementParentNode doc)
   reactRoot <- createRoot container
   launchAff_ do
-    contractStream <- do
-      let
-        reqInterval = RequestInterval (Milliseconds 50.0)
-        pollInterval = PollingInterval (Milliseconds 60_000.0)
-        filterContracts getContractResponse = case un ContractHeader getContractResponse.resource of
-          { block: Nothing } -> true
-          { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
-        maxPages = Just (MaxPages 1)
-      Streaming.mkContractsWithTransactions pollInterval reqInterval filterContracts maxPages config.marloweWebServerUrl
 
     CardanoMultiplatformLib.importLib >>= case _ of
       Nothing -> liftEffect $ logger "Cardano serialization lib loading failed"
@@ -104,7 +86,6 @@ main configJson = do
             { cardanoMultiplatformLib
             , walletInfoCtx
             , logger
-            , contractStream
             , msgHub
             , runtime
             , aboutMarkdown: config.aboutMarkdown

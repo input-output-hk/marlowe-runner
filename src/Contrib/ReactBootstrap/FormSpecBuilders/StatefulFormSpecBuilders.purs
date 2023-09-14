@@ -73,7 +73,6 @@ import ReactBootstrap.Form.Control as Form.Control
 import Record as Record
 import Type.Prelude (Proxy(..))
 
-
 type StatefulBootstrapFormSpec validatorM st = StatefulFormSpec validatorM st (Array JSX) String
 
 fromStatlessFormSpec = FormSpecBuilder.hoistFormSpec liftStatelessFormSpec
@@ -120,7 +119,6 @@ dateTimeField
   -> FormSpecBuilderT builderM (StatefulBootstrapFormSpec validatorM st) Query a
 dateTimeField possibleLabel possibleHelpText dateTimeValidator = do
   FormSpecBuilder.hoistFormSpec liftStatelessFormSpec $ StatelessFormSpecBuilders.dateTimeField possibleLabel possibleHelpText dateTimeValidator
-
 
 type MultiFieldIds = { multi :: FieldId, sub :: Array FieldId }
 

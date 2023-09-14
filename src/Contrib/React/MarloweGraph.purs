@@ -38,7 +38,6 @@ executionPathIndicies = foldMap \(_ /\ path) -> do
     arr = Array.NonEmpty.toArray path <#> fst
   map branchIndex arr
 
-
 type Props = { contract :: V1.Contract, executionPath :: Opt ExecutionPath }
 
 -- { contract :: V1.Contract, path :: ExecutionPath }

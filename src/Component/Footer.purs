@@ -11,7 +11,7 @@ footer :: Fixed -> JSX
 footer (Fixed fixed) = do
   let
     possibleFixedClass =
-        if fixed then "footer " else ""
+      if fixed then "footer " else ""
   DOM.footer
     { className: possibleFixedClass <> "mt-auto py-2 bg-light shadow-top z-index-sticky"
     , children:

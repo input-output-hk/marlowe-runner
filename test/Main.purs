@@ -27,4 +27,4 @@ main = do
     runSpec' config [ consoleReporter, specReporter ] $ do
       Spec.parallel do
         Web.spec serverUrlStr
-        --Test.Contrib.Data.Map.spec
+--Test.Contrib.Data.Map.spec

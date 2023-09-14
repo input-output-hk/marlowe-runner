@@ -102,7 +102,6 @@ fieldValidity touched value errors = do
     isValid = Just [] == map fst errors
   { errors: errors', isInvalid, isValid }
 
-
 data FormControlSizing = FormControlSm | FormControlLg
 
 data LabelSpacing
@@ -335,7 +334,6 @@ textInput props = formSpecBuilderT do
       props'.touched
       props'.validator
   pure form
-
 
 _validator = (Proxy :: Proxy "validator")
 _type = (Proxy :: Proxy "type")
@@ -667,7 +665,7 @@ textArea
 textArea props = formSpecBuilderT do
   name <- _genFieldId props'
   let
-    form ::StatelessBootstrapFormSpec validatorM Query a
+    form :: StatelessBootstrapFormSpec validatorM Query a
     form = StatelessFormSpec.input
       name
       props'.initial
@@ -966,8 +964,8 @@ booleanField props = do
       validator = liftFnEither case _ of
         "on" -> Right true
         _ -> Right false
-      booleanAsValue = if _
-        then "on"
+      booleanAsValue =
+        if _ then "on"
         else "off"
 
       initial = fromOpt false props'.initial
@@ -1012,10 +1010,10 @@ renderBooleanField { disabled, label: possibleLabel, layout, possibleHelpText, n
       MultiColumn spacing -> labelSpacingsToClasses spacing
       Inline -> { labelColClass: "", inputColClass: "" }
     label' = case NoProblem.toMaybe possibleLabel of
-        Nothing -> mempty
-        Just label -> if isInline layout
-          then DOM.label {} [ label ]
-          else DOM.label { className: "col-form-label-sm " <> labelColClass, htmlFor: nameStr } [ label ]
+      Nothing -> mempty
+      Just label ->
+        if isInline layout then DOM.label {} [ label ]
+        else DOM.label { className: "col-form-label-sm " <> labelColClass, htmlFor: nameStr } [ label ]
 
     body = do
       let
@@ -1027,21 +1025,21 @@ renderBooleanField { disabled, label: possibleLabel, layout, possibleHelpText, n
 
       DOM.div { className } $
         [ Form.check
-          { className: "min-h-1_2rem"
-          , disabled
-          , id: nameStr
-          , isValid
-          , isInvalid
-          , name: nameStr
-          , "type":
-              if switch then Check.checkType.switch
-              else Check.checkType.radio
-          , value: "on"
-          , checked
-          , onChange: handler_ do
-              onChange $ if checked then "off" else "on"
-          }
-          -- We should probably render this as `feedback` above when in `inline`
+            { className: "min-h-1_2rem"
+            , disabled
+            , id: nameStr
+            , isValid
+            , isInvalid
+            , name: nameStr
+            , "type":
+                if switch then Check.checkType.switch
+                else Check.checkType.radio
+            , value: "on"
+            , checked
+            , onChange: handler_ do
+                onChange $ if checked then "off" else "on"
+            }
+        -- We should probably render this as `feedback` above when in `inline`
         , helpText
         ]
 

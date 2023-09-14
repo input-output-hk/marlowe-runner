@@ -40,7 +40,8 @@ useMealyMachine
   :: forall output state action
    . MealyMachineSpec state action output
   -> React.Hook
-      (UseMealyMachine state action output) (state /\ Maybe output /\ (action -> Effect Unit))
+       (UseMealyMachine state action output)
+       (state /\ Maybe output /\ (action -> Effect Unit))
 useMealyMachine { driver, initialState, step } = React.coerceHook React.do
   { state: { state, output }, version } /\ setState <- useVersionedState' { state: initialState, output: Nothing }
   stateRef <- useStateRef version state

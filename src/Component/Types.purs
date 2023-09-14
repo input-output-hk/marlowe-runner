@@ -58,8 +58,8 @@ newtype MessageHub = MessageHub
   }
 
 newtype Slotting = Slotting
-  { slotLength :: BigInt,
-    slotZeroTime :: BigInt
+  { slotLength :: BigInt
+  , slotZeroTime :: BigInt
   }
 
 type MkContextBase r =
@@ -67,8 +67,6 @@ type MkContextBase r =
   , walletInfoCtx :: ReactContext (Maybe (WalletInfo Wallet.Api /\ WalletContext))
   -- FIXME: use more advanced logger so we use levels and setup app verbosity.
   , logger :: String -> Effect Unit
-  , contractStream :: ContractWithTransactionsStream
-  -- , transactionStream :: ContractTransactionsStream
   , runtime :: Runtime
   , msgHub :: MessageHub
   , aboutMarkdown :: String
