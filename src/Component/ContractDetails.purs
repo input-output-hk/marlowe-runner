@@ -91,7 +91,7 @@ mkComponent = do
         React.fragment
           [ tabs { fill: true, justify: true, defaultActiveKey, variant: Tabs.variant.pills } do
               let
-                renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto"} children
+                renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
               [ case contract of
                   Nothing -> mempty
                   Just contract' -> renderTab

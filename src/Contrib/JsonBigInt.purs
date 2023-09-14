@@ -21,23 +21,23 @@ unsafeToJson :: BigIntJson -> Json
 unsafeToJson = unsafeCoerce
 
 toBigInt :: BigIntJson -> Maybe BigInt
-toBigInt json = if isBigInt json
-  then Just <<< unsafeCoerce $ json
+toBigInt json =
+  if isBigInt json then Just <<< unsafeCoerce $ json
   else Nothing
 
-type ParseResultHandlers a = { failure :: String -> a, success :: BigIntJson -> a}
+type ParseResultHandlers a = { failure :: String -> a, success :: BigIntJson -> a }
 
-foreign import patchersImpl ::
-  { patchStringify :: Effect Unit
-  , patchParse :: Effect Unit
-  , parseImpl :: forall a. Fn3 (ParseResultHandlers a) Reviver JsonString a
-  }
+foreign import patchersImpl
+  :: { patchStringify :: Effect Unit
+     , patchParse :: Effect Unit
+     , parseImpl :: forall a. Fn3 (ParseResultHandlers a) Reviver JsonString a
+     }
 
-patchers ::
-  { patchStringify :: Effect Unit
-  , patchParse :: Effect Unit
-  , parse :: Reviver -> JsonString -> Either String BigIntJson
-  }
+patchers
+  :: { patchStringify :: Effect Unit
+     , patchParse :: Effect Unit
+     , parse :: Reviver -> JsonString -> Either String BigIntJson
+     }
 patchers = do
   let
     eitherHandlers = { failure: Left, success: Right }

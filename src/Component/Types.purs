@@ -58,8 +58,8 @@ newtype MessageHub = MessageHub
   }
 
 newtype Slotting = Slotting
-  { slotLength :: BigInt,
-    slotZeroTime :: BigInt
+  { slotLength :: BigInt
+  , slotZeroTime :: BigInt
   }
 
 type MkContextBase r =

@@ -18,7 +18,6 @@ marloweYaml contract =
   DOM.div { className: "child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent" }
     [ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys } ]
 
-
 -- Alphabetical order of keys
 sortStateKeys :: String -> String -> JsYaml.JsOrdering
 sortStateKeys a b = JsYaml.toJsOrdering $ a `compare` b

@@ -130,12 +130,12 @@ derive instance Eq ContractTemplate
 data ModalAction
   = NewContract
   | ContractDetails
-    { contract :: Maybe V1.Contract
-    , state :: Maybe V1.State
-    , initialContract :: V1.Contract
-    , initialState :: V1.State
-    , transactionEndpoints :: Array Runtime.TransactionEndpoint
-    }
+      { contract :: Maybe V1.Contract
+      , state :: Maybe V1.State
+      , initialContract :: V1.Contract
+      , initialState :: V1.State
+      , transactionEndpoints :: Array Runtime.TransactionEndpoint
+      }
   | ApplyInputs TransactionsEndpoint ApplyInputs.Machine.MarloweContext
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
   | ContractTemplate ContractTemplate
@@ -164,7 +164,8 @@ actionIconSizing = " h4"
 runLiteTags :: Tags -> Array String
 runLiteTags (Tags metadata) = case Map.lookup runLiteTag metadata >>= decodeJson >>> hush of
   Just arr ->
-      Array.filter ((_ > 2) <<< length) -- ignoring short tags
+    Array.filter ((_ > 2) <<< length) -- ignoring short tags
+
       $ arr
   Nothing -> []
 
@@ -221,15 +222,15 @@ mkContractList = do
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
         filtered <|> possibleContracts'
 
-      --         pure $ if ordering.orderAsc
-      --           then sortedContracts
-      --           else Array.reverse sortedContracts
+    --         pure $ if ordering.orderAsc
+    --           then sortedContracts
+    --           else Array.reverse sortedContracts
 
-      -- isLoadingContracts :: Boolean
-      -- isLoadingContracts = case possibleContracts'' of
-      --   Nothing -> true
-      --   Just [] -> true
-      --   Just contracts -> any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts
+    -- isLoadingContracts :: Boolean
+    -- isLoadingContracts = case possibleContracts'' of
+    --   Nothing -> true
+    --   Just [] -> true
+    --   Just contracts -> any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts
 
     pure $
       case possibleModalAction, connectedWallet of
@@ -271,7 +272,7 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints}), _ -> do
+        Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints }), _ -> do
           let
             onClose = resetModalAction
           contractDetails { contract, onClose, state, transactionEndpoints, initialContract, initialState }
@@ -421,8 +422,9 @@ mkContractList = do
                                           -- , disabled
                                           }
                                         [ text $ txOutRefToString contractId ]
-                                    , DOM.a { href: "#", className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset" } $
-                                        Icons.toJSX $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
+                                    , DOM.a { href: "#", className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset" }
+                                        $ Icons.toJSX
+                                        $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
                                     ]
                                 , tdCentered
                                     [ do
