@@ -33,7 +33,7 @@ import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (Instant, instant, unInstant)
-import Data.Either (Either(..), fromRight, hush)
+import Data.Either (Either(..), hush)
 import Data.Foldable as Foldable
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Identity (Identity)
@@ -47,7 +47,7 @@ import Data.Nullable as Nullable
 import Data.String (Pattern(..), split, trim)
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
-import Data.Tuple (fst, snd)
+import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
 import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
@@ -57,9 +57,8 @@ import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Runtime.Web.Client (ClientError, uriOpts)
+import Marlowe.Runtime.Web.Client (ClientError)
 import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..), Tags(..))
-import Parsing as Parsing
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
@@ -80,18 +79,9 @@ import Web.File.FileList (FileList)
 import Web.File.FileList as FileList
 import Web.HTML.HTMLInputElement (HTMLInputElement)
 import Web.HTML.HTMLInputElement as HTMLInputElement
-import URI (RelativeRef(..), URI(..)) as URI
-import URI.Extra.QueryPairs (QueryPairs(..), keyFromString, keyToString, valueFromString, valueToString) as URI
-import URI.Extra.QueryPairs as URI.QueryPairs
-import URI.HostPortPair (HostPortPair) as URI
-import URI.HostPortPair as HostPortPair
-import URI.URIRef (Fragment, HierPath, Host, Path, Port, RelPath, URIRefOptions, UserInfo) as URI
-import URI.URIRef as URIRef
-import Web.HTML (window)
-import Web.HTML.Location as Location
-import Web.HTML.Window as Window
 
 newtype ContractJsonString = ContractJsonString String
+
 derive instance Eq ContractJsonString
 derive instance Newtype ContractJsonString _
 
@@ -165,11 +155,11 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
       }
 
     autoRun <- map AutoRun $ labelSubform autoRunFieldId $ booleanField
-        { label: DOOM.text "Auto run"
-        , helpText: DOOM.text "Whether to run the contract creation process automatically"
-        , initial: initialAutoRun
-        , name: autoRunFieldId
-        }
+      { label: DOOM.text "Auto run"
+      , helpText: DOOM.text "Whether to run the contract creation process automatically"
+      , initial: initialAutoRun
+      , name: autoRunFieldId
+      }
     in
       contract /\ tags /\ autoRun
 
@@ -369,26 +359,27 @@ mkComponent = do
             Foldable.lookup fieldId fields
 
           formBody = DOM.div { className: "form-group" }
-            [ DOM.div { className: "row mb-2" } $
-                DOM.div { className: "col-12 text-end" } $ do
-                  let inputId = "contract-file-upload"
-                  [ DOM.label { htmlFor: inputId, className: "btn btn-primary" }
-                    [ R.text "Upload JSON" ]
-                  , loadFileHiddenInputComponent
-                    { onFileload: case _ of
-                        Just str -> do
-                          let
-                            allFields = formState.fields
-                          void $ for (Map.lookup contractFieldId allFields) \{ onChange } -> do
-                            let
-                              str' = formatPossibleJSON str
-                            onChange [str']
+            [ DOM.div { className: "row mb-2" }
+                $ DOM.div { className: "col-12 text-end" }
+                $ do
+                    let inputId = "contract-file-upload"
+                    [ DOM.label { htmlFor: inputId, className: "btn btn-primary" }
+                        [ R.text "Upload JSON" ]
+                    , loadFileHiddenInputComponent
+                        { onFileload: case _ of
+                            Just str -> do
+                              let
+                                allFields = formState.fields
+                              void $ for (Map.lookup contractFieldId allFields) \{ onChange } -> do
+                                let
+                                  str' = formatPossibleJSON str
+                                onChange [ str' ]
 
-                        Nothing -> traceM "No file"
-                    , id: inputId
-                    , accept: "application/json"
-                    }
-                  ]
+                            Nothing -> traceM "No file"
+                        , id: inputId
+                        , accept: "application/json"
+                        }
+                    ]
             , lookupSubform contractFieldId
             , lookupSubform tagFieldId
             , lookupSubform autoRunFieldId

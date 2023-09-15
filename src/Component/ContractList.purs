@@ -404,89 +404,91 @@ mkContractList = do
                                     ]
                                 DOM.td { className: "text-center" } $ DOM.small {} slotNoInfo
 
-                            in do
-                              let
-                                conractIdStr = txOutRefToString contractId
-                                copyToClipboard :: Effect Unit
-                                copyToClipboard = window >>= navigator >>= clipboard >>= \c -> do
-                                  launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
+                            in
+                              do
+                                let
+                                  conractIdStr = txOutRefToString contractId
 
-                              DOM.tr { className: "align-middle" }
-                                [ tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.createdAt ci
-                                , tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.updatedAt ci
-                                , DOM.td { className: "text-center" } $ DOM.span { className: "d-flex" }
-                                    [ DOM.a
-                                        do
-                                          let
-                                            onClick = case marloweInfo of
-                                              Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
-                                                let
-                                                  transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
-                                                setModalAction $ ContractDetails
-                                                  { contract: currentContract
-                                                  , state
-                                                  , initialState: initialState
-                                                  , initialContract: initialContract
-                                                  , transactionEndpoints
-                                                  }
-                                              _ -> pure unit
-                                          { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
-                                          , onClick: handler_ onClick
-                                          -- , disabled
-                                          }
-                                        [ text conractIdStr ]
-                                    , DOM.a
-                                        { href: "#"
-                                        , onClick: handler_ copyToClipboard
-                                        , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
-                                        }
-                                        $ Icons.toJSX
-                                        $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
-                                    ]
-                                , tdCentered
-                                    [ do
-                                        let
-                                          tags = runLiteTags contractTags
-                                        DOOM.text $ intercalate ", " tags
-                                    ]
-                                , tdCentered
-                                    [ do
-                                        case endpoints.transactions, marloweInfo of
-                                          Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
+                                  copyToClipboard :: Effect Unit
+                                  copyToClipboard = window >>= navigator >>= clipboard >>= \c -> do
+                                    launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
+
+                                DOM.tr { className: "align-middle" }
+                                  [ tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.createdAt ci
+                                  , tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.updatedAt ci
+                                  , DOM.td { className: "text-center" } $ DOM.span { className: "d-flex" }
+                                      [ DOM.a
+                                          do
                                             let
-                                              marloweContext = { initialContract, state, contract }
-                                            linkWithIcon
-                                              { icon: unsafeIcon $ "fast-forward-fill" <> actionIconSizing
-                                              , label: mempty
-                                              , tooltipText: Just "Apply available inputs to the contract"
-                                              , tooltipPlacement: Just placement.left
-                                              , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
-                                              }
-                                          _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                            { icon: unsafeIcon $ "file-earmark-check-fill success-color" <> actionIconSizing
-                                            , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
-                                            , tooltipPlacement: Just placement.left
-                                            , label: mempty
-                                            , onClick: mempty
+                                              onClick = case marloweInfo of
+                                                Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
+                                                  let
+                                                    transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
+                                                  setModalAction $ ContractDetails
+                                                    { contract: currentContract
+                                                    , state
+                                                    , initialState: initialState
+                                                    , initialContract: initialContract
+                                                    , transactionEndpoints
+                                                    }
+                                                _ -> pure unit
+                                            { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
+                                            , onClick: handler_ onClick
+                                            -- , disabled
                                             }
-                                          _, _ -> mempty
-                                    , case marloweInfo, possibleWalletContext of
-                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
+                                          [ text conractIdStr ]
+                                      , DOM.a
+                                          { href: "#"
+                                          , onClick: handler_ copyToClipboard
+                                          , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
+                                          }
+                                          $ Icons.toJSX
+                                          $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
+                                      ]
+                                  , tdCentered
+                                      [ do
                                           let
-                                            balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
-                                            roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
-                                          case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
-                                            Just { head, tail } ->
+                                            tags = runLiteTags contractTags
+                                          DOOM.text $ intercalate ", " tags
+                                      ]
+                                  , tdCentered
+                                      [ do
+                                          case endpoints.transactions, marloweInfo of
+                                            Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
+                                              let
+                                                marloweContext = { initialContract, state, contract }
                                               linkWithIcon
-                                                { icon: unsafeIcon $ "cash-coin warning-color" <> actionIconSizing
+                                                { icon: unsafeIcon $ "fast-forward-fill" <> actionIconSizing
                                                 , label: mempty
-                                                , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                                , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                                , tooltipText: Just "Apply available inputs to the contract"
+                                                , tooltipPlacement: Just placement.left
+                                                , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
                                                 }
-                                            _ -> mempty
-                                        _, _ -> mempty
-                                    ]
-                                ]
+                                            _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
+                                              { icon: unsafeIcon $ "file-earmark-check-fill success-color" <> actionIconSizing
+                                              , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
+                                              , tooltipPlacement: Just placement.left
+                                              , label: mempty
+                                              , onClick: mempty
+                                              }
+                                            _, _ -> mempty
+                                      , case marloweInfo, possibleWalletContext of
+                                          Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
+                                            let
+                                              balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
+                                              roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
+                                            case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
+                                              Just { head, tail } ->
+                                                linkWithIcon
+                                                  { icon: unsafeIcon $ "cash-coin warning-color" <> actionIconSizing
+                                                  , label: mempty
+                                                  , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                                  , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                                  }
+                                              _ -> mempty
+                                          _, _ -> mempty
+                                      ]
+                                  ]
                         ]
                     ]
                   _ ->
