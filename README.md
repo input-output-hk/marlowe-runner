@@ -29,12 +29,11 @@ spago test
 
 To start the server you can use the `npm run start` command, for example:
 ```bash
-NETWORK="preview" MARLOWE_WEB_SERVER_URL="http://localhost:3780" npm run start
+MARLOWE_WEB_SERVER_URL="http://localhost:3780" npm run start
 ```
 
 In the previous example:
-- `NETWORK`: Specifies the Cardano network to use. In the example above, it's set to `preview`.
-- `MARLOWE_WEB_SERVER_URL`: Specifies URL for the Marlowe Runtime Web server of the network specified (`NETWORK`).
+- `MARLOWE_WEB_SERVER_URL`: Specifies URL for the Marlowe Runtime Web server.
 
 After this, the Marlowe Runner instance should be available by default at: `http://localhost:8080/`
 

@@ -309,6 +309,7 @@ in  upstream
         , "effect"
         , "either"
         , "exceptions"
+        , "foreign-generic"
         , "foldable-traversable"
         , "js-object"
         , "js-promise-aff"
@@ -331,7 +332,7 @@ in  upstream
         "https://github.com/input-output-hk/purescript-cardano-wallet-client.git"
         "main"
 
-  with marlowe-runtime-client =
+  with marlowe-runtime-client = -- ./purescript-marlowe-runtime-client/spago.dhall as Location
       mkPackage
         [ "aff"
         , "aff-promise"

@@ -11,7 +11,6 @@ import aboutMarkdown from "../public/about.md";
 const config = {
   develMode: process.env.DEVEL_MODE,
   marloweWebServerUrl: process.env.MARLOWE_WEB_SERVER_URL,
-  network: process.env.NETWORK,
   aboutMarkdown: aboutMarkdown,
 };
 
