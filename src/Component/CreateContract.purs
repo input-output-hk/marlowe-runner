@@ -12,8 +12,12 @@ import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo)
 import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
+import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
+import Contrib.Polyform.FormSpecBuilder as StatelessFormSpecBuilder
+import Contrib.Polyform.FormSpecs.StatelessFormSpec (StatelessFormSpec)
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
+import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatlessFormSpec
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, booleanField)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
@@ -21,15 +25,17 @@ import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
 import Control.Promise as Promise
-import Data.Argonaut (decodeJson, encodeJson, parseJson, stringifyWithIndent)
+import Data.Argonaut (decodeJson, encodeJson, jsonParser, parseJson, stringifyWithIndent)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (Instant, instant, unInstant)
-import Data.Either (Either(..))
+import Data.Either (Either(..), hush)
+import Data.Foldable as Foldable
 import Data.FormURLEncoded.Query (FieldId(..), Query)
+import Data.Identity (Identity)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
@@ -43,6 +49,7 @@ import Data.Traversable (for)
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
 import Data.Validation.Semigroup (V(..))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
@@ -50,13 +57,13 @@ import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
-import Marlowe.Runtime.Web.Types (ContractEndpoint, Metadata(..), PostContractsError, RoleTokenConfig(..), RolesConfig(..), Tags(..))
+import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..), Tags(..))
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM as DOOM
 import React.Basic.DOM (css)
+import React.Basic.DOM (div, div_, input, text) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
@@ -85,52 +92,69 @@ type Result = V1.Contract /\ Tags /\ AutoRun
 contractFieldId :: FieldId
 contractFieldId = FieldId "contract-json"
 
-mkContractFormSpec :: (Maybe V1.Contract /\ AutoRun) -> StatelessBootstrapFormSpec Effect Query Result
-mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormSpecBuilder.evalBuilder Nothing $ ado
-  contract <- StatelessFormSpecBuilders.textArea
-    { missingError: "Please provide contract terms JSON value"
-    , initial: case possibleInitialContract of
-        Nothing -> ""
-        Just initialContract -> stringifyWithIndent 2 $ encodeJson initialContract
-    , label: Just $ DOOM.text "Contract JSON"
-    , touched: isJust possibleInitialContract
-    , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
-        json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
-        lmap (Array.singleton <<< show) (decodeJson json)
-    , rows: 15
-    , name: Just contractFieldId
-    }
+tagFieldId :: FieldId
+tagFieldId = FieldId "tags"
 
-  tags <- StatelessFormSpecBuilders.textInput
-    { helpText: Just $ DOOM.div_
-        [ DOOM.text "Tags"
-        ]
-    , initial: ""
-    , label: Just $ DOOM.text "Tags"
-    , touched: false
-    , validator: liftFn case _ of
-        Nothing -> Tags Map.empty
-        Just tags ->
-          ( Tags $ Map.singleton runLiteTag
-              (encodeJson $ map (encodeJson <<< trim) $ split (Pattern ",") tags)
-          )
-    }
+autoRunFieldId :: FieldId
+autoRunFieldId = FieldId "auto-run"
 
-  autoRun <- AutoRun <$> do
-    -- FIXME: This should be documented I left this as an example of more hard core lifting of validator
-    -- let
-    --   toAutoRun = liftBuilderM $ pure $ liftValidator $ liftFnM \value -> do
-    --       let
-    --         value' = AutoRun value
-    --       -- onAutoRunChange value'
-    --       pure value'
-    booleanField
-      { label: DOOM.text "Auto run"
-      , helpText: DOOM.text "Whether to run the contract creation process automatically"
-      , initial: initialAutoRun
+type LabeledFormSpec validatorM = StatelessFormSpec validatorM (Array (FieldId /\ JSX)) String
+
+mkContractFormSpec :: (Maybe V1.Contract /\ AutoRun) -> LabeledFormSpec Effect Query Result
+mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormSpecBuilder.evalBuilder Nothing $ do
+  let
+    -- We put subforms JSX into a Map so we can control rendering order etc.
+    labelSubform
+      :: forall a
+       . FieldId
+      -> FormSpecBuilderT Identity (StatelessBootstrapFormSpec Effect) Query a
+      -> FormSpecBuilderT Identity (LabeledFormSpec Effect) Query a
+    labelSubform name formSpecBuilder = do
+      let
+        label :: forall err i m. StatelessFormSpec m (Array JSX) err i ~> StatelessFormSpec m (Array (FieldId /\ JSX)) err i
+        label = StatlessFormSpec.mapRender $ map \subformJSX ->
+          name /\ subformJSX
+      StatelessFormSpecBuilder.hoistFormSpec label formSpecBuilder
+  ado
+    contract <- labelSubform contractFieldId $ StatelessFormSpecBuilders.textArea
+      { missingError: "Please provide contract terms JSON value"
+      , initial: case possibleInitialContract of
+          Nothing -> ""
+          Just initialContract -> stringifyWithIndent 2 $ encodeJson initialContract
+      , label: Just $ DOOM.text "Contract JSON"
+      , touched: isJust possibleInitialContract
+      , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
+          json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
+          lmap (Array.singleton <<< show) (decodeJson json)
+      , rows: 15
+      , name: Just contractFieldId
       }
-  in
-    contract /\ tags /\ autoRun
+
+    -- -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query a
+    tags <- labelSubform tagFieldId $ StatelessFormSpecBuilders.textInput
+      { helpText: Just $ DOOM.div_
+          [ DOOM.text "Tags"
+          ]
+      , initial: ""
+      , label: Just $ DOOM.text "Tags"
+      , touched: false
+      , validator: liftFn case _ of
+          Nothing -> Tags Map.empty
+          Just tags ->
+            ( Tags $ Map.singleton runLiteTag
+                (encodeJson $ map (encodeJson <<< trim) $ split (Pattern ",") tags)
+            )
+      , name: Just tagFieldId
+      }
+
+    autoRun <- map AutoRun $ labelSubform autoRunFieldId $ booleanField
+        { label: DOOM.text "Auto run"
+        , helpText: DOOM.text "Whether to run the contract creation process automatically"
+        , initial: initialAutoRun
+        , name: autoRunFieldId
+        }
+    in
+      contract /\ tags /\ autoRun
 
 mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> StatelessBootstrapFormSpec Effect Query RolesConfig
 mkRolesConfigForm roleNames cardanoMultiplatformLib = FormSpecBuilder.evalBuilder Nothing $ Mint <<< Map.fromFoldable <$> for roleNames \roleName -> ado
@@ -151,15 +175,12 @@ type ClientError' = ClientError PostContractsError
 
 foreign import _loadFile :: File -> Promise (Nullable String)
 
-loadFile :: File -> Aff (Maybe String)
-loadFile = map Nullable.toMaybe <<< Promise.toAff <<< _loadFile
-
 hoistMaybe :: forall m a. Applicative m => Maybe a -> MaybeT m a
 hoistMaybe = MaybeT <<< pure
 
-mkLoadFileButtonComponent :: MkComponentM ({ onFileload :: Maybe String -> Effect Unit } -> JSX)
-mkLoadFileButtonComponent =
-  liftEffect $ component "LoadFileButton" \{ onFileload } -> React.do
+mkLoadFileHiddenInputComponent :: MkComponentM ({ onFileload :: Maybe String -> Effect Unit, id :: String, accept :: String } -> JSX)
+mkLoadFileHiddenInputComponent =
+  liftEffect $ component "LoadFileButton" \{ id, onFileload, accept } -> React.do
     {- Working example in raw HTML:
       <script>
       const onfile = () => {
@@ -176,6 +197,9 @@ mkLoadFileButtonComponent =
     ref :: Ref (Nullable Node) <- useRef Nullable.null
 
     let
+      loadFile :: File -> Aff (Maybe String)
+      loadFile = map Nullable.toMaybe <<< Promise.toAff <<< _loadFile
+
       onChange :: Effect Unit
       onChange = map (fromMaybe unit) $ runMaybeT do
         node :: Node <- MaybeT $ Nullable.toMaybe <$> readRef ref
@@ -184,7 +208,8 @@ mkLoadFileButtonComponent =
         file :: File <- hoistMaybe $ FileList.item 0 files
         liftEffect $ launchAff_ $ (liftEffect <<< onFileload) =<< loadFile file
 
-    pure $ DOOM.input { type: "file", onChange: handler_ onChange, ref }
+    pure $ DOOM.input
+      { type: "file", accept, id, onChange: handler_ onChange, ref, className: "d-none" }
 
 machineProps (AutoRun autoRun) connectedWallet cardanoMultiplatformLib runtime = do
   let
@@ -272,6 +297,7 @@ mkComponent = do
     initialAutoRun = AutoRun true
 
   roleTokenComponent <- mkRoleTokensComponent
+  loadFileHiddenInputComponent <- mkLoadFileHiddenInputComponent
 
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss } -> React.do
     currentRun /\ setCurrentRun <- React.useState' Nothing
@@ -320,7 +346,36 @@ mkComponent = do
       Machine.DefiningContract -> do
         let
           fields = StatelessFormSpec.renderFormSpec formSpec formState
-          formBody = DOM.div { className: "form-group" } fields
+          lookupSubform fieldId = fromMaybe mempty do
+            Foldable.lookup fieldId fields
+
+          formBody = DOM.div { className: "form-group" }
+            [ DOM.div { className: "row mb-2" } $
+                DOM.div { className: "col-12 text-end" } $ do
+                  let inputId = "contract-file-upload"
+                  [ DOM.label { htmlFor: inputId, className: "btn btn-primary" }
+                    [ R.text "Upload JSON" ]
+                  , loadFileHiddenInputComponent
+                    { onFileload: case _ of
+                        Just str -> do
+                          let
+                            allFields = formState.fields
+                          void $ for (Map.lookup contractFieldId allFields) \{ onChange } -> do
+                            let
+                              str' = fromMaybe str do
+                                json <- hush $ jsonParser str
+                                pure $ stringifyWithIndent 2 $ encodeJson json
+                            onChange [str']
+
+                        Nothing -> traceM "No file"
+                    , id: inputId
+                    , accept: "application/json"
+                    }
+                  ]
+            , lookupSubform contractFieldId
+            , lookupSubform tagFieldId
+            , lookupSubform autoRunFieldId
+            ]
           formActions = fragment
             [ DOM.div { className: "row" } $
                 [ DOM.div { className: "col-6 text-start" } $
