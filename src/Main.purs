@@ -69,7 +69,6 @@ main configJson = do
     (getElementById "app-root" $ toNonElementParentNode doc)
   reactRoot <- createRoot container
   launchAff_ do
-
     HealthCheck { networkId } <- Marlowe.Runtime.Web.getHealthCheck serverURL >>= case _ of
       Left err -> liftEffect $ throw $ unsafeStringify err
       Right healthCheck -> pure healthCheck

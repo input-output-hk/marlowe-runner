@@ -39,11 +39,11 @@ import Data.DateTime (DateTime)
 import Data.DateTime.Instant (Instant, instant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either, hush)
-import Data.Foldable (any, fold, or)
+import Data.Foldable (fold, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
 import Data.JSDate (fromDateTime) as JSDate
-import Data.List (concat, intercalate)
+import Data.List (intercalate)
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
@@ -55,7 +55,7 @@ import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
-import Effect.Aff (Aff)
+import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
@@ -63,6 +63,7 @@ import Marlowe.Runtime.Web.Client (put')
 import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Payout(..), PutTransactionRequest(..), Runtime(..), ServerURL, SlotNumber(..), Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, WithdrawalsEndpoint, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
+import Promise.Aff as Promise
 import React.Basic (fragment)
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (br, div_, text) as DOOM
@@ -83,6 +84,10 @@ import ReactBootstrap.Types as OverlayTrigger
 import Utils.React.Basic.Hooks (useMaybeValue', useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
+import Web.Clipboard (clipboard)
+import Web.Clipboard as Clipboard
+import Web.HTML (window)
+import Web.HTML.Window (navigator)
 
 type ContractId = TxOutRef
 
@@ -397,7 +402,13 @@ mkContractList = do
                                     ]
                                 DOM.td { className: "text-center" } $ DOM.small {} slotNoInfo
 
-                            in
+                            in do
+                              let
+                                conractIdStr = txOutRefToString contractId
+                                copyToClipboard :: Effect Unit
+                                copyToClipboard = window >>= navigator >>= clipboard >>= \c -> do
+                                  launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
+
                               DOM.tr { className: "align-middle" }
                                 [ tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.createdAt ci
                                 , tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.updatedAt ci
@@ -421,8 +432,12 @@ mkContractList = do
                                           , onClick: handler_ onClick
                                           -- , disabled
                                           }
-                                        [ text $ txOutRefToString contractId ]
-                                    , DOM.a { href: "#", className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset" }
+                                        [ text conractIdStr ]
+                                    , DOM.a
+                                        { href: "#"
+                                        , onClick: handler_ copyToClipboard
+                                        , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
+                                        }
                                         $ Icons.toJSX
                                         $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
                                     ]

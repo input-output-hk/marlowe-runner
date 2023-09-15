@@ -74,6 +74,7 @@
   , "unsafe-coerce"
   , "validation"
   , "variant"
+  , "web-clipboard"
   , "web-dom"
   , "web-file"
   , "web-html"
