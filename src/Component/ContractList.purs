@@ -11,7 +11,7 @@ import Component.ContractDetails as ContractDetails
 import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle
 import Component.ContractTemplates.Escrow as Escrow
 import Component.ContractTemplates.Swap as Swap
-import Component.CreateContract (runLiteTag)
+import Component.CreateContract (ContractJsonString(..), runLiteTag)
 import Component.CreateContract as CreateContract
 import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, Slotting(..), WalletInfo)
 import Component.Types.ContractInfo (MarloweInfo(..))
@@ -47,7 +47,7 @@ import Data.List (intercalate)
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
-import Data.Newtype (un)
+import Data.Newtype (class Newtype, un)
 import Data.Set as Set
 import Data.String (contains, length)
 import Data.String.Pattern (Pattern(..))
@@ -81,7 +81,7 @@ import ReactBootstrap.Table (striped) as Table
 import ReactBootstrap.Table (table)
 import ReactBootstrap.Types (placement)
 import ReactBootstrap.Types as OverlayTrigger
-import Utils.React.Basic.Hooks (useMaybeValue', useStateRef')
+import Utils.React.Basic.Hooks (useMaybeValue, useMaybeValue', useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 import Web.Clipboard (clipboard)
@@ -107,11 +107,12 @@ useInput initialValue = React.do
 
 type SubmissionError = String
 
-type ContractListState = { modalAction :: Maybe ModalAction }
+type ContractListState = { possibleInitialModalAction :: Maybe ModalAction }
 
 type Props =
   { possibleContracts :: Maybe (Array ContractInfo) -- `Maybe` indicates if the contracts where fetched already
   , connectedWallet :: Maybe (WalletInfo Wallet.Api)
+  , possibleInitialModalAction :: Maybe ModalAction
   }
 
 data OrderBy
@@ -133,7 +134,7 @@ data ContractTemplate = Escrow | Swap | ContractForDifferencesWithOracle
 derive instance Eq ContractTemplate
 
 data ModalAction
-  = NewContract
+  = NewContract (Maybe ContractJsonString)
   | ContractDetails
       { contract :: Maybe V1.Contract
       , state :: Maybe V1.State
@@ -189,10 +190,10 @@ mkContractList = do
   swapComponent <- Swap.mkComponent
   contractForDifferencesWithOracleComponent <- ContractForDifferencesWithOracle.mkComponent
 
-  liftEffect $ component "ContractList" \{ connectedWallet, possibleContracts } -> React.do
+  liftEffect $ component "ContractList" \{ connectedWallet, possibleInitialModalAction, possibleContracts } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
 
-    possibleModalAction /\ setModalAction /\ resetModalAction <- useMaybeValue'
+    possibleModalAction /\ setModalAction /\ resetModalAction <- useMaybeValue possibleInitialModalAction
     possibleModalActionRef <- useStateRef' possibleModalAction
     ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
     possibleQueryValue /\ setQueryValue <- useState' Nothing
@@ -239,7 +240,7 @@ mkContractList = do
 
     pure $
       case possibleModalAction, connectedWallet of
-        Just NewContract, Just cw -> createContractComponent
+        Just (NewContract possibleInitialContract), Just cw -> createContractComponent
           { connectedWallet: cw
           , onDismiss: resetModalAction
           , onSuccess: \_ -> do
@@ -248,6 +249,7 @@ mkContractList = do
                 , "Contract status should change to 'Confirmed' at that point."
                 ]
               resetModalAction
+          , possibleInitialContract
           }
         Just (ApplyInputs transactionsEndpoint marloweContext), Just cw -> do
           let
@@ -317,7 +319,7 @@ mkContractList = do
                       , disabled
                       , onClick: do
                           readRef possibleModalActionRef >>= case _ of
-                            Nothing -> setModalAction NewContract
+                            Nothing -> setModalAction (NewContract Nothing)
                             _ -> pure unit
                       }
                     templateContractButton = dropdownButton

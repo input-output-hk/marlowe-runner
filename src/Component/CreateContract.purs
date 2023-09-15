@@ -21,6 +21,7 @@ import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatlessFormSpec
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, booleanField)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
+import Control.Error.Util (hoistMaybe)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
@@ -32,7 +33,7 @@ import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (Instant, instant, unInstant)
-import Data.Either (Either(..), hush)
+import Data.Either (Either(..), fromRight, hush)
 import Data.Foldable as Foldable
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Identity (Identity)
@@ -40,13 +41,13 @@ import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid.Disj (Disj(..))
-import Data.Newtype (un)
+import Data.Newtype (class Newtype, un)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Data.String (Pattern(..), split, trim)
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
-import Data.Tuple (snd)
+import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\))
 import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
@@ -56,8 +57,9 @@ import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Runtime.Web.Client (ClientError)
+import Marlowe.Runtime.Web.Client (ClientError, uriOpts)
 import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..), Tags(..))
+import Parsing as Parsing
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
@@ -78,11 +80,26 @@ import Web.File.FileList (FileList)
 import Web.File.FileList as FileList
 import Web.HTML.HTMLInputElement (HTMLInputElement)
 import Web.HTML.HTMLInputElement as HTMLInputElement
+import URI (RelativeRef(..), URI(..)) as URI
+import URI.Extra.QueryPairs (QueryPairs(..), keyFromString, keyToString, valueFromString, valueToString) as URI
+import URI.Extra.QueryPairs as URI.QueryPairs
+import URI.HostPortPair (HostPortPair) as URI
+import URI.HostPortPair as HostPortPair
+import URI.URIRef (Fragment, HierPath, Host, Path, Port, RelPath, URIRefOptions, UserInfo) as URI
+import URI.URIRef as URIRef
+import Web.HTML (window)
+import Web.HTML.Location as Location
+import Web.HTML.Window as Window
+
+newtype ContractJsonString = ContractJsonString String
+derive instance Eq ContractJsonString
+derive instance Newtype ContractJsonString _
 
 type Props =
   { onDismiss :: Effect Unit
   , onSuccess :: ContractEndpoint -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
+  , possibleInitialContract :: Maybe ContractJsonString
   }
 
 newtype AutoRun = AutoRun Boolean
@@ -100,7 +117,7 @@ autoRunFieldId = FieldId "auto-run"
 
 type LabeledFormSpec validatorM = StatelessFormSpec validatorM (Array (FieldId /\ JSX)) String
 
-mkContractFormSpec :: (Maybe V1.Contract /\ AutoRun) -> LabeledFormSpec Effect Query Result
+mkContractFormSpec :: (Maybe ContractJsonString /\ AutoRun) -> LabeledFormSpec Effect Query Result
 mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormSpecBuilder.evalBuilder Nothing $ do
   let
     -- We put subforms JSX into a Map so we can control rendering order etc.
@@ -120,7 +137,7 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
       { missingError: "Please provide contract terms JSON value"
       , initial: case possibleInitialContract of
           Nothing -> ""
-          Just initialContract -> stringifyWithIndent 2 $ encodeJson initialContract
+          Just (ContractJsonString initialContract) -> formatPossibleJSON initialContract
       , label: Just $ DOOM.text "Contract JSON"
       , touched: isJust possibleInitialContract
       , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
@@ -175,8 +192,10 @@ type ClientError' = ClientError PostContractsError
 
 foreign import _loadFile :: File -> Promise (Nullable String)
 
-hoistMaybe :: forall m a. Applicative m => Maybe a -> MaybeT m a
-hoistMaybe = MaybeT <<< pure
+formatPossibleJSON :: String -> String
+formatPossibleJSON str = fromMaybe str do
+  json <- hush $ jsonParser str
+  pure $ stringifyWithIndent 2 $ encodeJson json
 
 mkLoadFileHiddenInputComponent :: MkComponentM ({ onFileload :: Maybe String -> Effect Unit, id :: String, accept :: String } -> JSX)
 mkLoadFileHiddenInputComponent =
@@ -299,14 +318,14 @@ mkComponent = do
   roleTokenComponent <- mkRoleTokensComponent
   loadFileHiddenInputComponent <- mkLoadFileHiddenInputComponent
 
-  liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss } -> React.do
+  liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss, possibleInitialContract } -> React.do
     currentRun /\ setCurrentRun <- React.useState' Nothing
     { state: submissionState, applyAction, reset: resetStateMachine } <- do
       let
         props = machineProps initialAutoRun connectedWallet cardanoMultiplatformLib runtime
       useMooreMachine props
 
-    formSpec <- React.useMemo unit \_ -> mkContractFormSpec (Nothing /\ initialAutoRun)
+    formSpec <- React.useMemo unit \_ -> mkContractFormSpec (possibleInitialContract /\ initialAutoRun)
 
     let
       onSubmit :: _ -> Effect Unit
@@ -362,9 +381,7 @@ mkComponent = do
                             allFields = formState.fields
                           void $ for (Map.lookup contractFieldId allFields) \{ onChange } -> do
                             let
-                              str' = fromMaybe str do
-                                json <- hush $ jsonParser str
-                                pure $ stringifyWithIndent 2 $ encodeJson json
+                              str' = formatPossibleJSON str
                             onChange [str']
 
                         Nothing -> traceM "No file"
@@ -422,7 +439,12 @@ mkComponent = do
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: roleTokenComponent { onDismiss: pure unit, onSuccess: onSuccess', connectedWallet, roleNames }
+          , content: roleTokenComponent
+              { onDismiss
+              , onSuccess: onSuccess'
+              , connectedWallet
+              , roleNames
+              }
           }
       Machine.ContractCreated { contract, createTxResponse } -> do
         let

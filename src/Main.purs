@@ -4,6 +4,7 @@ import Prelude
 
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.App (mkApp)
+import Component.CreateContract (ContractJsonString(..))
 import Component.MessageHub (mkMessageHub)
 import Component.Types (Slotting(..))
 import Contrib.Data.Argonaut (JsonParser)
@@ -11,26 +12,40 @@ import Contrib.Effect as Effect
 import Contrib.JsonBigInt as JsonBigInt
 import Control.Monad.Reader (runReaderT)
 import Data.Argonaut (Json, decodeJson, (.:))
+import Data.Array as Array
 import Data.BigInt.Argonaut as BigInt
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Either (Either(..), hush)
+import Data.Foldable as Foldable
+import Data.Maybe (Maybe(..), fromJust, fromMaybe, maybe)
+import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Effect.Exception (throw)
+import Foreign.NullOrUndefined (null) as Foreign
 import JS.Unsafe.Stringify (unsafeStringify)
 import Marlowe.Runtime.Web as Marlowe.Runtime.Web
+import Marlowe.Runtime.Web.Client (uriOpts)
 import Marlowe.Runtime.Web.Types (HealthCheck(..), NetworkId(..), ServerURL(..))
+import Parsing as Parsing
 import Partial.Unsafe (unsafePartial)
 import React.Basic (createContext)
 import React.Basic.DOM.Client (createRoot, renderRoot)
+import URI (RelativeRef(..), URI(..)) as URI
+import URI.Extra.QueryPairs (QueryPairs(..)) as URI
+import URI.URIRef as URIRef
 import Web.DOM (Element)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (HTMLDocument, window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
+import Web.HTML.HTMLDocument as HTMLDocument
+import Web.HTML.History (DocumentTitle(..))
+import Web.HTML.History as History
+import Web.HTML.Location as Location
 import Web.HTML.Window (document)
+import Web.HTML.Window as Window
 
 type Config =
   { marloweWebServerUrl :: ServerURL
@@ -50,6 +65,40 @@ decodeConfig json = do
     , aboutMarkdown
     }
 
+-- We extract a possible contract json from the URL here:
+processInitialURL :: Effect (Maybe ContractJsonString)
+processInitialURL = do
+  location <- window >>= Window.location
+  href <- Location.href location
+  let
+    possibleUriRef = Parsing.runParser href (URIRef.parser uriOpts)
+    href' /\ possibleContract = fromMaybe (href /\ Nothing) do
+      uriRef <- hush $ possibleUriRef
+      let
+        extractContractJson possibleOrigQuery = do
+          URI.QueryPairs queryPairs <- possibleOrigQuery
+          contractJsonString <- join $ Foldable.lookup "contract" queryPairs
+          let
+            queryPairs' = Array.filter ((/=) "contract" <<< fst) queryPairs
+          pure (URI.QueryPairs queryPairs' /\ ContractJsonString contractJsonString)
+
+      uriRef' /\ c <- case uriRef of
+        Right (URIRef.RelativeRef relativePart query fragment) -> do
+          query' /\ contractJsonString <- extractContractJson query
+          pure (Right (URI.RelativeRef relativePart (Just query') fragment) /\ contractJsonString)
+        Left (URI.URI scheme hp query fragment) -> do
+          query' /\ contractJsonString <- extractContractJson query
+          pure (Left (URI.URI scheme hp (Just query') fragment) /\ contractJsonString)
+      pure (URIRef.print uriOpts uriRef' /\ Just c)
+  -- Location.setHref href' location
+  when (href' /= href) do
+    w <- window
+    history <- Window.history w
+    title <- Window.document w >>= HTMLDocument.title
+    History.replaceState Foreign.null (DocumentTitle title) (History.URL href') history
+
+  pure possibleContract
+
 main :: Json -> Effect Unit
 main configJson = do
   config <- Effect.liftEither $ decodeConfig configJson
@@ -63,6 +112,9 @@ main configJson = do
       if config.develMode then Console.log
       else const (pure unit)
     runtime@(Marlowe.Runtime.Web.Runtime { serverURL }) = Marlowe.Runtime.Web.runtime config.marloweWebServerUrl
+
+  -- We do this URL processing here because the future URL routing will initialized here as well.
+  possibleInitialContract <- processInitialURL
 
   doc :: HTMLDocument <- document =<< window
   container :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<
@@ -97,4 +149,4 @@ main configJson = do
             }
 
         app <- liftEffect $ runReaderT mkApp mkAppCtx
-        liftEffect $ renderRoot reactRoot $ msgHubComponent [ app unit ]
+        liftEffect $ renderRoot reactRoot $ msgHubComponent [ app { possibleInitialContract } ]

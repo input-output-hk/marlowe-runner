@@ -6,7 +6,8 @@ import CardanoMultiplatformLib.Types (Bech32)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
-import Component.ContractList (mkContractList)
+import Component.ContractList (ModalAction(..), mkContractList)
+import Component.CreateContract (ContractJsonString)
 import Component.Footer (footer)
 import Component.Footer as Footer
 import Component.LandingPage (mkLandingPage)
@@ -117,7 +118,9 @@ newtype AppContractInfoMap = AppContractInfoMap
   , map :: ContractInfoMap
   }
 
-mkApp :: MkComponentMBase () (Unit -> JSX)
+type Props = { possibleInitialContract :: Maybe ContractJsonString }
+
+mkApp :: MkComponentMBase () (Props -> JSX)
 mkApp = do
   landingPage <- mkLandingPage
   messageBox <- liftEffect $ mkMessageBox
@@ -136,7 +139,7 @@ mkApp = do
   about <- asks _.aboutMarkdown
   Runtime runtime <- asks _.runtime
 
-  liftEffect $ component "App" \_ -> React.do
+  liftEffect $ component "App" \props -> React.do
     possibleWalletInfo /\ setWalletInfo <- useState' Nothing
     let
       walletInfoName = _.name <<< un WalletInfo <$> possibleWalletInfo
@@ -336,6 +339,7 @@ mkApp = do
               -- if version == initialVersion then Nothing
               -- else Just contractArray
               , connectedWallet: possibleWalletInfo
+              , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
               }
         -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
 
