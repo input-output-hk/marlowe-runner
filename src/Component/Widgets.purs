@@ -132,7 +132,7 @@ buttonWithIcon provided = do
       if disabled then " disabled"
       else ""
   DOM.button
-    { className: "btn btn-primary" <> extraClassNames'
+    { className: "btn btn-outline-primary" <> extraClassNames'
     , onClick: handler preventDefault (const $ onClick)
     , type: "button"
     }

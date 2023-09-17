@@ -257,15 +257,15 @@ mkApp = do
     pure $ case possibleWalletInfo of
       Nothing -> landingPage { setWalletInfo: setWalletInfo <<< Just }
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light bg-light shadow-bottom fixed-top" } $
+        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light fixed-top" } $
             DOM.div { className: "container-fluid" }
-              [ DOM.a { href: "#", className: "navbar-brand p-0" }
+              [ DOM.a { href: "#", className: "navbar-brand" }
                   [ svgImg { src: marloweLogoUrl } ]
               , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
                   [ DOM.ul { className: "navbar-nav gap-2" }
                       [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
                           [ linkWithIcon
-                              { icon: if List.null msgs then unsafeIcon "bell-slash disabled-color h5" else unsafeIcon "bell-fill primary-color h5"
+                              { icon: unsafeIcon "h5"
                               , label: mempty
                               , extraClassNames: "nav-link"
                               , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
@@ -278,7 +278,7 @@ mkApp = do
                             Just (WalletInfo wallet) -> link
                               { label: DOM.span { className: "h5" }
                                   [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
-                                  , DOOM.span_ [ DOOM.text $ wallet.name <> " wallet" ]
+                                  , DOOM.span_ [ DOOM.text "TODO - Change Address" ]
                                   ]
                               , extraClassNames: "nav-link"
                               , onClick: setConfiguringWallet true
