@@ -456,20 +456,15 @@ mkContractList = do
                                         Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
                                           let
                                             marloweContext = { initialContract, state, contract }
-                                          linkWithIcon
-                                            { icon: unsafeIcon $ "fast-forward-fill" <> actionIconSizing
-                                            , label: mempty
+                                          buttonWithIcon
+                                            { icon: unsafeIcon mempty
+                                            , label: DOOM.text "Advance"
+                                            , extraClassNames: "font-weight-bold me-2"
                                             , tooltipText: Just "Apply available inputs to the contract"
                                             , tooltipPlacement: Just placement.left
                                             , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
                                             }
-                                        _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                          { icon: unsafeIcon $ "file-earmark-check-fill success-color" <> actionIconSizing
-                                          , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
-                                          , tooltipPlacement: Just placement.left
-                                          , label: mempty
-                                          , onClick: mempty
-                                          }
+                                        _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> DOOM.text "Complete"
                                         _, _ -> mempty
                                   , case marloweInfo, possibleWalletContext of
                                       Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
@@ -477,13 +472,13 @@ mkContractList = do
                                           balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
                                           roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
                                         case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
-                                          Just { head, tail } ->
-                                            linkWithIcon
-                                              { icon: unsafeIcon $ "cash-coin warning-color" <> actionIconSizing
-                                              , label: mempty
-                                              , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                              , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
-                                              }
+                                          Just { head, tail } -> buttonWithIcon
+                                            { icon: unsafeIcon mempty
+                                            , label: DOOM.text "Withdraw"
+                                            , extraClassNames: "font-weight-bold me-2"
+                                            , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                            , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                            }
                                           _ -> mempty
                                       _, _ -> mempty
                                   ]
