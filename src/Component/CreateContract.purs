@@ -64,7 +64,7 @@ import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (css)
-import React.Basic.DOM (div, div_, input, text) as DOOM
+import React.Basic.DOM (div, div_, input, text, img) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
@@ -73,6 +73,7 @@ import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
+import Web.DOM.Element (className)
 import Web.DOM.Node (Node)
 import Web.File.File (File)
 import Web.File.FileList (FileList)
@@ -522,7 +523,10 @@ mkComponent = do
 
 stateToTitle :: Machine.State -> JSX
 stateToTitle state = case state of
-  Machine.DefiningContract -> DOM.h3 {} $ DOOM.text "Defining contract"
+  Machine.DefiningContract -> DOM.div { className: "px-3 mx-3 fw-bold" }
+    [ DOOM.img { src: "/images/magnifying_glass.svg" }
+    , DOM.h3 {} $ DOOM.text "Create and submit your contract"
+    ]
   Machine.DefiningRoleTokens {} -> DOM.h3 {} $ DOOM.text "Defining role tokens"
   Machine.FetchingRequiredWalletContext {} -> DOM.h3 {} $ DOOM.text "Fetching required wallet context"
   Machine.CreatingTx {} -> DOM.h3 {} $ DOOM.text "Creating transaction"
@@ -552,22 +556,8 @@ machineStateToStepIndex state = StepIndex $ case state of
 -- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]
 stateToDetailedDescription :: Machine.State -> JSX
 stateToDetailedDescription state = case state of
-  Machine.DefiningContract -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "We are currently in the initial state, awaiting the user to initiate the contract creation process."
-    , DOM.p {} $ DOOM.text "When we receive the correct contract value in JSON format, it will be utilized as part of the request to the Marlowe runtime"
-    , DOM.p {} $ DOOM.text "As a user, you have two options for providing the contract:"
-    , DOM.ul {}
-        [ DOM.li {} $ DOOM.text "Enter a valid contract in JSON format in the input field to the right"
-        , DOM.li {} $ DOOM.text "Upload a contract JSON file using the \"Upload\" button."
-        ]
-    , DOM.p { className: "h3 fw-bold py-3" } $ DOOM.text "How to Provide a Contract in JSON Format:"
-    , DOM.p {}
-        [ DOOM.text "Please provide a contract in a JSON format. To generate it, you can use a Marlowe library for your language of choice (for example, "
-        , DOM.a { href: "https://github.com/input-output-hk/marlowe-ts-sdk", target: "_blank", className: "white-color" } [ DOOM.text " marlowe-ts-sdk" ]
-        , DOOM.text "), or you can use the "
-        , DOM.a { href: "https://play.marlowe.iohk.io/#/", target: "_blank", className: "white-color" } [ DOOM.text " Marlowe Playground" ]
-        , DOOM.text " to generate it. After creating a contract in the simulator within the Marlowe Playground, you can use the \"Download JSON\" button to obtain the contract in JSON format. Once you have the JSON file, you can either enter it in the input field to the right or upload it using the \"Upload\" button."
-        ]
+  Machine.DefiningContract -> DOM.div { className: "px-3 mx-3" }
+    [ DOM.p {} $ DOOM.text "Review your contract details before setting the terms to run it. Check the code and all details, this is your last chance to correct any errors before the contract is permanently live."
     ]
   Machine.DefiningRoleTokens {} -> DOOM.div_
     [ DOM.p {} $ DOOM.text "NOT IMPLEMENTED YET"

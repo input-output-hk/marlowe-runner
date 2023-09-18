@@ -19,12 +19,12 @@ component :: { title :: JSX, description :: JSX, content :: JSX } -> JSX
 component { title, description, content } =
   DOM.div { className: "container-fluid overflow-hidden" } $ do
     DOM.div { className: "row" }
-      [ DOM.div { className: "col-3 background-color-primary-light overflow-auto vh-100 px-0 pt-59px pb-71px" } $
+      [ DOM.div { className: "col-3 background-color-primary-light overflow-auto vh-100 px-0 pt-59px pb-71px d-flex flex-column justify-content-center" } $
           DOM.div { className: "p-3" }
             [ title
             , description
             ]
-      , DOM.div { className: "col-9 p-3 m-3 overflow-auto vh-100 pt-59px pb-71px d-flex flex-column" } content
+      , DOM.div { className: "col-9 overflow-auto vh-100 pt-59px pb-71px d-flex flex-column" } content
       ]
 
 descriptionLink :: { icon :: String, href :: String, label :: String } -> JSX
