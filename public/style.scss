@@ -1,7 +1,7 @@
 $font-family-base: 'Outfit', sans-serif;
 $primary: #511CF7;
 $sucess: #00C48C;
-$warning: #FFC107;
+$warning: #E8740A;
 $danger: #F44336;
 $disabled: #BDBDBD;
 $navbar-light-color: #F6F7FF;
@@ -191,6 +191,10 @@ $link-color: #511CF7;
 
 .transform-translate-x--50 {
   transform: translate(-50%, 0) !important;
+}
+
+.font-weight-bold {
+  font-weight: bold !important;
 }
 
 

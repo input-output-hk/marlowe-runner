@@ -307,7 +307,7 @@ mkContractList = do
                 newContractButton = buttonWithIcon
                   { icon: unsafeIcon "h5 me-1"
                   , label: DOOM.text "Create a contract"
-                  , extraClassNames: "font-weight-bold me-2"
+                  , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
                   , disabled
                   , onClick: do
                       readRef possibleModalActionRef >>= case _ of
@@ -456,14 +456,14 @@ mkContractList = do
                                         Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
                                           let
                                             marloweContext = { initialContract, state, contract }
-                                          buttonWithIcon
-                                            { icon: unsafeIcon mempty
-                                            , label: DOOM.text "Advance"
-                                            , extraClassNames: "font-weight-bold me-2"
-                                            , tooltipText: Just "Apply available inputs to the contract"
-                                            , tooltipPlacement: Just placement.left
-                                            , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
-                                            }
+                                            buttonWithIcon
+                                              { icon: unsafeIcon mempty
+                                              , label: DOOM.text "Advance"
+                                              , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
+                                              , tooltipText: Just "Apply available inputs to the contract"
+                                              , tooltipPlacement: Just placement.left
+                                              , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
+                                              }
                                         _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> DOOM.text "Complete"
                                         _, _ -> mempty
                                   , case marloweInfo, possibleWalletContext of
@@ -475,7 +475,7 @@ mkContractList = do
                                           Just { head, tail } -> buttonWithIcon
                                             { icon: unsafeIcon mempty
                                             , label: DOOM.text "Withdraw"
-                                            , extraClassNames: "font-weight-bold me-2"
+                                            , extraClassNames: "font-weight-bold me-2 btn-outline-warning"
                                             , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
                                             , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
                                             }
