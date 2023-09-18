@@ -520,15 +520,15 @@ mkComponent = do
           , content: wrappedContentWithFooter body formActions
           }
 
-stateToTitle :: Machine.State -> String
+stateToTitle :: Machine.State -> JSX
 stateToTitle state = case state of
-  Machine.DefiningContract -> "Defining contract"
-  Machine.DefiningRoleTokens {} -> "Defining role tokens"
-  Machine.FetchingRequiredWalletContext {} -> "Fetching required wallet context"
-  Machine.CreatingTx {} -> "Creating transaction"
-  Machine.SigningTx {} -> "Signing transaction"
-  Machine.SubmittigTx {} -> "Submitting transaction"
-  Machine.ContractCreated {} -> "Contract created"
+  Machine.DefiningContract -> DOM.h3 {} $ DOOM.text "Defining contract"
+  Machine.DefiningRoleTokens {} -> DOM.h3 {} $ DOOM.text "Defining role tokens"
+  Machine.FetchingRequiredWalletContext {} -> DOM.h3 {} $ DOOM.text "Fetching required wallet context"
+  Machine.CreatingTx {} -> DOM.h3 {} $ DOOM.text "Creating transaction"
+  Machine.SigningTx {} -> DOM.h3 {} $ DOOM.text "Signing transaction"
+  Machine.SubmittigTx {} -> DOM.h3 {} $ DOOM.text "Submitting transaction"
+  Machine.ContractCreated {} -> DOM.h3 {} $ DOOM.text "Contract created"
 
 -- To display progress bar
 newtype StepIndex = StepIndex Int

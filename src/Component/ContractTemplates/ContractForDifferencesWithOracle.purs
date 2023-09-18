@@ -275,7 +275,7 @@ mkComponent = do
             ]
         ]
     pure $ BodyLayout.component
-      { title: "Contract For Differences With Oracle"
+      { title: DOM.h3 {} $ DOOM.text "Contract For Differences With Oracle"
       , description: DOOM.text "\"Party\" and \"Counterparty\" deposit 100 Ada and after 60 slots these assets are redistributed depending on the change in price of 100 Ada worth of dollars between the start and the end of the contract. If the price increases, the difference goes to \"Counterparty\"; if it decreases, the difference goes to \"Party\", up to a maximum of 100 Ada."
       , content: wrappedContentWithFooter
           formBody

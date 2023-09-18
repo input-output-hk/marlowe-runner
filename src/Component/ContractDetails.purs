@@ -153,7 +153,7 @@ mkComponent = do
       content = wrappedContentWithFooter body footer
 
     pure $ BodyLayout.component
-      { title: "Contract details"
+      { title: DOM.h3 {} $ DOOM.text "Contract details"
       , description: DOM.div {}
           [ DOM.p {} [ DOOM.text "This page shows the details of the selected contract. The page is divided into three tabs: Source Code, Source Graph, and Contract State. Each tab provides a different view of the contract." ]
           , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Code" ]

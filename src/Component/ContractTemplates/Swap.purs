@@ -202,7 +202,7 @@ mkComponent = do
             ]
         ]
     pure $ BodyLayout.component
-      { title: "Swap"
+      { title: DOM.h3 {} $ DOOM.text "Swap"
       , description: DOOM.text "Takes currency amount from one party and another currency amount from another party, and it swaps them atomically."
       , content: wrappedContentWithFooter
           formBody

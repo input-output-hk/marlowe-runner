@@ -277,7 +277,7 @@ mkComponent = do
             ]
         ]
     pure $ BodyLayout.component
-      { title: "Escrow"
+      { title: DOM.h3 {} $ DOOM.text "Escrow"
       , description: DOOM.text "Regulates a money exchange between a \"Buyer\" and a \"Seller\". If there is a disagreement, an \"Mediator\" will decide whether the money is refunded or paid to the \"Seller\"."
       , content: wrappedContentWithFooter
           formBody

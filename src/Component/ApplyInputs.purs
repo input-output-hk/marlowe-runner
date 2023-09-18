@@ -224,7 +224,7 @@ mkDepositFormComponent = do
               ]
           ]
 
-      { title: "Select a Deposit to Perform"
+      { title: DOM.h3 {} $ DOOM.text "Select a Deposit to Perform"
       , description: fragment
           [ DOM.p {}
               [ DOOM.text "On the right, you can view all the deposits available for performance at this stage." ]
@@ -325,7 +325,7 @@ mkChoiceFormComponent = do
               ]
           ]
 
-      { title: "Apply a Choice"
+      { title: DOM.h3 {} $ DOOM.text "Apply a Choice"
       , description: DOM.div {}
           [ DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "Select a choice from the dropdown menu to proceed. Each choice represents a decision that a participant can make at a particular point in the contract." ]
           , DOM.p
@@ -378,7 +378,7 @@ mkNotifyFormComponent = do
               ]
           ]
 
-      { title: "Perform a Notify Action"
+      { title: DOM.h3 {} $ DOOM.text "Perform a Notify Action"
       , description: DOM.div {}
           [ DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "The Notify action in Marlowe is used to continue the execution of the contract when a certain condition is satisfied. It essentially acts as a gatekeeper, ensuring that the contract only proceeds when the specified observations hold true. " ]
           , DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "This is useful for creating contracts that have conditional flows, where the next steps depend on certain criteria being met. By performing a Notify action, you are signaling that the required conditions are fulfilled and the contract can move forward to the next state." ]
@@ -421,7 +421,7 @@ mkAdvanceFormComponent = do
                   ]
               ]
           ]
-      { title: "Advance the Contract"
+      { title: DOM.h3 {} $ DOOM.text "Advance the Contract"
       , description: DOM.div {}
           [ DOM.p { className: "white-color h5 pb-5" } [ DOOM.text "Advancing the contract is a crucial action in Marlowe that moves the contract forward to its next state. This action is used when the contract is waiting for something to happen and needs to be manually pushed forward. It's like turning the page to the next chapter in a book. " ]
           , DOM.p { className: "white-color h5 pb-5" } [ DOOM.text "This can be particularly useful in situations where the contract is waiting for an external data feed or an event to occur. By advancing the contract, you are ensuring that the contract stays on course and progresses through its intended sequence of states and actions." ]
@@ -529,17 +529,12 @@ mkContractDetailsComponent = do
             ]
         ]
     pure $ BodyLayout.component
-      { title: "Apply Input"
-      , description: DOM.div {}
-          [ DOM.p {} [ DOOM.text "This page allows contract participants to interact with the contract and take actions to progress through it. On the right side of the page, you will see a representation of the contract state as it currently exists on the blockchain. The page is divided into three tabs: Source Graph, Source Code, and Contract State. Each tab provides a different view of the contract." ]
-          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Graph" ]
-          , DOM.p {} [ DOOM.text "The Source Graph tab provides a visual representation of the contract. It displays the contract as a graph, with nodes representing the different states and actions of the contract. The paths that have already been executed (transactions) are highlighted, allowing you to see the progression of the contract over time." ]
-          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Code" ]
-          , DOM.p {} [ DOOM.text "In the Source Code tab, you can view the remaining part of the contract that is on the blockchain. This includes the logic and conditions that are yet to be executed. It's a textual representation of the contract, allowing you to understand the contract's structure and logic." ]
-          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Contract State" ]
-          , DOM.p {} [ DOOM.text "In the Contract State tab, you can view the current status of the participant's account, as well as the chosen values and variables that have been set within the contract (using 'let' statements). This tab provides a snapshot of the contract's current state and the participant's interaction with it." ]
-          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Marlowe Explorer" ]
-          , DOM.p {} [ DOOM.text "To view the state of the contract on the Cardano blockchain, visit the ", DOM.a { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", target: "_blank", className: "white-color" } [ DOOM.text "Marlowe Explorer" ], DOOM.text "." ]
+      { title: DOM.div { className: "px-3 mx-3 fw-bold" }
+          [ DOOM.img { src: "/images/magnifying_glass.svg" }
+          , DOM.h3 { className: "fw-bold" } $ DOOM.text "Advance the contract"
+          ]
+      , description: DOM.div { className: "px-3 mx-3" }
+          [ DOM.p {} [ DOOM.text "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details." ]
           ]
       , content: wrappedContentWithFooter body footer
       }
@@ -593,7 +588,7 @@ fetchingRequiredWalletContextDetails marloweContext possibleOnNext onDismiss pos
       ]
 
   BodyLayout.component
-    { title: "Fetching Wallet Context"
+    { title: DOM.h3 {} $ DOOM.text "Fetching Wallet Context"
     , description:
         DOM.div {}
           [ DOM.p {}
@@ -655,7 +650,7 @@ creatingTxDetails possibleOnNext onDismiss runtimeRequest possibleRuntimeRespons
           ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Creating Transaction"
+    { title: DOM.h3 {} $ DOOM.text "Creating Transaction"
     , description: DOOM.div_
         [ DOM.p {} [ DOOM.text "We use the Marlowe Runtime to request a transaction that will apply the chosen input." ]
         , DOM.p {} [ DOOM.text "In order to build the required transaction we use Marlowe Runtime REST API. We encode the input which we wish to apply and also provide the addresses which we were able to collect in the previous step from the wallet. The addresses are re-encoded from the lower-level Cardano CBOR hex format into Bech32 format (", DOM.code {} [ DOOM.text "addr_test..." ], DOOM.text ") and sent to the backend as part of the request." ]
@@ -705,7 +700,7 @@ signingTransaction possibleOnNext onDismiss possibleWalletResponse = do
             [ R.text "Next" ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Signing transaction"
+    { title: DOM.h3 {} $ DOOM.text "Signing transaction"
     , description: fragment
         [ DOM.p {} [ DOOM.text "We are now signing the transaction with the wallet. While the wallet currently does not provide detailed information about the Marlowe contract within the transaction, all transaction details, including the contract, are readily accessible and can be decoded for verification:" ]
         , DOM.ul {}
@@ -751,7 +746,7 @@ submittingTransaction onDismiss runtimeRequest possibleRuntimeResponse = do
           }
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Submitting transaction signatures"
+    { title: fragment [ DOM.h3 {} $ DOOM.text "Submitting transaction signatures" ]
     , description: fragment
         [ DOM.p {} [ DOOM.text "We are submitting the signatures for the transaction to the Marlowe Runtime now using its REST API." ]
         , DOM.p {} [ DOOM.text "Marlowe Runtime will verify the signatures and if they are correct, it will attach them to the transaction and submit the transaction to the blockchain." ]
@@ -779,7 +774,7 @@ inputApplied onNext = do
           [ R.text "Ok" ]
       ]
   DOM.div { className: "row" } $ BodyLayout.component
-    { title: "Inputs applied successfully"
+    { title: DOM.h3 {} $ DOOM.text "Inputs applied successfully"
     , description: DOOM.text "We are submitting the final signed transaction."
     , content: wrappedContentWithFooter body footer
     }
@@ -815,7 +810,7 @@ showPossibleErrorAndDismiss title description body onDismiss errors = do
         ]
       Nothing -> mempty
   DOM.div { className: "row" } $ BodyLayout.component
-    { title
+    { title: DOM.h3 {} $ DOOM.text title
     , description: DOOM.text "We are submitting the final signed transaction."
     , content: wrappedContentWithFooter body' footer
     }
@@ -937,7 +932,7 @@ mkComponent = do
                   ]
               ]
           BodyLayout.component
-            { title: "Select Input Type"
+            { title: DOM.h3 {} $ DOOM.text "Select Input Type"
             , description:
                 DOM.div {}
                   [ DOM.p {}
@@ -997,7 +992,7 @@ mkComponent = do
         DetailedFlow _ ->
           submittingTransaction onDismiss "Final request placeholder" $ errors
         SimplifiedFlow -> BodyLayout.component
-          { title: "Submitting transaction"
+          { title: DOM.h3 {} $ DOOM.text "Submitting transaction"
           , description: DOOM.text "We are submitting the initial transaction."
           , content: DOOM.text "Auto submitting tx... (progress bar?)"
           }
