@@ -102,7 +102,7 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Just Nami -- Just Lace -- Nami -- Eternl -- Nami -- Nothing
+debugWallet = Nothing -- Nami -- Eternl -- Nami -- Nothing
 
 data DisplayOption = Default | About
 
@@ -146,38 +146,38 @@ mkApp = do
 
     possibleWalletInfoRef <- useStateRef walletInfoName possibleWalletInfo
     possibleWalletContext /\ setWalletContext <- useState' Nothing
-    possibleWalletContextRef <- useStateRef' possibleWalletContext
-
-    possibleContractMap /\ setContractMap <- useState' Nothing
-
     let
       walletCtx = un WalletContext <$> possibleWalletContext
 
-    useAff ((\w -> w.usedAddresses /\ w.changeAddress) <$> walletCtx) do
-      let
-        (usedAddresses :: Array Bech32) = fromMaybe [] $ _.usedAddresses <$> walletCtx
-        (tokens :: Array AssetId) = map (uncurry AssetId) <<< fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un NonAdaAssets <<< nonAdaAssets <<< _.balance <$> walletCtx
+    possibleWalletContextRef <- useStateRef' possibleWalletContext
+    possibleContractMap /\ setContractMap <- useState' Nothing
 
-        reqInterval = RequestInterval (Milliseconds 50.0)
-        pollInterval = PollingInterval (Milliseconds 60_000.0)
-        filterContracts getContractResponse = case un ContractHeader getContractResponse.resource of
-          { block: Nothing } -> true
-          { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
-        maxPages = Just (MaxPages 1)
-        params = { partyAddresses: usedAddresses, partyRoles: tokens, tags: [] }
+    useAff ((\w -> w.usedAddresses /\ w.changeAddress) <$> walletCtx) $
+      case walletCtx of
+        Just ctx -> do
+          let
+            reqInterval = RequestInterval (Milliseconds 50.0)
+            pollInterval = PollingInterval (Milliseconds 60_000.0)
+            filterContracts getContractResponse = case un ContractHeader getContractResponse.resource of
+              { block: Nothing } -> true
+              { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
+            maxPages = Just (MaxPages 1)
+            tokens = map (uncurry AssetId) <<< Array.fromFoldable <<< Map.keys <<< un NonAdaAssets <<< nonAdaAssets $ ctx.balance
+            params = { partyAddresses: ctx.usedAddresses, partyRoles: tokens, tags: [] }
 
-      ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages runtime.serverURL
-      supervise do
-        void $ forkAff do
-          untilJust do
-            updates <- liftEffect $ contractStream.getLiveState
-            let
-              new = mkAppContractInfoMap possibleWalletContext updates
-            liftEffect $ setContractMap $ Just new
-            delay (Milliseconds 1_000.0)
-            pure Nothing
+          ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages runtime.serverURL
+          supervise do
+            void $ forkAff do
+              untilJust do
+                updates <- liftEffect $ contractStream.getLiveState
+                let
+                  new = mkAppContractInfoMap possibleWalletContext updates
+                liftEffect $ setContractMap $ Just new
+                delay (Milliseconds 1_000.0)
+                pure Nothing
 
-        contractStream.start
+            contractStream.start
+        Nothing -> pure unit
 
     useLoopAff walletInfoName (Milliseconds 20_000.0) do
       pwi <- liftEffect $ readRef possibleWalletInfoRef

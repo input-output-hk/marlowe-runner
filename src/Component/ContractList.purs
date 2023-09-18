@@ -367,7 +367,7 @@ mkContractList = do
                         buttons
                   ]
               , case possibleContracts'' of
-                  Just contracts | not (null contracts) -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
+                  Just contracts -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
                     [ table { striped: Table.striped.boolean true, hover: true }
                         [ DOM.thead {} do
                             let
