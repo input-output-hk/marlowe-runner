@@ -171,9 +171,12 @@ mkApp = do
         void $ forkAff do
           untilJust do
             updates <- liftEffect $ contractStream.getLiveState
-            let
-              new = mkAppContractInfoMap possibleWalletContext updates
-            liftEffect $ setContractMap $ Just new
+            case updates of
+                Just updates' -> do
+                  let
+                    new = mkAppContractInfoMap possibleWalletContext updates'
+                  liftEffect $ setContractMap $ Just new
+                Nothing -> pure unit
             delay (Milliseconds 1_000.0)
             pure Nothing
 
