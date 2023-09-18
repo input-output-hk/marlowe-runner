@@ -50,7 +50,7 @@ mkLandingPage = do
   liftEffect $ component "LandingPage" \{ setWalletInfo } -> React.do
     possibleErrors /\ setErrors <- useState' Nothing
     pure $ DOM.div {} $
-      [ DOM.nav { className: "navbar navbar-expand-sm navbar-light bg-light shadow-bottom fix-top" } $
+      [ DOM.nav { className: "navbar navbar-expand-sm navbar-light bg-light fix-top" } $
           DOM.div { className: "container-fluid" }
             [ DOM.a { href: "#", className: "navbar-brand" }
                 [ svgImg { src: marloweLogoUrl } ]

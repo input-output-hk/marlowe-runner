@@ -66,7 +66,7 @@ import Polyform.Validator (liftFnM)
 import Promise.Aff as Promise
 import React.Basic (fragment)
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (br, div_, text) as DOOM
+import React.Basic.DOM (br, div_, img, text) as DOOM
 import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -300,206 +300,204 @@ mkContractList = do
           , onDismiss: resetModalAction
           }
 
-        Nothing, _ -> BodyLayout.component
-          { title: "Your Marlowe Contracts"
-          , description: DOOM.div_
-              [ DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "To the right, you will find a list of all contracts that your wallet is involved in on the Cardano Blockchain's `preview` network."
-              , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Your involvement means that one of your wallet addresses is a part of the contract (some contracts are non fully public) or that you have a token (so called \"role token\") which gives you permission to act as a party in some contract."
-              -- , DOM.div "You can filter the list by contract ID or by contract creator. You can also click on a contract id to view its details."
-              , DOM.div { className: "pb-3" } $ DOM.p { className: "white-color h5" } $ DOOM.text "Click on the 'New Contract' button to upload a new contract or try out one of our contract templates."
-              ]
-          , content: React.fragment
-              [ DOM.div { className: "row p-4" } do
-                  let
-                    disabled = isNothing connectedWallet
-                    newContractButton = buttonWithIcon
-                      { icon: unsafeIcon "file-earmark-plus h5 me-1"
-                      , label: DOOM.text "Create Contract"
-                      , extraClassNames: "font-weight-bold me-2"
-                      , disabled
-                      , onClick: do
-                          readRef possibleModalActionRef >>= case _ of
-                            Nothing -> setModalAction (NewContract Nothing)
-                            _ -> pure unit
-                      }
-                    templateContractButton = dropdownButton
-                      { className: "d-inline-block"
-                      , title: fragment
-                          [ Icons.toJSX $ unsafeIcon "file-earmark-medical h5 me-1"
-                          , DOOM.text "Use Contract Template"
-                          ]
-                      -- , onToggle: const $ pure unit
-                      }
-                      [ dropdownItem
-                          { onClick: handler_ $ setModalAction $ ContractTemplate Escrow
-                          }
-                          [ DOOM.text "Escrow" ]
-                      , dropdownItem
-                          { onClick: handler_ $ setModalAction $ ContractTemplate Swap
-                          }
-                          [ DOOM.text "Swap" ]
-                      , dropdownItem
-                          { onClick: handler_ $ setModalAction $ ContractTemplate ContractForDifferencesWithOracle
-                          }
-                          [ DOOM.text "Contract For Differences with Oracle" ]
+        Nothing, _ -> React.fragment
+          [ DOM.div { className: "row p-4 mt-5" } do
+              let
+                disabled = isNothing connectedWallet
+                newContractButton = buttonWithIcon
+                  { icon: unsafeIcon "h5 me-1"
+                  , label: DOOM.text "Create a contract"
+                  , extraClassNames: "font-weight-bold me-2"
+                  , disabled
+                  , onClick: do
+                      readRef possibleModalActionRef >>= case _ of
+                        Nothing -> setModalAction (NewContract Nothing)
+                        _ -> pure unit
+                  }
+                templateContractButton = dropdownButton
+                  { className: "d-none"
+                  , title: fragment
+                      [ Icons.toJSX $ unsafeIcon "file-earmark-medical h5 me-1"
+                      , DOOM.text "Use Contract Template"
                       ]
-                  [ DOM.div { className: "col-7 text-end" }
-                      [ DOM.div { className: "form-group" } $ renderFormSpec form formState ]
-                  , DOM.div { className: "col-5" } $ Array.singleton $ do
-                      let
-                        buttons = DOM.div { className: "text-end" }
-                          [ newContractButton
-                          , templateContractButton
-                          ]
-                      if disabled then do
-                        let
-                          tooltipJSX = tooltip
-                            { placement: placement.left }
-                            (DOOM.text "Connect to a wallet to add a contract")
-                        overlayTrigger
-                          { overlay: tooltipJSX
-                          , placement: OverlayTrigger.placement.bottom
-                          }
-                          -- Disabled button doesn't trigger the hook,
-                          -- so we wrap it in a `span`
-                          buttons
-                      else
-                        buttons
-                  ]
-              , case possibleContracts'' of
-                  Just contracts | not (null contracts) -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
-                    [ table { striped: Table.striped.boolean true, hover: true }
-                        [ DOM.thead {} do
-                            let
-                              orderingTh = Table.orderingHeader ordering updateOrdering
-                              th label = DOM.th { className: "text-center text-muted" } [ label ]
-                            [ DOM.tr {}
-                                [ do
-                                    let
-                                      label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                                    orderingTh label OrderByCreationDate
-                                , do
-                                    let
-                                      label = DOOM.fragment [ DOOM.text "Updated" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                                    orderingTh label OrderByLastUpdateDate
-                                , DOM.th { className: "text-center w-16rem" } $ DOOM.text "Contract Id"
-                                , th $ DOOM.text "Tags"
-                                , th $ DOOM.text "Actions"
-                                ]
-                            ]
-                        , DOM.tbody {} $ contracts <#> \ci@(ContractInfo { _runtime, endpoints, marloweInfo, tags: contractTags }) ->
-                            let
-                              ContractHeader { contractId } = _runtime.contractHeader
-                              tdCentered = DOM.td { className: "text-center" }
-                              tdSlotInfo Nothing = tdCentered $ []
-                              tdSlotInfo (Just slotNo) = do
-                                let
-                                  slotNoInfo = do
-                                    let
-                                      dateTime = slotToTimestamp slotting slotNo
-                                      jsDate = JSDate.fromDateTime dateTime
-                                    [ DOOM.text $ JSDate.toLocaleDateString jsDate
-                                    , DOOM.br {}
-                                    , DOOM.text $ JSDate.toLocaleTimeString jsDate
-                                    ]
-                                DOM.td { className: "text-center" } $ DOM.small {} slotNoInfo
-
-                            in
-                              do
-                                let
-                                  conractIdStr = txOutRefToString contractId
-
-                                  copyToClipboard :: Effect Unit
-                                  copyToClipboard = window >>= navigator >>= clipboard >>= \c -> do
-                                    launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
-
-                                DOM.tr { className: "align-middle" }
-                                  [ tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.createdAt ci
-                                  , tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.updatedAt ci
-                                  , DOM.td { className: "text-center" } $ DOM.span { className: "d-flex" }
-                                      [ DOM.a
-                                          do
-                                            let
-                                              onClick = case marloweInfo of
-                                                Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
-                                                  let
-                                                    transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
-                                                  setModalAction $ ContractDetails
-                                                    { contract: currentContract
-                                                    , state
-                                                    , initialState: initialState
-                                                    , initialContract: initialContract
-                                                    , transactionEndpoints
-                                                    }
-                                                _ -> pure unit
-                                            { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
-                                            , onClick: handler_ onClick
-                                            -- , disabled
-                                            }
-                                          [ text conractIdStr ]
-                                      , DOM.a
-                                          { href: "#"
-                                          , onClick: handler_ copyToClipboard
-                                          , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
-                                          }
-                                          $ Icons.toJSX
-                                          $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
-                                      ]
-                                  , tdCentered
-                                      [ do
-                                          let
-                                            tags = runLiteTags contractTags
-                                          DOOM.text $ intercalate ", " tags
-                                      ]
-                                  , tdCentered
-                                      [ do
-                                          case endpoints.transactions, marloweInfo of
-                                            Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
-                                              let
-                                                marloweContext = { initialContract, state, contract }
-                                              linkWithIcon
-                                                { icon: unsafeIcon $ "fast-forward-fill" <> actionIconSizing
-                                                , label: mempty
-                                                , tooltipText: Just "Apply available inputs to the contract"
-                                                , tooltipPlacement: Just placement.left
-                                                , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
-                                                }
-                                            _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
-                                              { icon: unsafeIcon $ "file-earmark-check-fill success-color" <> actionIconSizing
-                                              , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
-                                              , tooltipPlacement: Just placement.left
-                                              , label: mempty
-                                              , onClick: mempty
-                                              }
-                                            _, _ -> mempty
-                                      , case marloweInfo, possibleWalletContext of
-                                          Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
-                                            let
-                                              balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
-                                              roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
-                                            case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
-                                              Just { head, tail } ->
-                                                linkWithIcon
-                                                  { icon: unsafeIcon $ "cash-coin warning-color" <> actionIconSizing
-                                                  , label: mempty
-                                                  , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                                  , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
-                                                  }
-                                              _ -> mempty
-                                          _, _ -> mempty
-                                      ]
-                                  ]
-                        ]
-                    ]
-                  _ ->
-                    DOM.div
-                      -- { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
-                      { className: "col-12 position-relative d-flex justify-content-center align-items-center blur-bg z-index-sticky"
+                  -- , onToggle: const $ pure unit
+                  }
+                  [ dropdownItem
+                      { onClick: handler_ $ setModalAction $ ContractTemplate Escrow
                       }
-                      $ loadingSpinnerLogo
-                          {}
+                      [ DOOM.text "Escrow" ]
+                  , dropdownItem
+                      { onClick: handler_ $ setModalAction $ ContractTemplate Swap
+                      }
+                      [ DOOM.text "Swap" ]
+                  , dropdownItem
+                      { onClick: handler_ $ setModalAction $ ContractTemplate ContractForDifferencesWithOracle
+                      }
+                      [ DOOM.text "Contract For Differences with Oracle" ]
+                  ]
+              [ DOM.div { className: "col-7 text-end" }
+                  [ DOM.div { className: "form-group" } $ renderFormSpec form formState ]
+              , DOM.div { className: "col-5" } $ Array.singleton $ do
+                  let
+                    buttons = DOM.div { className: "text-end" }
+                      [ newContractButton
+                      , templateContractButton
+                      ]
+                  if disabled then do
+                    let
+                      tooltipJSX = tooltip
+                        { placement: placement.left }
+                        (DOOM.text "Connect to a wallet to add a contract")
+                    overlayTrigger
+                      { overlay: tooltipJSX
+                      , placement: OverlayTrigger.placement.bottom
+                      }
+                      -- Disabled button doesn't trigger the hook,
+                      -- so we wrap it in a `span`
+                      buttons
+                  else
+                    buttons
               ]
-          }
+          , case possibleContracts'' of
+              Just contracts | not (null contracts) -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
+                [ table { striped: Table.striped.boolean true, hover: true }
+                    [ DOM.thead {} do
+                        let
+                          orderingTh = Table.orderingHeader ordering updateOrdering
+                          th label = DOM.th { className: "text-center text-muted" } [ label ]
+                        [ DOM.tr {}
+                            [ DOM.th { className: "text-center" } $ DOOM.img { src: "/images/calendar_month.svg" }
+                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/event_available.svg" }
+                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/fingerprint.svg" }
+                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/sell.svg" }
+                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/frame_65.svg" }
+                            ]
+                        , DOM.tr {}
+                            [ do
+                                let
+                                  label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                                orderingTh label OrderByCreationDate
+                            , do
+                                let
+                                  label = DOOM.fragment [ DOOM.text "Updated" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                                orderingTh label OrderByLastUpdateDate
+                            , DOM.th { className: "text-center w-16rem" } $ DOOM.text "Contract Id"
+                            , th $ DOOM.text "Tags"
+                            , th $ DOOM.text "Actions"
+                            ]
+                        ]
+                    , DOM.tbody {} $ contracts <#> \ci@(ContractInfo { _runtime, endpoints, marloweInfo, tags: contractTags }) ->
+                        let
+                          ContractHeader { contractId } = _runtime.contractHeader
+                          tdCentered = DOM.td { className: "text-center" }
+                          tdSlotInfo Nothing = tdCentered $ []
+                          tdSlotInfo (Just slotNo) = do
+                            let
+                              slotNoInfo = do
+                                let
+                                  dateTime = slotToTimestamp slotting slotNo
+                                  jsDate = JSDate.fromDateTime dateTime
+                                [ DOOM.text $ JSDate.toLocaleDateString jsDate
+                                , DOOM.br {}
+                                , DOOM.text $ JSDate.toLocaleTimeString jsDate
+                                ]
+                            DOM.td { className: "text-center" } $ DOM.small {} slotNoInfo
+
+                        in
+                          do
+                            let
+                              conractIdStr = txOutRefToString contractId
+
+                              copyToClipboard :: Effect Unit
+                              copyToClipboard = window >>= navigator >>= clipboard >>= \c -> do
+                                launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
+
+                            DOM.tr { className: "align-middle" }
+                              [ tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.createdAt ci
+                              , tdSlotInfo $ _.slotNo <<< un Runtime.BlockHeader <$> ContractInfo.updatedAt ci
+                              , DOM.td { className: "text-center" } $ DOM.span { className: "d-flex" }
+                                  [ DOM.a
+                                      do
+                                        let
+                                          onClick = case marloweInfo of
+                                            Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
+                                              let
+                                                transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
+                                              setModalAction $ ContractDetails
+                                                { contract: currentContract
+                                                , state
+                                                , initialState: initialState
+                                                , initialContract: initialContract
+                                                , transactionEndpoints
+                                                }
+                                            _ -> pure unit
+                                        { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
+                                        , onClick: handler_ onClick
+                                        -- , disabled
+                                        }
+                                      [ text conractIdStr ]
+                                  , DOM.a
+                                      { href: "#"
+                                      , onClick: handler_ copyToClipboard
+                                      , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
+                                      }
+                                      $ Icons.toJSX
+                                      $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
+                                  ]
+                              , tdCentered
+                                  [ do
+                                      let
+                                        tags = runLiteTags contractTags
+                                      DOOM.text $ intercalate ", " tags
+                                  ]
+                              , tdCentered
+                                  [ do
+                                      case endpoints.transactions, marloweInfo of
+                                        Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
+                                          let
+                                            marloweContext = { initialContract, state, contract }
+                                          linkWithIcon
+                                            { icon: unsafeIcon $ "fast-forward-fill" <> actionIconSizing
+                                            , label: mempty
+                                            , tooltipText: Just "Apply available inputs to the contract"
+                                            , tooltipPlacement: Just placement.left
+                                            , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
+                                            }
+                                        _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> linkWithIcon
+                                          { icon: unsafeIcon $ "file-earmark-check-fill success-color" <> actionIconSizing
+                                          , tooltipText: Just "Contract is completed - click on contract id to see in Marlowe Explorer"
+                                          , tooltipPlacement: Just placement.left
+                                          , label: mempty
+                                          , onClick: mempty
+                                          }
+                                        _, _ -> mempty
+                                  , case marloweInfo, possibleWalletContext of
+                                      Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
+                                        let
+                                          balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
+                                          roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
+                                        case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
+                                          Just { head, tail } ->
+                                            linkWithIcon
+                                              { icon: unsafeIcon $ "cash-coin warning-color" <> actionIconSizing
+                                              , label: mempty
+                                              , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                              , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                              }
+                                          _ -> mempty
+                                      _, _ -> mempty
+                                  ]
+                              ]
+                    ]
+                ]
+              _ ->
+                DOM.div
+                  -- { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
+                  { className: "col-12 position-relative d-flex justify-content-center align-items-center blur-bg z-index-sticky"
+                  }
+                  $ loadingSpinnerLogo
+                      {}
+          ]
         _, _ -> mempty
 
 prettyState :: V1.State -> String

@@ -52,7 +52,7 @@
   "scripts": {
     "postinstall": "if ! command -v purs &> /dev/null; then npm install --no-save spago@0.20.9 purescript@0.15.6; fi",
     "bundle": "webpack-cli --mode=production -c webpack.js",
-    "start": "webpack-cli serve --mode=development -c webpack.js",
+    "start": "spago build && webpack-cli serve --mode=development -c webpack.js",
     "test": "node --experimental-specifier-resolution=node -e \"import('./output/Test.Main/index.js').then(function(Main) { Main.main(); })\""
   }
 }
