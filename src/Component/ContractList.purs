@@ -66,7 +66,7 @@ import Polyform.Validator (liftFnM)
 import Promise.Aff as Promise
 import React.Basic (fragment)
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (br, div_, text) as DOOM
+import React.Basic.DOM (br, div_, img, text) as DOOM
 import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -366,6 +366,13 @@ mkContractList = do
                           orderingTh = Table.orderingHeader ordering updateOrdering
                           th label = DOM.th { className: "text-center text-muted" } [ label ]
                         [ DOM.tr {}
+                            [ DOM.th { className: "text-center" } $ DOOM.img { src: "/images/calendar_month.svg" }
+                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/event_available.svg" }
+                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/fingerprint.svg" }
+                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/sell.svg" }
+                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/frame_65.svg" }
+                            ]
+                        , DOM.tr {}
                             [ do
                                 let
                                   label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]

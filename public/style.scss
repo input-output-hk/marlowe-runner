@@ -34,6 +34,23 @@ $link-color: #511CF7;
   table-layout: fixed;
 }
 
+/* Center the content of the table headers */
+.table th, td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.table thead {
+  border-radius: 0.625rem;
+  background: #F8F6FF;
+}
+
+/* Remove border from table headers */
+.table thead th, td {
+  background: #F8F6FF;
+  border: none;
+}
+
 .truncate-text {
   white-space: nowrap;
   overflow: hidden;
