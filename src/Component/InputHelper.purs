@@ -8,7 +8,7 @@ import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as Array.NonEmpty
 import Data.BigInt.Argonaut as BigInt
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Foldable (foldM)
 import Data.List (List)
 import Data.List as List
@@ -275,3 +275,46 @@ executionPath inputs contract state = do
   { executionPath: ep } <- foldM step initialAcc inputs
   pure $ List.reverse ep
 
+allInputs
+  :: Environment
+  -> State
+  -> Contract
+  -> Either Contract
+       { choices :: Array ChoiceInput
+       , deposits :: Array DepositInput
+       , notifies :: Array NotifyInput
+       }
+allInputs environment state contract =
+  case nextTimeoutAdvance environment state contract of
+    Just advanceContinuation -> Left advanceContinuation
+    Nothing -> do
+      let
+        deposits = nextDeposit environment state contract
+        choices = nextChoice environment state contract
+        notifies = nextNotify environment state contract
+      Right { deposits, choices, notifies }
+
+canInput
+  :: Party
+  -> Environment
+  -> State
+  -> Contract
+  -> Boolean
+canInput party environment state contract =
+  case allInputs environment state contract of
+    Left _ -> true
+    Right { choices, deposits, notifies } -> Array.any identity $
+      map (canInputChoice party) choices
+        `Array.union` map (canInputDeposit party) deposits
+        `Array.union` map canInputNotify notifies
+
+canInputDeposit :: Party -> DepositInput -> Boolean
+canInputDeposit party (DepositInput _ party' _ _ _) | party == party' = true
+canInputDeposit _ _ = false
+
+canInputChoice :: Party -> ChoiceInput -> Boolean
+canInputChoice party (ChoiceInput (ChoiceId _ party') _ _) | party == party' = true
+canInputChoice _ _ = false
+
+canInputNotify :: NotifyInput -> Boolean
+canInputNotify _ = true

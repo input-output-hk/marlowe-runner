@@ -2,24 +2,25 @@ module Component.ContractList where
 
 import Prelude
 
-import CardanoMultiplatformLib (CborHex)
+import CardanoMultiplatformLib (CborHex, bech32ToString)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
 import Component.ApplyInputs.Machine as ApplyInputs.Machine
-import Component.BodyLayout as BodyLayout
 import Component.ContractDetails as ContractDetails
 import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle
 import Component.ContractTemplates.Escrow as Escrow
 import Component.ContractTemplates.Swap as Swap
-import Component.CreateContract (ContractJsonString(..), runLiteTag)
+import Component.CreateContract (ContractJsonString, runLiteTag)
 import Component.CreateContract as CreateContract
+import Component.InputHelper (canInput)
 import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, Slotting(..), WalletInfo)
 import Component.Types.ContractInfo (MarloweInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (buttonWithIcon, linkWithIcon)
+import Component.Widgets (buttonWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Cardano as Cardano
+import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
@@ -31,7 +32,7 @@ import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FormCo
 import Control.Alt ((<|>))
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (decodeJson, encodeJson, stringify)
-import Data.Array (null)
+import Data.Array (catMaybes, null)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.BigInt.Argonaut as BigInt
@@ -42,12 +43,13 @@ import Data.Either (Either, hush)
 import Data.Foldable (fold, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
+import Data.Int as Int
 import Data.JSDate (fromDateTime) as JSDate
 import Data.List (intercalate)
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
-import Data.Newtype (class Newtype, un)
+import Data.Newtype (un)
 import Data.Set as Set
 import Data.String (contains, length)
 import Data.String.Pattern (Pattern(..))
@@ -66,7 +68,7 @@ import Polyform.Validator (liftFnM)
 import Promise.Aff as Promise
 import React.Basic (fragment)
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (br, div_, img, text) as DOOM
+import React.Basic.DOM (br, img, text) as DOOM
 import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -81,7 +83,7 @@ import ReactBootstrap.Table (striped) as Table
 import ReactBootstrap.Table (table)
 import ReactBootstrap.Types (placement)
 import ReactBootstrap.Types as OverlayTrigger
-import Utils.React.Basic.Hooks (useMaybeValue, useMaybeValue', useStateRef')
+import Utils.React.Basic.Hooks (useMaybeValue, useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 import Web.Clipboard (clipboard)
@@ -189,6 +191,9 @@ mkContractList = do
   escrowComponent <- Escrow.mkComponent
   swapComponent <- Swap.mkComponent
   contractForDifferencesWithOracleComponent <- ContractForDifferencesWithOracle.mkComponent
+
+  invalidBefore <- liftEffect $ millisecondsFromNow (Duration.Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
+  invalidHereafter <- liftEffect $ millisecondsFromNow (Duration.Milliseconds (Int.toNumber $ 5 * 60 * 1000))
 
   liftEffect $ component "ContractList" \{ connectedWallet, possibleInitialModalAction, possibleContracts } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
@@ -452,9 +457,32 @@ mkContractList = do
                                   ]
                               , tdCentered
                                   [ do
-                                      case endpoints.transactions, marloweInfo of
-                                        Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
+                                      case endpoints.transactions, marloweInfo, possibleWalletContext of
+                                        Just transactionsEndpoint,
+                                        Just (MarloweInfo { currencySymbol: Just currencySymbol, initialContract, state: Just state, currentContract: Just contract }),
+                                        Just { balance: Cardano.Value balance } -> do
                                           let
+                                            timeInterval = V1.TimeInterval invalidBefore invalidHereafter
+                                            environment = V1.Environment { timeInterval }
+                                            marloweContext = { initialContract, state, contract }
+                                            balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
+                                            roles = map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
+                                          buttonWithIcon
+                                            { icon: unsafeIcon mempty
+                                            , label: DOOM.text "Advance"
+                                            , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
+                                            , tooltipText: Just "Apply available inputs to the contract"
+                                            , tooltipPlacement: Just placement.left
+                                            , disabled: not $ Array.any identity $
+                                                map (\role -> canInput (V1.Role role) environment state contract) (catMaybes roles)
+                                            , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
+                                            }
+                                        Just transactionsEndpoint,
+                                        Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }),
+                                        Just { usedAddresses } -> do
+                                          let
+                                            timeInterval = V1.TimeInterval invalidBefore invalidHereafter
+                                            environment = V1.Environment { timeInterval }
                                             marloweContext = { initialContract, state, contract }
                                           buttonWithIcon
                                             { icon: unsafeIcon mempty
@@ -462,10 +490,12 @@ mkContractList = do
                                             , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
                                             , tooltipText: Just "Apply available inputs to the contract"
                                             , tooltipPlacement: Just placement.left
+                                            , disabled: not $ Array.any identity $
+                                                map (\addr -> canInput (V1.Address $ bech32ToString addr) environment state contract) usedAddresses
                                             , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
                                             }
-                                        _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }) -> DOOM.text "Complete"
-                                        _, _ -> mempty
+                                        _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }), _ -> DOOM.text "Complete"
+                                        _, _, _ -> mempty
                                   , case marloweInfo, possibleWalletContext of
                                       Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
                                         let
@@ -494,6 +524,10 @@ mkContractList = do
                       {}
           ]
         _, _ -> mempty
+
+assetToString :: Cardano.AssetId -> Maybe String
+assetToString Cardano.AdaAssetId = Nothing
+assetToString (Cardano.AssetId _ assetName) = Cardano.assetNameToString assetName
 
 prettyState :: V1.State -> String
 prettyState = stringify <<< encodeJson
