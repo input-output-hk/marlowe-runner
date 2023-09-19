@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
 $font-family-base: 'Outfit', sans-serif;
 $primary: #511CF7;
 $sucess: #00C48C;
@@ -329,6 +332,7 @@ $utilities: map-merge(
         8rem: 8rem,
         16rem: 16rem,
         32rem: 32rem,
+        100: 100%,
       )
     ),
     "margin-top": (

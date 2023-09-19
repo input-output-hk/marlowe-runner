@@ -61,6 +61,7 @@ import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
 import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..), Tags(..))
 import Partial.Unsafe (unsafeCrashWith)
+import Polyform.Batteries.Generic.Messages (placeholder)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
@@ -130,7 +131,7 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
       , initial: case possibleInitialContract of
           Nothing -> ""
           Just (ContractJsonString initialContract) -> formatPossibleJSON initialContract
-      , label: Just $ DOOM.text "Contract JSON"
+      , label: mempty
       , touched: isJust possibleInitialContract
       , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
           json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
@@ -142,10 +143,11 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
     -- -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query a
     tags <- labelSubform tagFieldId $ StatelessFormSpecBuilders.textInput
       { helpText: Just $ DOOM.div_
-          [ DOOM.text "Tags"
+          [ DOOM.text "Add Tags"
           ]
       , initial: ""
-      , label: Just $ DOOM.text "Tags"
+      , label: mempty
+      , placeholder: "Tags"
       , touched: false
       , validator: liftFn case _ of
           Nothing -> Tags Map.empty
@@ -157,8 +159,8 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
       }
 
     autoRun <- map AutoRun $ labelSubform autoRunFieldId $ booleanField
-      { label: DOOM.text "Auto run"
-      , helpText: DOOM.text "Whether to run the contract creation process automatically"
+      { label: DOOM.text ""
+      , helpText: DOOM.text "Auto-run contract"
       , initial: initialAutoRun
       , name: autoRunFieldId
       }
@@ -388,26 +390,20 @@ mkComponent = do
             ]
           formActions = fragment
             [ DOM.div { className: "row" } $
-                [ DOM.div { className: "col-6 text-start" } $
-                    [ link
-                        { label: DOOM.text "Cancel"
-                        , onClick: onDismiss
-                        , showBorders: true
-                        , extraClassNames: "me-3"
-                        }
-                    ]
-                , DOM.div { className: "col-6 text-end" } $
+                [ DOM.div { className: "col-12" } $
                     [ DOM.button
                         do
                           let
                             disabled = case result of
                               Just (V (Right _) /\ _) -> false
                               _ -> true
-                          { className: "btn btn-primary"
+                          { className: "btn btn-primary w-100"
                           , onClick: onSubmit'
                           , disabled
                           }
-                        [ R.text "Submit" ]
+                        [ R.text "Submit contract"
+                        , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                        ]
                     ]
                 ]
             ]
@@ -452,7 +448,7 @@ mkComponent = do
                   [ DOM.div { className: "row" } $
                       [ DOM.div { className: "col-12 text-end" } $
                           [ DOM.button
-                              { className: "btn btn-primary"
+                              { className: "btn btn-primary w-100"
                               , onClick: handler_ (onSuccess contractEndpoint)
                               }
                               [ R.text "Done" ]
