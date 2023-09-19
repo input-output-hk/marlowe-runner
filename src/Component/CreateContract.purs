@@ -29,6 +29,7 @@ import Control.Promise as Promise
 import Data.Argonaut (decodeJson, encodeJson, jsonParser, parseJson, stringifyWithIndent)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NonEmptyArray
 import Data.Bifunctor (lmap)
 import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
@@ -165,7 +166,7 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
       contract /\ tags /\ autoRun
 
 mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> StatelessBootstrapFormSpec Effect Query RolesConfig
-mkRolesConfigForm roleNames cardanoMultiplatformLib = FormSpecBuilder.evalBuilder Nothing $ Mint <<< Map.fromFoldable <$> for roleNames \roleName -> ado
+mkRolesConfigForm roleNames cardanoMultiplatformLib = FormSpecBuilder.evalBuilder Nothing $ Mint <<< Map.fromFoldable <$> for (NonEmptyArray.sort roleNames) \roleName -> ado
   address <- StatelessFormSpecBuilders.textInput
     { missingError: "Please provide an address for a role token"
     , helpText: Just $ DOOM.div_
