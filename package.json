@@ -1,4 +1,5 @@
 {
+  "name" : "marlowe-runner",
   "dependencies": {
     "@babel/register": "^7.18.9",
     "@cardano-sdk/wallet": "^0.7.0",
