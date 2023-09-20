@@ -280,7 +280,7 @@ mkApp = do
     pure $ case possibleWalletInfo of
       Nothing -> landingPage { setWalletInfo: setWalletInfo <<< Just }
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light fixed-top" } $
+        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light" } $
             DOM.div { className: "container-fluid" }
               [ DOM.a { href: "#", className: "navbar-brand" }
                   [ svgImg { src: marloweLogoUrl } ]
@@ -387,7 +387,7 @@ mkApp = do
         --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
         --              ]
         --          ]
-        , footer (Footer.Fixed true)
+        , footer (Footer.Fixed false)
         ]
 
 mkAppContractInfoMap :: Slotting -> Maybe WalletContext -> ContractWithTransactionsMap -> AppContractInfoMap
