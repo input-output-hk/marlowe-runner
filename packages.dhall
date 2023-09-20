@@ -298,7 +298,7 @@ in  upstream
         , "web-encoding"
         ]
         "https://github.com/input-output-hk/purescript-cardano-multiplatform-lib.git"
-        "main"
+        "v0.0.1"
 
   with cardano-wallet-client =
       mkPackage
@@ -330,7 +330,7 @@ in  upstream
         , "web-encoding"
         ]
         "https://github.com/input-output-hk/purescript-cardano-wallet-client.git"
-        "main"
+        "v0.0.1"
 
   with marlowe-runtime-client = -- ./purescript-marlowe-runtime-client/spago.dhall as Location
       mkPackage
@@ -425,7 +425,7 @@ in  upstream
         , "web-html"
         ]
         "https://github.com/input-output-hk/purescript-marlowe-runtime-client.git"
-        "v0.0.1"
+        "v0.0.2"
   with
     errors =
       mkPackage

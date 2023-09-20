@@ -26,6 +26,7 @@
   , "foreign-generic"
   , "foreign-object"
   , "formatters"
+  , "free"
   , "functions"
   , "functors"
   , "halogen-subscriptions"

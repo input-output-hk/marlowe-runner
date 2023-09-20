@@ -10,6 +10,7 @@ import Component.BodyLayout as BodyLayout
 import Component.CreateContract.Machine as Machine
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo)
+import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
@@ -59,7 +60,7 @@ import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
-import Marlowe.Runtime.Web.Types (ContractEndpoint, PostContractsError, RoleTokenConfig(..), RolesConfig(..), Tags(..))
+import Marlowe.Runtime.Web.Types (PostContractsError, PostContractsResponseContent(..), RoleTokenConfig(..), RolesConfig(..), Tags(..))
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Batteries.Generic.Messages (placeholder)
 import Polyform.Validator (liftFn)
@@ -75,7 +76,6 @@ import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
-import Web.DOM.Element (className)
 import Web.DOM.Node (Node)
 import Web.File.File (File)
 import Web.File.FileList (FileList)
@@ -90,7 +90,7 @@ derive instance Newtype ContractJsonString _
 
 type Props =
   { onDismiss :: Effect Unit
-  , onSuccess :: ContractEndpoint -> Effect Unit
+  , onSuccess :: ContractInfo.ContractCreated -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , possibleInitialContract :: Maybe ContractJsonString
   }
@@ -435,9 +435,21 @@ mkComponent = do
               , roleNames
               }
           }
-      Machine.ContractCreated { contract, createTxResponse } -> do
+      Machine.ContractCreated { contract, createTxResponse, submittedAt, tags } -> do
         let
-          { links: { contract: contractEndpoint } } = createTxResponse
+          { resource: PostContractsResponseContent { contractId }
+          , links: { contract: contractEndpoint }
+          } = createTxResponse
+
+          contractCreated = ContractInfo.ContractCreated
+            { contract
+            , contractEndpoint
+            , contractId
+            , submittedAt
+            , tags
+            }
+
+
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
@@ -449,7 +461,7 @@ mkComponent = do
                       [ DOM.div { className: "col-12 text-end" } $
                           [ DOM.button
                               { className: "btn btn-primary w-100"
-                              , onClick: handler_ (onSuccess contractEndpoint)
+                              , onClick: handler_ (onSuccess contractCreated)
                               }
                               [ R.text "Done" ]
                           ]

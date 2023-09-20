@@ -2,6 +2,7 @@ module Component.App where
 
 import Prelude
 
+import Cardano (AssetId(..), NonAdaAssets(..), nonAdaAssets)
 import CardanoMultiplatformLib.Types (Bech32)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
@@ -14,22 +15,24 @@ import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
 import Component.Types (ContractInfo(..), MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
-import Component.Types.ContractInfo (MarloweInfo(..))
+import Component.Types.ContractInfo (MarloweInfo(..), emptyNotSyncedYet)
+import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (link, linkWithIcon)
-import Contrib.Cardano (AssetId(..), NonAdaAssets(..), nonAdaAssets)
 import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Loops (untilJust)
 import Control.Monad.Reader.Class (asks)
 import Data.Array as Array
+import Data.DateTime.Instant (Instant)
 import Data.Either (Either(..))
 import Data.List as List
 import Data.Map (Map)
-import Data.Map (catMaybes, keys) as Map
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Newtype as Newtype
+import Data.Profunctor.Strong ((&&&))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (uncurry)
@@ -56,6 +59,7 @@ import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Offcanvas (offcanvas)
 import ReactBootstrap.Offcanvas as Offcanvas
 import Record as Record
+import Contrib.Cardano (Slotting, slotToTimestamp)
 import Type.Prelude (Proxy(..))
 import Utils.React.Basic.Hooks (useLoopAff, useStateRef, useStateRef')
 import Wallet as Wallet
@@ -135,6 +139,7 @@ mkApp = do
 
   walletInfoCtx <- asks _.walletInfoCtx
   msgHub@(MessageHub msgHubProps) <- asks _.msgHub
+  slotting <- asks _.slotting
 
   about <- asks _.aboutMarkdown
   Runtime runtime <- asks _.runtime
@@ -150,10 +155,25 @@ mkApp = do
 
     possibleContractMap /\ setContractMap <- useState' Nothing
 
+    notSyncedYet /\ addToNotSyncedYet <- React.do
+      notSyncedYet /\ setNotSyncedYet <- React.useState Nothing
+      let
+        addContractCreated :: ContractInfo.ContractCreated -> Effect Unit
+        addContractCreated cc = setNotSyncedYet case _ of
+          Nothing -> Just $ ContractInfo.addContractCreated cc emptyNotSyncedYet
+          Just notSyncedYet -> Just $ ContractInfo.addContractCreated cc notSyncedYet
+
+        -- (ContractInfo.addContractUpdated cu)
+        addContractUpdated :: ContractInfo.ContractUpdated -> Effect Unit
+        addContractUpdated cu = setNotSyncedYet case _ of
+          Nothing -> Just $ ContractInfo.addContractUpdated cu emptyNotSyncedYet
+          Just notSyncedYet -> Just $ ContractInfo.addContractUpdated cu notSyncedYet
+      pure (notSyncedYet /\ { addContractUpdated, addContractCreated })
+
     let
       walletCtx = un WalletContext <$> possibleWalletContext
 
-    useAff ((\w -> w.usedAddresses /\ w.changeAddress) <$> walletCtx) do
+    useAff ((_.usedAddresses &&& _.changeAddress) <$> walletCtx) do
       let
         (usedAddresses :: Array Bech32) = fromMaybe [] $ _.usedAddresses <$> walletCtx
         (tokens :: Array AssetId) = map (uncurry AssetId) <<< fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un NonAdaAssets <<< nonAdaAssets <<< _.balance <$> walletCtx
@@ -174,7 +194,7 @@ mkApp = do
             case updates of
               Just updates' -> do
                 let
-                  new = mkAppContractInfoMap possibleWalletContext updates'
+                  new = mkAppContractInfoMap slotting possibleWalletContext updates'
                 liftEffect $ setContractMap $ Just new
               Nothing -> pure unit
             delay (Milliseconds 1_000.0)
@@ -338,9 +358,8 @@ mkApp = do
             let
               contractArray = Array.fromFoldable <$> possibleContracts
             subcomponents.contractListComponent
-              { possibleContracts: contractArray
-              -- if version == initialVersion then Nothing
-              -- else Just contractArray
+              { possibleContracts: map ContractInfo.SyncedConractInfo <$> contractArray
+              -- , notSyncedYet: notSyncedYet /\ addToNotSyncedYet
               , connectedWallet: possibleWalletInfo
               , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
               }
@@ -371,8 +390,8 @@ mkApp = do
         , footer (Footer.Fixed true)
         ]
 
-mkAppContractInfoMap :: Maybe WalletContext -> ContractWithTransactionsMap -> AppContractInfoMap
-mkAppContractInfoMap walletContext updates = do
+mkAppContractInfoMap :: Slotting -> Maybe WalletContext -> ContractWithTransactionsMap -> AppContractInfoMap
+mkAppContractInfoMap slotting walletContext updates = do
   let
     -- walletCtx = un WalletContext <$> walletContext
     -- (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <$> walletCtx
@@ -392,20 +411,21 @@ mkAppContractInfoMap walletContext updates = do
             , initialState: V1.emptyState -- FIXME: No initial state on the API LEVEL?
             , unclaimedPayouts: contractState'.unclaimedPayouts
             }
+        Runtime.ContractHeader { contractId, block } = contractHeader
+        blockSlotTimestamp (Runtime.BlockHeader { slotNo }) = slotToTimestamp slotting slotNo
 
-      -- let
-      --   keepContract =
-      --     case marloweInfo of
-      --       Just (MarloweInfo { initialContract })
-      --         | (not $ Array.null $ Array.intersect usedAddresses (addressesInContract initialContract))
-      --           || (not $ Array.null $ Array.intersect tokens (rolesInContract initialContract)) -> Just true
-      --       Just _ -> Just false
-      --       _ -> Nothing
+        createdAt :: Maybe Instant
+        createdAt = blockSlotTimestamp <$> block
 
-      let Runtime.ContractHeader { contractId } = contractHeader
+        updatedAt :: Maybe Instant
+        updatedAt = do
+          Runtime.TxHeader tx /\ _ <- Array.head transactions
+          blockSlotTimestamp <$> tx.block
 
       pure $ ContractInfo $
         { contractId
+        , createdAt
+        , updatedAt
         , endpoints
         , marloweInfo
         , tags

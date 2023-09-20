@@ -7,7 +7,6 @@ module Component.Types
   , MessageId(..)
   , MessageContent(..)
   , WalletInfo(..)
-  , Slotting(..)
   , module Exports
   ) where
 
@@ -16,15 +15,14 @@ import Prelude
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.Types.ContractInfo (ContractInfo(..)) as Exports
 import Control.Monad.Reader (ReaderT)
-import Data.BigInt.Argonaut (BigInt)
 import Data.List (List)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Marlowe.Runtime.Web (Runtime)
-import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsStream)
 import React.Basic (JSX, ReactContext)
+import Contrib.Cardano (Slotting)
 import Wallet as Wallet
 import WalletContext (WalletContext)
 
@@ -55,11 +53,6 @@ newtype MessageHub = MessageHub
   { add :: MessageContent -> Effect Unit
   , remove :: MessageId -> Effect Unit
   , ctx :: ReactContext (List Message)
-  }
-
-newtype Slotting = Slotting
-  { slotLength :: BigInt
-  , slotZeroTime :: BigInt
   }
 
 type MkContextBase r =

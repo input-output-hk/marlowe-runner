@@ -13,19 +13,18 @@ import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as Array.NonEmpty
 import Data.BigInt.Argonaut as BigInt
+import Data.DateTime.Instant (Instant)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Variant (Variant)
-import Debug (traceM)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
+import Effect.Now as Instant
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsError, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), ResourceWithLinks, RolesConfig, Runtime(Runtime), ServerURL, Tags(..), TextEnvelope(TextEnvelope), toTextEnvelope)
-import React.Basic (JSX)
-import React.Basic.DOM as DOM
-import React.Basic.DOM.Simplified.Generated as S
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsError, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), ResourceWithLinks, RolesConfig, Runtime(Runtime), ServerURL, Tags, TextEnvelope(TextEnvelope), toTextEnvelope)
 import Record as Record
 import Type.Prelude (Proxy(..))
 import Wallet as Wallet
@@ -74,6 +73,7 @@ data State
   | SigningTx
       { contract :: V1.Contract
       , rolesConfig :: Maybe RolesConfig
+      , tags :: Tags
       , errors :: Maybe String
       , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
       }
@@ -81,13 +81,16 @@ data State
       { contract :: V1.Contract
       , rolesConfig :: Maybe RolesConfig
       , errors :: Maybe String
+      , tags :: Tags
       , txWitnessSet :: CborHex TransactionWitnessSetObject
       , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
       }
   | ContractCreated
       { contract :: V1.Contract
       , rolesConfig :: Maybe RolesConfig
+      , tags :: Tags
       , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
+      , submittedAt :: Instant
       }
 
 data Action
@@ -107,7 +110,7 @@ data Action
   | SignTxSucceeded (CborHex TransactionWitnessSetObject)
   | SubmitTx
   | SubmitTxFailed String
-  | SubmitTxSucceeded
+  | SubmitTxSucceeded Instant
 
 type Env =
   { connectedWallet :: WalletInfo Wallet.Api
@@ -139,27 +142,28 @@ step state action = do
       FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
       FetchRequiredWalletContextSucceeded reqWalletContext -> CreatingTx $ Record.insert (Proxy :: Proxy "reqWalletContext") reqWalletContext r
       _ -> state
-    CreatingTx r@{ contract, reqWalletContext, errors: Just _ } -> case action of
+    CreatingTx r@{ errors: Just _ } -> case action of
       CreateTx -> CreatingTx $ r { errors = Nothing }
       _ -> state
-    CreatingTx r@{ contract, rolesConfig } -> case action of
+    CreatingTx r@{ contract, rolesConfig, tags } -> case action of
       CreateTxFailed err -> CreatingTx $ r { errors = Just err }
       CreateTxSucceeded res -> do
-        SigningTx $ { contract, createTxResponse: res, errors: Nothing, rolesConfig }
+        SigningTx $ { contract, createTxResponse: res, errors: Nothing, rolesConfig, tags }
       _ -> state
-    SigningTx r@{ contract, createTxResponse, errors: Just _ } -> case action of
+    SigningTx r@{ errors: Just _ } -> case action of
       SignTx -> SigningTx $ r { errors = Nothing }
       _ -> state
-    SigningTx r@{ contract, createTxResponse: createTxResponse, rolesConfig } -> case action of
+    SigningTx r@{ contract, createTxResponse: createTxResponse, rolesConfig, tags } -> case action of
       SignTxFailed err -> SigningTx $ r { errors = Just err }
-      SignTxSucceeded txWitnessSet -> SubmittigTx { contract, createTxResponse, errors: Nothing, txWitnessSet, rolesConfig }
+      SignTxSucceeded txWitnessSet -> SubmittigTx { contract, createTxResponse, errors: Nothing, txWitnessSet, rolesConfig, tags }
       _ -> state
-    SubmittigTx r@{ contract, createTxResponse, txWitnessSet, errors: Just _ } -> case action of
+    SubmittigTx r@{ errors: Just _ } -> case action of
       SubmitTx -> SubmittigTx $ r { errors = Nothing }
       _ -> state
-    SubmittigTx { contract, createTxResponse, txWitnessSet, rolesConfig } -> case action of
-      SubmitTxFailed err -> SubmittigTx { contract, createTxResponse, errors: Just err, txWitnessSet, rolesConfig }
-      SubmitTxSucceeded -> ContractCreated { contract, createTxResponse, rolesConfig }
+    SubmittigTx { contract, createTxResponse, txWitnessSet, rolesConfig, tags } -> case action of
+      SubmitTxFailed err -> SubmittigTx { contract, createTxResponse, errors: Just err, txWitnessSet, rolesConfig, tags }
+      SubmitTxSucceeded submittedAt -> ContractCreated
+        { contract, createTxResponse, rolesConfig, submittedAt, tags }
       _ -> state
     (ContractCreated _) -> state
 
@@ -253,7 +257,9 @@ requestToAffAction = case _ of
       let
         Runtime { serverURL } = runtime
       liftAff $ submit txWitnessSet serverURL createTxResponse.links.contract >>= case _ of
-        Right _ -> pure SubmitTxSucceeded
+        Right _ -> do
+          now <- liftEffect $ Instant.now
+          pure $ SubmitTxSucceeded now
         Left err -> pure $ SubmitTxFailed $ show err
 
 driver :: Env -> State -> Maybe (Aff Action)

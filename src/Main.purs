@@ -6,7 +6,6 @@ import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.App (mkApp)
 import Component.CreateContract (ContractJsonString(..))
 import Component.MessageHub (mkMessageHub)
-import Component.Types (Slotting(..))
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
 import Contrib.JsonBigInt as JsonBigInt
@@ -28,11 +27,12 @@ import Foreign.NullOrUndefined (null) as Foreign
 import JS.Unsafe.Stringify (unsafeStringify)
 import Marlowe.Runtime.Web as Marlowe.Runtime.Web
 import Marlowe.Runtime.Web.Client (uriOpts)
-import Marlowe.Runtime.Web.Types (HealthCheck(..), NetworkId(..), ServerURL(..))
+import Marlowe.Runtime.Web.Types (HealthCheck(..), NetworkId(..), NetworkMagic(..), ServerURL(..))
 import Parsing as Parsing
 import Partial.Unsafe (unsafePartial)
 import React.Basic (createContext)
 import React.Basic.DOM.Client (createRoot, renderRoot)
+import Contrib.Cardano (Slotting(..))
 import URI (RelativeRef(..), URI(..)) as URI
 import URI.Extra.QueryPairs (QueryPairs(..)) as URI
 import URI.URIRef as URIRef
@@ -129,6 +129,7 @@ main configJson = do
       -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
       slotting = case networkId of
         Mainnet -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
+        Testnet (NetworkMagic 1) -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1655683200000" }
         _ -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
 
     CardanoMultiplatformLib.importLib >>= case _ of
