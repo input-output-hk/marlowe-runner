@@ -11,3 +11,4 @@
 /dist-newstyle/
 .vscode
 public/app.js
+.pre-commit-config.yaml
