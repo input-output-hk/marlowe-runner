@@ -110,6 +110,7 @@ type SubmissionError = String
 
 type Props =
   { possibleContracts :: Maybe (Array SomeContractInfo) -- `Maybe` indicates if the contracts where fetched already
+  , contractMapInitialized :: Boolean
   , connectedWallet :: Maybe (WalletInfo Wallet.Api)
   , possibleInitialModalAction :: Maybe ModalAction
   }
@@ -200,7 +201,7 @@ mkContractList = do
   invalidBefore <- liftEffect $ millisecondsFromNow (Duration.Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
   invalidHereafter <- liftEffect $ millisecondsFromNow (Duration.Milliseconds (Int.toNumber $ 5 * 60 * 1000))
 
-  liftEffect $ component "ContractList" \{ connectedWallet, possibleInitialModalAction, possibleContracts } -> React.do
+  liftEffect $ component "ContractList" \{ connectedWallet, possibleInitialModalAction, possibleContracts, contractMapInitialized } -> React.do
 
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
 
@@ -377,7 +378,7 @@ mkContractList = do
               ]
           , case possibleContracts'' of
               Nothing -> DOOM.text "Initiating contract searching..."
-              Just [] -> DOOM.text "No contracts found yet for your wallet."
+              Just [] | not contractMapInitialized -> DOOM.text "No contracts found yet for your wallet."
               Just contracts -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
                 let
                   tdCentered :: forall jsx. ToJSX jsx => jsx -> JSX

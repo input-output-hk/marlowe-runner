@@ -18,6 +18,7 @@ import Component.Types (ContractInfo(..), MessageContent(Success), MessageHub(Me
 import Component.Types.ContractInfo (MarloweInfo(..), emptyNotSyncedYet)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (link, linkWithIcon)
+import Contrib.Cardano (Slotting, slotToTimestamp)
 import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Loops (untilJust)
@@ -51,7 +52,7 @@ import React.Basic (JSX)
 import React.Basic as ReactContext
 import React.Basic.DOM (div, img, span_, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (component, provider, readRef, useState')
+import React.Basic.Hooks (component, provider, readRef, useState, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import ReactBootstrap.Icons (unsafeIcon)
@@ -59,7 +60,6 @@ import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Offcanvas (offcanvas)
 import ReactBootstrap.Offcanvas as Offcanvas
 import Record as Record
-import Contrib.Cardano (Slotting, slotToTimestamp)
 import Type.Prelude (Proxy(..))
 import Utils.React.Basic.Hooks (useLoopAff, useStateRef, useStateRef')
 import Wallet as Wallet
@@ -153,7 +153,7 @@ mkApp = do
     possibleWalletContext /\ setWalletContext <- useState' Nothing
     possibleWalletContextRef <- useStateRef' possibleWalletContext
 
-    possibleContractMap /\ setContractMap <- useState' Nothing
+    (possibleContractMap /\ contractMapInitialized) /\ updateContractMap <- useState (Nothing /\ false)
 
     notSyncedYet /\ addToNotSyncedYet <- React.do
       notSyncedYet /\ setNotSyncedYet <- React.useState Nothing
@@ -189,14 +189,15 @@ mkApp = do
       ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages runtime.serverURL
       supervise do
         void $ forkAff do
+          _ <- contractStream.getState
+          liftEffect $ updateContractMap \(contractMap /\ _) -> (contractMap /\ true)
+
+        void $ forkAff do
           untilJust do
             updates <- liftEffect $ contractStream.getLiveState
-            case updates of
-              Just updates' -> do
-                let
-                  new = mkAppContractInfoMap slotting possibleWalletContext updates'
-                liftEffect $ setContractMap $ Just new
-              Nothing -> pure unit
+            let
+              new = mkAppContractInfoMap slotting possibleWalletContext updates
+            liftEffect $ updateContractMap \(_ /\ initialized) -> (Just new /\ initialized)
             delay (Milliseconds 1_000.0)
             pure Nothing
 
@@ -359,6 +360,7 @@ mkApp = do
               contractArray = Array.fromFoldable <$> possibleContracts
             subcomponents.contractListComponent
               { possibleContracts: map ContractInfo.SyncedConractInfo <$> contractArray
+              , contractMapInitialized
               -- , notSyncedYet: notSyncedYet /\ addToNotSyncedYet
               , connectedWallet: possibleWalletInfo
               , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
