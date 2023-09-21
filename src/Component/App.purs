@@ -193,7 +193,7 @@ mkApp = do
               untilJust do
                 newSynced <- liftEffect $ contractStream.getLiveState
                 liftEffect $ updateContractInfoMap \(contractMap /\ initialized) ->
-                    (ContractInfoMap.updateSynced newSynced contractMap) /\ initialized
+                    (ContractInfoMap.updateSynced (Just newSynced) contractMap) /\ initialized
                 delay (Milliseconds 1_000.0)
                 pure Nothing
             contractStream.start
