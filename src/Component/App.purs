@@ -281,7 +281,7 @@ mkApp = do
 
     pure $ case possibleWalletInfo of
       Nothing -> DOM.div {} $
-        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light" } $
+        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light position-absolute" } $
             DOM.div { className: "container-fluid" }
               [ DOM.a { href: "#", className: "navbar-brand" }
                   [ svgImg { src: marloweLogoUrl } ]
