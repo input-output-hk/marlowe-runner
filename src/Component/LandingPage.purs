@@ -60,12 +60,7 @@ mkLandingPage = do
             [ DOM.p {} [ DOOM.text "Selecting a wallet is your first step in deploying a smart contract, your choice should be compatible with the blockchain network you want to deploy your contract on." ]
             ]
       , content: DOM.div {} $
-          [ DOM.nav { className: "navbar navbar-expand-sm navbar-light bg-light fix-top" } $
-              DOM.div { className: "container-fluid" }
-                [ DOM.a { href: "#", className: "navbar-brand" }
-                    [ svgImg { src: marloweLogoUrl } ]
-                ]
-          , DOM.div { className: "container-fluid" }
+          [ DOM.div { className: "container-fluid" }
               $ DOM.div { className: "row justify-content-center" }
               $ DOM.div { className: "col-xl-5 col-lg-8 col-12" }
                   [ case possibleErrors of

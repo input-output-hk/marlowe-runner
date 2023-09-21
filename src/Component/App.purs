@@ -280,7 +280,14 @@ mkApp = do
         pure contracts
 
     pure $ case possibleWalletInfo of
-      Nothing -> landingPage { setWalletInfo: setWalletInfo <<< Just }
+      Nothing -> DOM.div {} $
+        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light" } $
+            DOM.div { className: "container-fluid" }
+              [ DOM.a { href: "#", className: "navbar-brand" }
+                  [ svgImg { src: marloweLogoUrl } ]
+              ]
+        , landingPage { setWalletInfo: setWalletInfo <<< Just }
+        ]
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
         [ DOM.nav { className: "navbar navbar-expand-sm navbar-light" } $
             DOM.div { className: "container-fluid" }
