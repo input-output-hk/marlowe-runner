@@ -205,7 +205,7 @@ mkDepositFormComponent = do
                       { label: DOOM.text "Cancel"
                       , onClick: onDismiss
                       , showBorders: true
-                      , extraClassNames: "me-3"
+                      , extraClassNames: "me-3 w-100"
                       }
                   ]
               , DOM.div { className: "col-6 text-end" } $
@@ -215,7 +215,7 @@ mkDepositFormComponent = do
                           disabled = case result of
                             Just (V (Right _) /\ _) -> false
                             _ -> true
-                        { className: "btn btn-primary"
+                        { className: "btn btn-primary w-100"
                         , onClick: onSubmit'
                         , disabled
                         }

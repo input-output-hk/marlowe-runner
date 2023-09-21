@@ -390,7 +390,15 @@ mkComponent = do
             ]
           formActions = fragment
             [ DOM.div { className: "row" } $
-                [ DOM.div { className: "col-12" } $
+                [ DOM.div { className: "col-6" } $
+                    [ link
+                        { label: DOOM.text "Cancel"
+                        , onClick: onDismiss
+                        , showBorders: true
+                        , extraClassNames: "me-3 w-100"
+                        }
+                    ]
+                , DOM.div { className: "col-6" } $
                     [ DOM.button
                         do
                           let
