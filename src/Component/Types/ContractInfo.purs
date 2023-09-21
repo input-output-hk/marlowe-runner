@@ -68,6 +68,7 @@ newtype ContractInfo = ContractInfo
       }
   }
 
+derive instance Eq ContractInfo
 derive instance Newtype ContractInfo _
 
 fetchAppliedInputs :: ServerURL -> Array Runtime.TransactionEndpoint -> Aff (V (Array (Runtime.ClientError String)) (Array ((Maybe V1.InputContent) /\ V1.TimeInterval)))
@@ -103,13 +104,12 @@ type ContractCreatedDetails =
 newtype ContractCreated = ContractCreated ContractCreatedDetails
 
 type ContractUpdatedDetails =
-    { contractInfo :: ContractInfo
-    , ouptutContract :: V1.Contract
-    , outputState :: V1.State
-    , submittedAt :: Instant
-    , transactionInput :: V1.TransactionInput
-    , txId :: Runtime.TxId
-    }
+  { contractInfo :: ContractInfo
+  , transactionInput :: V1.TransactionInput
+  , outputContract :: V1.Contract
+  , outputState :: V1.State
+  , submittedAt :: Instant
+  }
 
 newtype ContractUpdated = ContractUpdated ContractUpdatedDetails
 
@@ -138,6 +138,15 @@ data SomeContractInfo
   = SyncedConractInfo ContractInfo
   | NotSyncedCreatedContract ContractCreatedDetails
   | NotSyncedUpdatedContract ContractUpdatedDetails
+
+someContractInfoFromContractInfo :: ContractInfo -> SomeContractInfo
+someContractInfoFromContractInfo = SyncedConractInfo
+
+someContractInfoFromContractCreated :: ContractCreated -> SomeContractInfo
+someContractInfoFromContractCreated (ContractCreated details) = NotSyncedCreatedContract details
+
+someContractInfoFromContractUpdated :: ContractUpdated -> SomeContractInfo
+someContractInfoFromContractUpdated (ContractUpdated details) = NotSyncedUpdatedContract details
 
 createdAt :: SomeContractInfo -> Maybe Instant
 createdAt (SyncedConractInfo (ContractInfo { createdAt: c })) = c

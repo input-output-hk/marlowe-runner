@@ -108,9 +108,15 @@ useInput initialValue = React.do
 
 type SubmissionError = String
 
+newtype NotSyncedYetInserts = NotSyncedYetInserts
+  { add :: ContractInfo.ContractCreated -> Effect Unit
+  , update :: ContractInfo.ContractUpdated -> Effect Unit
+  }
+
 type Props =
   { possibleContracts :: Maybe (Array SomeContractInfo) -- `Maybe` indicates if the contracts where fetched already
   , contractMapInitialized :: Boolean
+  , notSyncedYetInserts :: NotSyncedYetInserts
   , connectedWallet :: Maybe (WalletInfo Wallet.Api)
   , possibleInitialModalAction :: Maybe ModalAction
   }
@@ -142,7 +148,7 @@ data ModalAction
       , initialState :: V1.State
       , transactionEndpoints :: Array Runtime.TransactionEndpoint
       }
-  | ApplyInputs TransactionsEndpoint ApplyInputs.Machine.MarloweContext
+  | ApplyInputs ContractInfo TransactionsEndpoint ApplyInputs.Machine.MarloweContext
   | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
   | ContractTemplate ContractTemplate
 
@@ -188,7 +194,6 @@ mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
   Runtime runtime <- asks _.runtime
   walletInfoCtx <- asks _.walletInfoCtx
-  slotting <- asks _.slotting
 
   createContractComponent <- CreateContract.mkComponent
   applyInputsComponent <- ApplyInputs.mkComponent
@@ -201,7 +206,9 @@ mkContractList = do
   invalidBefore <- liftEffect $ millisecondsFromNow (Duration.Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
   invalidHereafter <- liftEffect $ millisecondsFromNow (Duration.Milliseconds (Int.toNumber $ 5 * 60 * 1000))
 
-  liftEffect $ component "ContractList" \{ connectedWallet, possibleInitialModalAction, possibleContracts, contractMapInitialized } -> React.do
+  liftEffect $ component "ContractList" \props@{ connectedWallet, possibleInitialModalAction, possibleContracts, contractMapInitialized } -> React.do
+    let
+      NotSyncedYetInserts notSyncedYetInserts = props.notSyncedYetInserts
 
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
 
@@ -221,8 +228,8 @@ mkContractList = do
       possibleContracts' = do
         contracts <- possibleContracts
         let
-          -- FIXME: Quick and dirty hack to display just submited contracts as first
-          someFutureBlockNumber = Runtime.BlockNumber 129058430
+          -- FIXME: Quick and dirty hack to display just submited contracts as first - `Nothing ` is lower than `Just`
+          -- someFutureBlockNumber = Runtime.BlockNumber 129058430
           sortedContracts = case ordering.orderBy of
             OrderByCreationDate -> Array.sortBy (compare `on` ContractInfo.createdAt) contracts
             OrderByLastUpdateDate -> Array.sortBy (compare `on` ContractInfo.updatedAt) contracts
@@ -244,39 +251,30 @@ mkContractList = do
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
         filtered <|> possibleContracts'
 
-    --         pure $ if ordering.orderAsc
-    --           then sortedContracts
-    --           else Array.reverse sortedContracts
-
-    -- isLoadingContracts :: Boolean
-    -- isLoadingContracts = case possibleContracts'' of
-    --   Nothing -> true
-    --   Just [] -> true
-    --   Just contracts -> any (\(ContractInfo { marloweInfo }) -> isNothing marloweInfo) contracts
-
     pure $
       case possibleModalAction, connectedWallet of
         Just (NewContract possibleInitialContract), Just cw -> createContractComponent
           { connectedWallet: cw
           , onDismiss: resetModalAction
-          , onSuccess: \newContractDetails -> do
-              -- addToNotSyncedYet (newContractDetails.contractId) (ContractCreated newContractDetails)
-
+          , onSuccess: \contractCreated -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
                 [ "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain."
                 , "Contract status should change to 'Confirmed' at that point."
                 ]
               resetModalAction
+              notSyncedYetInserts.add contractCreated
           , possibleInitialContract
           }
-        Just (ApplyInputs transactionsEndpoint marloweContext), Just cw -> do
+        Just (ApplyInputs contractInfo transactionsEndpoint marloweContext), Just cw -> do
           let
-            onSuccess = \_ -> do
+            onSuccess = \contractUpdated -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
                 [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
+              notSyncedYetInserts.update contractUpdated
               resetModalAction
           applyInputsComponent
             { transactionsEndpoint
+            , contractInfo
             , marloweContext
             , connectedWallet: cw
             , onSuccess
@@ -376,143 +374,113 @@ mkContractList = do
                   else
                     buttons
               ]
-          , case possibleContracts'' of
-              Nothing -> DOOM.text "Initiating contract searching..."
-              Just [] | not contractMapInitialized -> DOOM.text "No contracts found yet for your wallet."
-              Just contracts -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
-                let
-                  tdCentered :: forall jsx. ToJSX jsx => jsx -> JSX
-                  tdCentered = DOM.td { className: "text-center" }
-                  tdDateTime Nothing = tdCentered $ ([] :: Array JSX)
-                  tdDateTime (Just dateTime) = tdCentered $ Array.singleton $ DOM.small {} do
-                    let
-                      jsDate = JSDate.fromDateTime dateTime
-                    [ DOOM.text $ JSDate.toLocaleDateString jsDate
-                    , DOOM.br {}
-                    , DOOM.text $ JSDate.toLocaleTimeString jsDate
-                    ]
-                  tdInstant possibleInstant = do
-                    let
-                      possibleDateTime = Instant.toDateTime <$> possibleInstant
-                    tdDateTime possibleDateTime
-
-                  tdContractId contractId possibleMarloweInfo transactionEndpoints = do
-                    let
-                      conractIdStr = txOutRefToString contractId
-
-                      copyToClipboard :: Effect Unit
-                      copyToClipboard = window >>= navigator >>= clipboard >>= \c -> do
-                        launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
-
-                    tdCentered $ DOM.span { className: "d-flex" }
-                      [ DOM.a
-                          do
-                            let
-                              onClick = case possibleMarloweInfo of
-                                Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
-                                  setModalAction $ ContractDetails
-                                    { contract: currentContract
-                                    , state
-                                    , initialState: initialState
-                                    , initialContract: initialContract
-                                    , transactionEndpoints
-                                    }
-                                _ -> pure unit
-                            { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
-                            , onClick: handler_ onClick
-                            -- , disabled
-                            }
-                          [ text conractIdStr ]
-                      , DOM.a
-                          { href: "#"
-                          , onClick: handler_ copyToClipboard
-                          , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
-                          }
-                          $ Icons.toJSX
-                          $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
+          , do
+              let
+                spinner =
+                   DOM.div
+                     { className: "col-12 position-relative d-flex justify-content-center align-items-center blur-bg z-index-sticky" }
+                     $ loadingSpinnerLogo {}
+              case possibleContracts'', contractMapInitialized of
+                Nothing, _ -> spinner
+                Just [], false -> spinner
+                Just [], true -> DOOM.text "No contracts found yet for your wallet."
+                Just contracts, _ -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
+                  let
+                    tdCentered :: forall jsx. ToJSX jsx => jsx -> JSX
+                    tdCentered = DOM.td { className: "text-center" }
+                    tdDateTime Nothing = tdCentered $ ([] :: Array JSX)
+                    tdDateTime (Just dateTime) = tdCentered $ Array.singleton $ DOM.small {} do
+                      let
+                        jsDate = JSDate.fromDateTime dateTime
+                      [ DOOM.text $ JSDate.toLocaleDateString jsDate
+                      , DOOM.br {}
+                      , DOOM.text $ JSDate.toLocaleTimeString jsDate
                       ]
+                    tdInstant possibleInstant = do
+                      let
+                        possibleDateTime = Instant.toDateTime <$> possibleInstant
+                      tdDateTime possibleDateTime
 
-                [ table { striped: Table.striped.boolean true, hover: true }
-                    [ DOM.thead {} do
-                        let
-                          orderingTh = Table.orderingHeader ordering updateOrdering
-                          th label = DOM.th { className: "text-center text-muted" } [ label ]
-                        [ DOM.tr {}
-                            [ DOM.th { className: "text-center" } $ DOOM.img { src: "/images/calendar_month.svg" }
-                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/event_available.svg" }
-                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/fingerprint.svg" }
-                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/sell.svg" }
-                            , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/frame_65.svg" }
-                            ]
-                        , DOM.tr {}
-                            [ do
-                                let
-                                  label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                                orderingTh label OrderByCreationDate
-                            , do
-                                let
-                                  label = DOOM.fragment [ DOOM.text "Updated" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                                orderingTh label OrderByLastUpdateDate
-                            , DOM.th { className: "text-center w-16rem" } $ DOOM.text "Contract Id"
-                            , th $ DOOM.text "Tags"
-                            , th $ DOOM.text "Actions"
-                            ]
+                    tdContractId contractId possibleMarloweInfo transactionEndpoints = do
+                      let
+                        conractIdStr = txOutRefToString contractId
+
+                        copyToClipboard :: Effect Unit
+                        copyToClipboard = window >>= navigator >>= clipboard >>= \c -> do
+                          launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
+
+                      tdCentered $ DOM.span { className: "d-flex" }
+                        [ DOM.a
+                            do
+                              let
+                                onClick = case possibleMarloweInfo of
+                                  Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
+                                    setModalAction $ ContractDetails
+                                      { contract: currentContract
+                                      , state
+                                      , initialState: initialState
+                                      , initialContract: initialContract
+                                      , transactionEndpoints
+                                      }
+                                  _ -> pure unit
+                              { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
+                              , onClick: handler_ onClick
+                              -- , disabled
+                              }
+                            [ text conractIdStr ]
+                        , DOM.a
+                            { href: "#"
+                            , onClick: handler_ copyToClipboard
+                            , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
+                            }
+                            $ Icons.toJSX
+                            $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
                         ]
-                    , DOM.tbody {} $ contracts <#> \someContract -> do
-                        let
-                          createdAt = ContractInfo.createdAt someContract
-                          updatedAt = ContractInfo.updatedAt someContract
-                          tags = runLiteTags $ ContractInfo.someContractTags someContract
-                          contractId = ContractInfo.someContractContractId someContract
 
-                        DOM.tr { className: "align-middle" } $ case someContract of
-                          (SyncedConractInfo ci@(ContractInfo { _runtime, endpoints, marloweInfo })) -> do
-                            let
-                              ContractHeader { contractId } = _runtime.contractHeader
-                            [ tdInstant createdAt
-                            , tdInstant $ updatedAt <|> createdAt
-                            , do
-                                let
-                                  transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
-                                tdContractId contractId marloweInfo transactionEndpoints
-                            , tdCentered [ DOOM.text $ intercalate ", " tags ]
---                             , tdCentered
---                                 [ do
---                                     case endpoints.transactions, marloweInfo of
---                                       Just transactionsEndpoint, Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }) -> do
---                                         let
--- <<<<<<< HEAD
---                                           onClick = case marloweInfo of
---                                             Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
---                                               let
---                                                 transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
---                                               setModalAction $ ContractDetails
---                                                 { contract: currentContract
---                                                 , state
---                                                 , initialState: initialState
---                                                 , initialContract: initialContract
---                                                 , transactionEndpoints
---                                                 }
---                                             _ -> pure unit
---                                         { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
---                                         , onClick: handler_ onClick
---                                         -- , disabled
---                                         }
---                                       [ text conractIdStr ]
---                                   , DOM.a
---                                       { href: "#"
---                                       , onClick: handler_ copyToClipboard
---                                       , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
---                                       }
---                                       $ Icons.toJSX
---                                       $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
---                                   ]
---                               , tdCentered
---                                   [ do
---                                       let
---                                         tags = runLiteTags contractTags
---                                       DOOM.text $ intercalate ", " tags
---                                   ]
+                  [ table { striped: Table.striped.boolean true, hover: true }
+                      [ DOM.thead {} do
+                          let
+                            orderingTh = Table.orderingHeader ordering updateOrdering
+                            th label = DOM.th { className: "text-center text-muted" } [ label ]
+                          [ DOM.tr {}
+                              [ DOM.th { className: "text-center" } $ DOOM.img { src: "/images/calendar_month.svg" }
+                              , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/event_available.svg" }
+                              , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/fingerprint.svg" }
+                              , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/sell.svg" }
+                              , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/frame_65.svg" }
+                              ]
+                          , DOM.tr {}
+                              [ do
+                                  let
+                                    label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                                  orderingTh label OrderByCreationDate
+                              , do
+                                  let
+                                    label = DOOM.fragment [ DOOM.text "Updated" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                                  orderingTh label OrderByLastUpdateDate
+                              , DOM.th { className: "text-center w-16rem" } $ DOOM.text "Contract Id"
+                              , th $ DOOM.text "Tags"
+                              , th $ DOOM.text "Actions"
+                              ]
+                          ]
+                      , DOM.tbody {} $ contracts <#> \someContract -> do
+                          let
+                            createdAt = ContractInfo.createdAt someContract
+                            updatedAt = ContractInfo.updatedAt someContract
+                            tags = runLiteTags $ ContractInfo.someContractTags someContract
+                            contractId = ContractInfo.someContractContractId someContract
+
+                          DOM.tr { className: "align-middle" } $ case someContract of
+                            (SyncedConractInfo ci@(ContractInfo { _runtime, endpoints, marloweInfo })) -> do
+                              let
+                                ContractHeader { contractId } = _runtime.contractHeader
+                              [ tdInstant createdAt
+                              , tdInstant $ updatedAt <|> createdAt
+                              , do
+                                  let
+                                    transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
+                                  tdContractId contractId marloweInfo transactionEndpoints
+                              , tdCentered [ DOOM.text $ intercalate ", " tags ]
                               , tdCentered
                                   [ do
                                       case endpoints.transactions, marloweInfo, possibleWalletContext of
@@ -533,7 +501,7 @@ mkContractList = do
                                             , tooltipPlacement: Just placement.left
                                             , disabled: not $ Array.any identity $
                                                 map (\role -> canInput (V1.Role role) environment state contract) (catMaybes roles)
-                                            , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
+                                            , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
                                             }
                                         Just transactionsEndpoint,
                                         Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }),
@@ -550,7 +518,7 @@ mkContractList = do
                                             , tooltipPlacement: Just placement.left
                                             , disabled: not $ Array.any identity $
                                                 map (\addr -> canInput (V1.Address $ bech32ToString addr) environment state contract) usedAddresses
-                                            , onClick: setModalAction $ ApplyInputs transactionsEndpoint marloweContext
+                                            , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
                                             }
                                         _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }), _ -> DOOM.text "Complete"
                                         _, _, _ -> mempty
@@ -585,35 +553,28 @@ mkContractList = do
                                         _ -> mempty
                                     _, _ -> mempty
                                 ]
-                            ]
-                          NotSyncedCreatedContract {} -> do
-                            [ tdInstant createdAt
-                            , tdInstant $ updatedAt <|> createdAt
-                            , tdContractId contractId Nothing []
-                            , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered ([] :: Array JSX) -- FIXME: Withdrawals should be still possible
-                            ]
-                          NotSyncedUpdatedContract { contractInfo }-> do
-                            [ tdInstant createdAt
-                            , tdInstant $ updatedAt <|> createdAt
-                            , do
-                                let
-                                  ContractInfo { _runtime } = contractInfo
-                                  transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
-                                tdContractId contractId Nothing transactionEndpoints
-                            , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered ([] :: Array JSX) -- FIXME: Withdrawals should be still possible
-                            ]
+                              ]
+                            NotSyncedCreatedContract {} -> do
+                              [ tdInstant createdAt
+                              , tdInstant $ updatedAt <|> createdAt
+                              , tdContractId contractId Nothing []
+                              , tdCentered [ DOOM.text $ intercalate ", " tags ]
+                              , tdCentered ([ DOOM.text "Placeholder - CREATED" ] :: Array JSX) -- FIXME: Withdrawals should be still possible
+                              ]
+                            NotSyncedUpdatedContract { contractInfo }-> do
+                              [ tdInstant createdAt
+                              , tdInstant $ updatedAt <|> createdAt
+                              , do
+                                  let
+                                    ContractInfo { _runtime } = contractInfo
+                                    transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
+                                  tdContractId contractId Nothing transactionEndpoints
+                              , tdCentered [ DOOM.text $ intercalate ", " tags ]
+                              , tdCentered ([ DOOM.text "Placeholder - UPDATED" ] :: Array JSX) -- FIXME: Withdrawals should be still possible
+                              ]
 
-                    ]
-                ]
-              _ ->
-                DOM.div
-                  -- { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
-                  { className: "col-12 position-relative d-flex justify-content-center align-items-center blur-bg z-index-sticky"
-                  }
-                  $ loadingSpinnerLogo
-                      {}
+                      ]
+                  ]
           ]
         _, _ -> mempty
 

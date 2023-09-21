@@ -70,6 +70,7 @@
   , "spec"
   , "strings"
   , "tailrec"
+  , "these"
   , "transformers"
   , "tuples"
   , "typelevel-prelude"

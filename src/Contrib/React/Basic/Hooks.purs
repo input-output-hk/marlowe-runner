@@ -187,3 +187,19 @@ useVersionedState' a = React.do
   let
     setState = updateState <<< const
   pure $ currState /\ setState
+
+newtype UseVersionedStateWithRef a hooks = UseVersionedStateWithRef (UseStateRef Int a (UseVersionedState a hooks))
+
+derive instance Newtype (UseVersionedStateWithRef a hooks) _
+
+useVersionedStateWithRef
+  :: forall a
+   . a
+  -> Hook
+      (UseVersionedStateWithRef a)
+      ({ state :: a, version :: Int } /\ Ref a /\ ((a -> a) -> Effect Unit))
+useVersionedStateWithRef a = React.coerceHook React.do
+  currState /\ updateState <- useVersionedState a
+  stateRef <- useStateRef currState.version currState.state
+  pure $ currState /\ stateRef /\ updateState
+

@@ -3,11 +3,10 @@ module Component.App where
 import Prelude
 
 import Cardano (AssetId(..), NonAdaAssets(..), nonAdaAssets)
-import CardanoMultiplatformLib.Types (Bech32)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
-import Component.ContractList (ModalAction(..), mkContractList)
+import Component.ContractList (ModalAction(..), NotSyncedYetInserts(..), mkContractList)
 import Component.CreateContract (ContractJsonString)
 import Component.Footer (footer)
 import Component.Footer as Footer
@@ -15,8 +14,9 @@ import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
 import Component.Types (ContractInfo(..), MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
-import Component.Types.ContractInfo (MarloweInfo(..), emptyNotSyncedYet)
+import Component.Types.ContractInfo (MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
 import Component.Types.ContractInfo as ContractInfo
+import Component.Types.ContractInfoMap as ContractInfoMap
 import Component.Widgets (link, linkWithIcon)
 import Contrib.Cardano (Slotting, slotToTimestamp)
 import Contrib.React.Svg (svgImg)
@@ -38,7 +38,6 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (uncurry)
 import Data.Tuple.Nested ((/\))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, supervise)
 import Effect.Class (liftEffect)
@@ -112,7 +111,7 @@ data DisplayOption = Default | About
 
 derive instance Eq DisplayOption
 
-type ContractInfoMap = Map Runtime.ContractId ContractInfo
+type ContractInfoMap = Map Runtime.ContractId SomeContractInfo
 
 -- On the app level we keep the previous wallet context
 -- so we can reuse pieces of contract info from the previous
@@ -145,7 +144,7 @@ mkApp = do
   Runtime runtime <- asks _.runtime
 
   liftEffect $ component "App" \props -> React.do
-    possibleWalletInfo /\ setWalletInfo <- useState' Nothing
+    possibleWalletInfo /\ setWalletInfo <- useState' $ Nothing
     let
       walletInfoName = _.name <<< un WalletInfo <$> possibleWalletInfo
 
@@ -153,22 +152,20 @@ mkApp = do
     possibleWalletContext /\ setWalletContext <- useState' Nothing
     possibleWalletContextRef <- useStateRef' possibleWalletContext
 
-    (possibleContractMap /\ contractMapInitialized) /\ updateContractMap <- useState (Nothing /\ false)
+    (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
 
-    notSyncedYet /\ addToNotSyncedYet <- React.do
-      notSyncedYet /\ setNotSyncedYet <- React.useState Nothing
-      let
-        addContractCreated :: ContractInfo.ContractCreated -> Effect Unit
-        addContractCreated cc = setNotSyncedYet case _ of
-          Nothing -> Just $ ContractInfo.addContractCreated cc emptyNotSyncedYet
-          Just notSyncedYet -> Just $ ContractInfo.addContractCreated cc notSyncedYet
+    let
+      notSyncedYetInserts = NotSyncedYetInserts do
+        let
+          add :: ContractInfo.ContractCreated -> Effect Unit
+          add cc = do
+            updateContractInfoMap $ \(contractMap /\ initialized) ->
+              ContractInfoMap.insertContractCreated cc contractMap /\ initialized
 
-        -- (ContractInfo.addContractUpdated cu)
-        addContractUpdated :: ContractInfo.ContractUpdated -> Effect Unit
-        addContractUpdated cu = setNotSyncedYet case _ of
-          Nothing -> Just $ ContractInfo.addContractUpdated cu emptyNotSyncedYet
-          Just notSyncedYet -> Just $ ContractInfo.addContractUpdated cu notSyncedYet
-      pure (notSyncedYet /\ { addContractUpdated, addContractCreated })
+          update :: ContractInfo.ContractUpdated -> Effect Unit
+          update cu = updateContractInfoMap $ \(contractMap /\ initialized) ->
+            ContractInfoMap.insertContractUpdated cu contractMap /\ initialized
+        { add, update }
 
     let
       walletCtx = un WalletContext <$> possibleWalletContext
@@ -190,17 +187,15 @@ mkApp = do
           supervise do
             void $ forkAff do
               _ <- contractStream.getState
-              liftEffect $ updateContractMap \(contractMap /\ _) -> (contractMap /\ true)
+              liftEffect $ updateContractInfoMap \(contractMap /\ _) -> (contractMap /\ true)
 
             void $ forkAff do
               untilJust do
-                updates <- liftEffect $ contractStream.getLiveState
-                let
-                  new = mkAppContractInfoMap slotting possibleWalletContext updates
-                liftEffect $ updateContractMap \(_ /\ initialized) -> (Just new /\ initialized)
+                newSynced <- liftEffect $ contractStream.getLiveState
+                liftEffect $ updateContractInfoMap \(contractMap /\ initialized) ->
+                    (ContractInfoMap.updateSynced newSynced contractMap) /\ initialized
                 delay (Milliseconds 1_000.0)
                 pure Nothing
-
             contractStream.start
         Nothing -> pure unit
 
@@ -218,7 +213,6 @@ mkApp = do
               liftEffect $ setWalletContext walletContext
           action `catchError` \_ -> do
             -- FIXME: Report back (to the reporting backend) a wallet problem?
-            traceM "ERROR during wallet context construction"
             pure unit
 
     configuringWallet /\ setConfiguringWallet <- useState' false
@@ -275,9 +269,7 @@ mkApp = do
         liftEffect $ setWalletInfo $ Just walletInfo
 
     let
-      possibleContracts = do
-        AppContractInfoMap { map: contracts } <- possibleContractMap
-        pure contracts
+      possibleContracts = Array.fromFoldable <$> ContractInfoMap.getContractsMap contractInfoMap
 
     pure $ case possibleWalletInfo of
       Nothing -> DOM.div {} $
@@ -364,12 +356,10 @@ mkApp = do
                 }
             jsx
         , do
-            let
-              contractArray = Array.fromFoldable <$> possibleContracts
             subcomponents.contractListComponent
-              { possibleContracts: map ContractInfo.SyncedConractInfo <$> contractArray
+              { possibleContracts
               , contractMapInitialized
-              -- , notSyncedYet: notSyncedYet /\ addToNotSyncedYet
+              , notSyncedYetInserts
               , connectedWallet: possibleWalletInfo
               , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
               }
@@ -400,46 +390,49 @@ mkApp = do
         , footer (Footer.Fixed false)
         ]
 
-mkAppContractInfoMap :: Slotting -> Maybe WalletContext -> ContractWithTransactionsMap -> AppContractInfoMap
-mkAppContractInfoMap slotting walletContext updates = do
+mkAppContractInfoMap :: Slotting -> Maybe WalletContext -> Maybe ContractWithTransactionsMap -> Maybe NotSyncedYet -> Maybe AppContractInfoMap
+mkAppContractInfoMap _ _ Nothing Nothing = Nothing
+mkAppContractInfoMap slotting walletContext possiblySynced possiblyNotSyncedYet = do
   let
-    -- walletCtx = un WalletContext <$> walletContext
-    -- (usedAddresses :: Array String) = map bech32ToString $ fromMaybe [] $ _.usedAddresses <$> walletCtx
-    -- (tokens :: Array String) = map Cardano.assetIdToString $ fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un Cardano.Value <<< _.balance <$> walletCtx
+    ns = fromMaybe Map.empty do
+      NotSyncedYet { created, updated } <- possiblyNotSyncedYet
+      pure $ map someContractInfoFromContractCreated created
+        `Map.union` map someContractInfoFromContractUpdated updated
+    s = fromMaybe Map.empty do
+      synced <- possiblySynced
+      pure $ Map.catMaybes $ synced <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
+        let
+          marloweInfo = do
+            Runtime.ContractState contractState' <- contractState
+            pure $ MarloweInfo
+              { initialContract: contractState'.initialContract
+              , currencySymbol: case roleTokenMintingPolicyId of
+                  PolicyId "" -> Nothing
+                  PolicyId policyId -> Just $ policyId
+              , state: contractState'.state
+              , currentContract: contractState'.currentContract
+              , initialState: V1.emptyState -- FIXME: No initial state on the API LEVEL?
+              , unclaimedPayouts: contractState'.unclaimedPayouts
+              }
+          Runtime.ContractHeader { contractId, block } = contractHeader
+          blockSlotTimestamp (Runtime.BlockHeader { slotNo }) = slotToTimestamp slotting slotNo
 
-    map = Map.catMaybes $ updates <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { contractId, roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
-      let
-        marloweInfo = do
-          Runtime.ContractState contractState' <- contractState
-          pure $ MarloweInfo
-            { initialContract: contractState'.initialContract
-            , currencySymbol: case roleTokenMintingPolicyId of
-                PolicyId "" -> Nothing
-                PolicyId policyId -> Just $ policyId
-            , state: contractState'.state
-            , currentContract: contractState'.currentContract
-            , initialState: V1.emptyState -- FIXME: No initial state on the API LEVEL?
-            , unclaimedPayouts: contractState'.unclaimedPayouts
-            }
-        Runtime.ContractHeader { contractId, block } = contractHeader
-        blockSlotTimestamp (Runtime.BlockHeader { slotNo }) = slotToTimestamp slotting slotNo
+          createdAt :: Maybe Instant
+          createdAt = blockSlotTimestamp <$> block
 
-        createdAt :: Maybe Instant
-        createdAt = blockSlotTimestamp <$> block
+          updatedAt :: Maybe Instant
+          updatedAt = do
+            Runtime.TxHeader tx /\ _ <- Array.head transactions
+            blockSlotTimestamp <$> tx.block
 
-        updatedAt :: Maybe Instant
-        updatedAt = do
-          Runtime.TxHeader tx /\ _ <- Array.head transactions
-          blockSlotTimestamp <$> tx.block
+        pure $ SyncedConractInfo $ ContractInfo $
+          { contractId
+          , createdAt
+          , updatedAt
+          , endpoints
+          , marloweInfo
+          , tags
+          , _runtime: { contractHeader, transactions }
+          }
 
-      pure $ ContractInfo $
-        { contractId
-        , createdAt
-        , updatedAt
-        , endpoints
-        , marloweInfo
-        , tags
-        , _runtime: { contractHeader, transactions }
-        }
-
-  AppContractInfoMap { walletContext, map }
+  pure $ AppContractInfoMap { walletContext, map: ns `Map.union` s }

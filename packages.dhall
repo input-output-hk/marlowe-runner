@@ -332,7 +332,8 @@ in  upstream
         "https://github.com/input-output-hk/purescript-cardano-wallet-client.git"
         "v0.0.1"
 
-  with marlowe-runtime-client = -- ./purescript-marlowe-runtime-client/spago.dhall as Location
+  with marlowe-runtime-client = ../purescript-marlowe-runtime-client/spago.dhall as Location
+  with remote-marlowe-runtime-client =
       mkPackage
         [ "aff"
         , "aff-promise"

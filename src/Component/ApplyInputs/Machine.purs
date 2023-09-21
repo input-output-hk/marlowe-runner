@@ -14,14 +14,15 @@ import Control.Monad.Error.Class (catchError)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmpty
-import Data.DateTime.Instant (instant, toDateTime, unInstant)
+import Data.DateTime.Instant (Instant, toDateTime)
 import Data.Either (Either(..), isLeft)
 import Data.Foldable (foldMap)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
-import Data.Time.Duration (Milliseconds(..), fromDuration)
-import Data.Time.Duration as Time.Duration
+import Data.Time.Duration (Milliseconds(..))
 import Data.Variant (Variant)
+import Debug (traceM)
+import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
@@ -29,7 +30,6 @@ import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (PostContractsError, PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), ResourceWithLinks, Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
-import Partial.Unsafe (unsafeCrashWith)
 import Wallet as Wallet
 import WalletContext (WalletContext(..), walletContext)
 
@@ -83,14 +83,18 @@ data State
   | ChoosingInputType
       { autoRun :: AutoRun
       , errors :: Maybe String
+      , marloweContext :: MarloweContext
       , allInputsChoices :: AllInputsChoices
+      , environment :: V1.Environment
       , requiredWalletContext :: RequiredWalletContext
       , transactionsEndpoint :: TransactionsEndpoint
       }
   | PickingInput
       { autoRun :: AutoRun
       , errors :: Maybe String
+      , marloweContext :: MarloweContext
       , allInputsChoices :: AllInputsChoices
+      , environment :: V1.Environment
       , inputChoices :: InputChoices
       , requiredWalletContext :: RequiredWalletContext
       , transactionsEndpoint :: TransactionsEndpoint
@@ -99,35 +103,44 @@ data State
       { autoRun :: AutoRun
       , errors :: Maybe String
       , allInputsChoices :: AllInputsChoices
+      , environment :: V1.Environment
       , transactionsEndpoint :: TransactionsEndpoint
       , inputChoices :: InputChoices
       , input :: Maybe V1.Input
+      , newMarloweContext :: MarloweContext
       , requiredWalletContext :: RequiredWalletContext
       }
   | SigningTx
       { autoRun :: AutoRun
       , errors :: Maybe String
       , allInputsChoices :: AllInputsChoices
+      , environment :: V1.Environment
       , inputChoices :: InputChoices
       , input :: Maybe V1.Input
+      , newMarloweContext :: MarloweContext
       , createTxResponse :: ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint)
       }
   | SubmittingTx
       { autoRun :: AutoRun
       , errors :: Maybe String
       , allInputsChoices :: AllInputsChoices
+      , environment :: V1.Environment
       , inputChoices :: InputChoices
       , input :: Maybe V1.Input
+      , newMarloweContext :: MarloweContext
       , createTxResponse :: ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint)
       , txWitnessSet :: CborHex TransactionWitnessSetObject
       }
   | InputApplied
       { autoRun :: AutoRun
       , allInputsChoices :: AllInputsChoices
+      , environment :: V1.Environment
       , inputChoices :: InputChoices
       , input :: Maybe V1.Input
+      , newMarloweContext :: MarloweContext
       , txWitnessSet :: CborHex TransactionWitnessSetObject
       , createTxResponse :: ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint)
+      , submittedAt :: Instant
       }
 
 autoRunFromState :: State -> Maybe AutoRun
@@ -151,13 +164,14 @@ data Action
   | FetchRequiredWalletContextSucceeded
       { allInputsChoices :: AllInputsChoices
       , requiredWalletContext :: RequiredWalletContext
+      , environment :: V1.Environment
       }
   | ChooseInputType
   | ChooseInputTypeFailed String
   | ChooseInputTypeSucceeded InputChoices
   | PickInput
   | PickInputFailed String
-  | PickInputSucceeded (Maybe V1.Input)
+  | PickInputSucceeded { input :: Maybe V1.Input, newMarloweContext :: MarloweContext }
   | CreateTx
   | CreateTxFailed String
   | CreateTxSucceeded (ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint))
@@ -166,7 +180,7 @@ data Action
   | SignTxSucceeded (CborHex TransactionWitnessSetObject)
   | SubmitTx
   | SubmitTxFailed String
-  | SubmitTxSucceeded
+  | SubmitTxSucceeded Instant
 
 step :: State -> Action -> State
 step state action = do
@@ -183,12 +197,14 @@ step state action = do
       FetchRequiredWalletContext { autoRun, marloweContext, transactionsEndpoint } ->
         FetchingRequiredWalletContext $ { autoRun, marloweContext, transactionsEndpoint, errors: Nothing }
       _ -> state
-    FetchingRequiredWalletContext r@{ autoRun, transactionsEndpoint } -> case action of
+    FetchingRequiredWalletContext r@{ autoRun, transactionsEndpoint, marloweContext } -> case action of
       FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
-      FetchRequiredWalletContextSucceeded { requiredWalletContext, allInputsChoices } -> ChoosingInputType
+      FetchRequiredWalletContextSucceeded { requiredWalletContext, allInputsChoices, environment } -> ChoosingInputType
         { autoRun
         , errors: Nothing
         , allInputsChoices
+        , environment
+        , marloweContext
         , requiredWalletContext
         , transactionsEndpoint
         }
@@ -196,13 +212,15 @@ step state action = do
     ChoosingInputType r@{ errors: Just _ } -> case action of
       ChooseInputType -> ChoosingInputType r { errors = Nothing }
       _ -> state
-    ChoosingInputType r@{ allInputsChoices, autoRun, requiredWalletContext, transactionsEndpoint } -> case action of
+    ChoosingInputType r@{ allInputsChoices, environment, marloweContext, autoRun, requiredWalletContext, transactionsEndpoint } -> case action of
       ChooseInputTypeFailed error -> ChoosingInputType $ r { errors = Just error }
       ChooseInputTypeSucceeded inputChoices -> PickingInput
         { autoRun
         , errors: Nothing
         , allInputsChoices
+        , environment
         , inputChoices
+        , marloweContext
         , requiredWalletContext
         , transactionsEndpoint
         }
@@ -210,12 +228,14 @@ step state action = do
     PickingInput r@{ errors: Just _ } -> case action of
       PickInput -> PickingInput $ r { errors = Nothing }
       _ -> state
-    PickingInput r@{ allInputsChoices, autoRun, inputChoices, requiredWalletContext, transactionsEndpoint } -> case action of
+    PickingInput r@{ allInputsChoices, environment, autoRun, inputChoices, requiredWalletContext, transactionsEndpoint } -> case action of
       PickInputFailed error -> PickingInput $ r { errors = Just error }
-      PickInputSucceeded input -> CreatingTx
+      PickInputSucceeded { input, newMarloweContext } -> CreatingTx
         { autoRun
         , errors: Nothing
         , allInputsChoices
+        , newMarloweContext
+        , environment
         , inputChoices
         , input
         , requiredWalletContext
@@ -225,26 +245,26 @@ step state action = do
     CreatingTx r@{ errors: Just _ } -> case action of
       CreateTx -> CreatingTx $ r { errors = Nothing }
       _ -> state
-    CreatingTx r@{ allInputsChoices, autoRun, inputChoices, input } -> case action of
+    CreatingTx r@{ allInputsChoices, newMarloweContext, environment, autoRun, inputChoices, input } -> case action of
       CreateTxFailed error -> CreatingTx $ r { errors = Just error }
       CreateTxSucceeded createTxResponse -> SigningTx
-        { autoRun, errors: Nothing, allInputsChoices, inputChoices, input, createTxResponse }
+        { autoRun, errors: Nothing, allInputsChoices, newMarloweContext, environment, inputChoices, input, createTxResponse }
       _ -> state
     SigningTx r@{ errors: Just _ } -> case action of
       SignTx -> SigningTx $ r { errors = Nothing }
       _ -> state
-    SigningTx r@{ allInputsChoices, autoRun, inputChoices, input, createTxResponse } -> case action of
+    SigningTx r@{ allInputsChoices, environment, newMarloweContext, autoRun, inputChoices, input, createTxResponse } -> case action of
       SignTxFailed error -> SigningTx $ r { errors = Just error }
       SignTxSucceeded txWitnessSet -> SubmittingTx
-        { autoRun, errors: Nothing, allInputsChoices, inputChoices, input, createTxResponse, txWitnessSet }
+        { autoRun, errors: Nothing, allInputsChoices, newMarloweContext, environment, inputChoices, input, createTxResponse, txWitnessSet }
       _ -> state
     SubmittingTx r@{ errors: Just _ } -> case action of
       SubmitTx -> SubmittingTx $ r { errors = Nothing }
       _ -> state
-    SubmittingTx r@{ allInputsChoices, autoRun, inputChoices, input, createTxResponse, txWitnessSet } -> case action of
+    SubmittingTx r@{ allInputsChoices, environment, newMarloweContext, autoRun, inputChoices, input, createTxResponse, txWitnessSet } -> case action of
       SubmitTxFailed error -> SubmittingTx $ r { errors = Just error }
-      SubmitTxSucceeded ->
-        InputApplied { allInputsChoices, autoRun, inputChoices, input, txWitnessSet, createTxResponse }
+      SubmitTxSucceeded submittedAt ->
+        InputApplied { allInputsChoices, environment, newMarloweContext, autoRun, inputChoices, input, txWitnessSet, createTxResponse, submittedAt }
       _ -> state
     InputApplied _ -> state
 
@@ -278,6 +298,7 @@ data WalletRequest
 data RuntimeRequest
   = CreateTxRequest
       { allInputsChoices :: AllInputsChoices
+      , environment :: V1.Environment
       , inputChoices :: InputChoices
       , input :: Maybe V1.Input
       , requiredWalletContext :: RequiredWalletContext
@@ -306,9 +327,10 @@ nextRequest env state = do
       Just $ WalletRequest $ FetchWalletContextRequest { marloweContext, cardanoMultiplatformLib, walletInfo }
     FetchingRequiredWalletContext { marloweContext, errors: Nothing } ->
       Just $ WalletRequest $ FetchWalletContextRequest { marloweContext, cardanoMultiplatformLib, walletInfo }
-    CreatingTx { errors: Nothing, inputChoices, input, allInputsChoices, requiredWalletContext, transactionsEndpoint } -> do
+    CreatingTx { errors: Nothing, inputChoices, input, allInputsChoices, environment, requiredWalletContext, transactionsEndpoint } -> do
       Just $ RuntimeRequest $ CreateTxRequest
         { allInputsChoices
+        , environment
         , inputChoices
         , input
         , requiredWalletContext
@@ -323,6 +345,18 @@ nextRequest env state = do
       Just $ RuntimeRequest $ SubmitTxRequest { txWitnessSet, createTxResponse, serverURL }
     _ -> Nothing
 
+
+-- This is pretty arbitrary choice - we should keep track which inputs are relevant
+-- during the further steps.
+mkEnvironment :: Effect V1.Environment
+mkEnvironment = do
+  invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
+  invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
+  let
+    timeInterval = V1.TimeInterval invalidBefore invalidHereafter
+    environment = V1.Environment { timeInterval }
+  pure environment
+
 -- We want to rewrite driver logic here based on the request type
 requestToAffAction :: Request -> Aff Action
 requestToAffAction = case _ of
@@ -335,14 +369,15 @@ requestToAffAction = case _ of
         Left err -> pure $ FetchRequiredWalletContextFailed $ show err
         Right Nothing -> pure $ FetchRequiredWalletContextFailed "Wallet does not have a change address"
         Right (Just (WalletContext { changeAddress, usedAddresses })) -> liftEffect $ do
-          invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
-          invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
+          -- TODO: investingate if this is good strategy. We should probably migrate to something similiar to the
+          -- next endpoint implementation.
+          environment <- mkEnvironment
           let
             { contract, state } = marloweContext
-            timeInterval = V1.TimeInterval invalidBefore invalidHereafter
-            environment = V1.Environment { timeInterval }
             allInputsChoices = case nextTimeoutAdvance environment state contract of
-              Just advanceContinuation -> Left advanceContinuation
+              Just advanceContinuation -> do
+                traceM "We computed 'advance' reduction"
+                Left advanceContinuation
               Nothing -> do
                 let
                   deposits = NonEmpty.fromArray $ nextDeposit environment state contract
@@ -353,6 +388,7 @@ requestToAffAction = case _ of
           pure $ FetchRequiredWalletContextSucceeded
             { requiredWalletContext: { changeAddress, usedAddresses }
             , allInputsChoices
+            , environment
             }
     SignTxRequest { walletInfo, tx } -> do
       let
@@ -361,15 +397,17 @@ requestToAffAction = case _ of
         Left err -> pure $ SignTxFailed $ unsafeStringify err
         Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
   RuntimeRequest runtimeRequest -> case runtimeRequest of
-    CreateTxRequest { input, requiredWalletContext, serverURL, transactionsEndpoint } -> do
+    CreateTxRequest { input, environment, requiredWalletContext, serverURL, transactionsEndpoint } -> do
       let
         inputs = foldMap Array.singleton input
-      create inputs requiredWalletContext serverURL transactionsEndpoint >>= case _ of
+      create inputs environment requiredWalletContext serverURL transactionsEndpoint >>= case _ of
         Right res -> pure $ CreateTxSucceeded res
         Left err -> pure $ CreateTxFailed $ show err
     SubmitTxRequest { txWitnessSet, createTxResponse, serverURL } -> do
       submit txWitnessSet serverURL createTxResponse.links.transaction >>= case _ of
-        Right _ -> pure $ SubmitTxSucceeded
+        Right _ -> do
+          n <- liftEffect $ now
+          pure $ SubmitTxSucceeded n
         Left err -> pure $ SubmitTxFailed $ show err
 
 driver :: Env -> State -> Maybe (Aff Action)
@@ -380,29 +418,21 @@ driver env state = do
 -- Lower level helpers
 create
   :: Array V1.Input
+  -> V1.Environment
   -> WalletAddresses
   -> ServerURL
   -> TransactionsEndpoint
   -> Aff (Either ClientError' { resource :: PostTransactionsResponse, links :: { transaction :: TransactionEndpoint } })
-create inputs walletAddresses serverUrl transactionsEndpoint = do
-  nowInstant <- liftEffect $ now
+create inputs environment walletAddresses serverUrl transactionsEndpoint = do
   let
-    nowPosixMilliseconds = unInstant nowInstant
-    oneHour = fromDuration $ Time.Duration.Hours 1.0
-    oneMinuteAgo = fromDuration $ Time.Duration.Minutes (-1.0)
-    inOneHourInstant = case instant (nowPosixMilliseconds <> oneHour) of
-      Just instant' -> instant'
-      Nothing -> unsafeCrashWith "Component.ApplyInputs.Machine: Failed to subtract one minute to the current time"
-    beforeOneHourInstant = case instant (nowPosixMilliseconds <> oneMinuteAgo) of
-      Just instant' -> instant'
-      Nothing -> unsafeCrashWith "Component.ApplyInputs.Machine: Failed to add one hour to the current time"
-  let
+    V1.Environment { timeInterval } = environment
+    V1.TimeInterval invalidBefore invalidHereafter = timeInterval
     { changeAddress, usedAddresses } = walletAddresses
 
     req = PostTransactionsRequest
       { metadata: mempty
-      , invalidBefore: toDateTime beforeOneHourInstant
-      , invalidHereafter: toDateTime inOneHourInstant
+      , invalidBefore: toDateTime invalidBefore
+      , invalidHereafter: toDateTime invalidHereafter
       -- , version :: MarloweVersion
       , inputs
       , tags: mempty -- TODO: use instead of metadata
