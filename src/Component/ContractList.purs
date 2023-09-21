@@ -317,7 +317,7 @@ mkContractList = do
           }
 
         Nothing, _ -> React.fragment
-          [ DOM.div { className: "row p-4 mt-5" } do
+          [ DOM.div { className: "container pt-5" } $ DOM.div { className: "row pt-5" } do
               let
                 disabled = isNothing connectedWallet
                 newContractButton = buttonWithIcon
@@ -437,7 +437,7 @@ mkContractList = do
                             $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
                         ]
 
-                  [ table { striped: Table.striped.boolean true, hover: true }
+                  [ DOM.div { className: "container" } $ DOM.div { className: "row" } $ table { striped: Table.striped.boolean true, hover: true }
                       [ DOM.thead {} do
                           let
                             orderingTh = Table.orderingHeader ordering updateOrdering
@@ -561,7 +561,7 @@ mkContractList = do
                               , tdCentered [ DOOM.text $ intercalate ", " tags ]
                               , tdCentered ([ DOOM.text "Placeholder - CREATED" ] :: Array JSX) -- FIXME: Withdrawals should be still possible
                               ]
-                            NotSyncedUpdatedContract { contractInfo }-> do
+                            NotSyncedUpdatedContract { contractInfo } -> do
                               [ tdInstant createdAt
                               , tdInstant $ updatedAt <|> createdAt
                               , do

@@ -281,8 +281,8 @@ mkApp = do
         , landingPage { setWalletInfo: setWalletInfo <<< Just }
         ]
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light" } $
-            DOM.div { className: "container-fluid" }
+        [ DOM.div {} $ DOM.nav { className: "navbar navbar-expand-sm navbar-light position-absolute w-100" } $
+            DOM.div { className: "container-fluid d-flex justify-content-between" }
               [ DOM.a { href: "#", className: "navbar-brand" }
                   [ svgImg { src: marloweLogoUrl } ]
               , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
