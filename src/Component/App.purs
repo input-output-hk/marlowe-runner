@@ -173,35 +173,36 @@ mkApp = do
     let
       walletCtx = un WalletContext <$> possibleWalletContext
 
-    useAff ((_.usedAddresses &&& _.changeAddress) <$> walletCtx) do
-      let
-        (usedAddresses :: Array Bech32) = fromMaybe [] $ _.usedAddresses <$> walletCtx
-        (tokens :: Array AssetId) = map (uncurry AssetId) <<< fromMaybe [] $ Array.fromFoldable <<< Map.keys <<< un NonAdaAssets <<< nonAdaAssets <<< _.balance <$> walletCtx
+    useAff ((_.usedAddresses &&& _.changeAddress) <$> walletCtx) $
+      case walletCtx of
+        Just ctx -> do
+          let
+            tokens = map (uncurry AssetId) <<< Array.fromFoldable <<< Map.keys <<< un NonAdaAssets <<< nonAdaAssets $ ctx.balance
+            reqInterval = RequestInterval (Milliseconds 50.0)
+            pollInterval = PollingInterval (Milliseconds 60_000.0)
+            filterContracts getContractResponse = case un ContractHeader getContractResponse.resource of
+              { block: Nothing } -> true
+              { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
+            maxPages = Just (MaxPages 1)
+            params = { partyAddresses: ctx.usedAddresses, partyRoles: tokens, tags: [] }
 
-        reqInterval = RequestInterval (Milliseconds 50.0)
-        pollInterval = PollingInterval (Milliseconds 60_000.0)
-        filterContracts getContractResponse = case un ContractHeader getContractResponse.resource of
-          { block: Nothing } -> true
-          { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
-        maxPages = Just (MaxPages 1)
-        params = { partyAddresses: usedAddresses, partyRoles: tokens, tags: [] }
+          ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages runtime.serverURL
+          supervise do
+            void $ forkAff do
+              _ <- contractStream.getState
+              liftEffect $ updateContractMap \(contractMap /\ _) -> (contractMap /\ true)
 
-      ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages runtime.serverURL
-      supervise do
-        void $ forkAff do
-          _ <- contractStream.getState
-          liftEffect $ updateContractMap \(contractMap /\ _) -> (contractMap /\ true)
+            void $ forkAff do
+              untilJust do
+                updates <- liftEffect $ contractStream.getLiveState
+                let
+                  new = mkAppContractInfoMap slotting possibleWalletContext updates
+                liftEffect $ updateContractMap \(_ /\ initialized) -> (Just new /\ initialized)
+                delay (Milliseconds 1_000.0)
+                pure Nothing
 
-        void $ forkAff do
-          untilJust do
-            updates <- liftEffect $ contractStream.getLiveState
-            let
-              new = mkAppContractInfoMap slotting possibleWalletContext updates
-            liftEffect $ updateContractMap \(_ /\ initialized) -> (Just new /\ initialized)
-            delay (Milliseconds 1_000.0)
-            pure Nothing
-
-        contractStream.start
+            contractStream.start
+        Nothing -> pure unit
 
     useLoopAff walletInfoName (Milliseconds 20_000.0) do
       pwi <- liftEffect $ readRef possibleWalletInfoRef
