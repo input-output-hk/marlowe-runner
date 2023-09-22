@@ -111,6 +111,7 @@ data LabelSpacing
   | Col4Label
   | Col5Label
   | Col6Label
+  | Col12Label
 
 derive instance Eq LabelSpacing
 derive instance Ord LabelSpacing
@@ -154,6 +155,7 @@ labelSpacingToClasses breakpoint = do
     Col4Label -> { labelColClass: "col-" <> breakpointStr <> "-4", inputColClass: "col-" <> breakpointStr <> "-8" }
     Col5Label -> { labelColClass: "col-" <> breakpointStr <> "-5", inputColClass: "col-" <> breakpointStr <> "-7" }
     Col6Label -> { labelColClass: "col-" <> breakpointStr <> "-6", inputColClass: "col-" <> breakpointStr <> "-6" }
+    Col12Label -> { labelColClass: "col-" <> breakpointStr <> "-12", inputColClass: "col-" <> breakpointStr <> "-12" }
 
 labelSpacingsToClasses :: LabelSpacings -> { labelColClass :: String, inputColClass :: String }
 labelSpacingsToClasses { sm, md, lg } = do
@@ -620,22 +622,34 @@ type TextAreaProps m a =
 renderTextArea
   :: { helpText :: Maybe JSX
      , possibleLabel :: Maybe JSX
+      , layout :: FieldLayout
      , name :: FieldId
      , placeholder :: String
      , rows :: Int
      }
   -> InputState String
   -> JSX
-renderTextArea { possibleLabel, helpText, name, placeholder, rows } { value, errors, onChange, touched } = do
+renderTextArea { layout, possibleLabel, helpText, name, placeholder, rows } { value, errors, onChange, touched } = do
   let
     nameStr = un FieldId name
-    label = DOM.label { className: "col-form-label-sm col-sm-3", htmlFor: nameStr } $ possibleLabel `flip foldMap`
-      \labelJsx ->
-        [ labelJsx ]
-    body = DOM.div { className: "col-sm-9" } do
+
+    label = flip foldMap possibleLabel \labelJSX -> case layout of
+      Inline -> DOM.label { htmlFor: nameStr } [ labelJSX ]
+      MultiColumn spacings -> do
+        let { labelColClass } = labelSpacingsToClasses spacings
+        DOM.label { className: labelColClass <> " col-form-label-sm", htmlFor: nameStr } [ labelJSX ]
+    body = do
       let
+        wrapper =
+          case layout of
+            Inline -> identity
+            MultiColumn spacing -> do
+              let
+                { inputColClass } = labelSpacingsToClasses spacing
+              DOM.div { className: inputColClass }
         { errors: errors', isValid, isInvalid } = fieldValidity touched value errors
-      Form.Control.textArea
+
+      wrapper $ Form.Control.textArea
         { id: nameStr
         , name: nameStr
         , placeholder
@@ -672,6 +686,7 @@ textArea props = formSpecBuilderT do
       ( Array.singleton <<< renderTextArea
           { possibleLabel: props'.label
           , name
+          , layout: props'.layout
           , helpText: props'.helpText
           , placeholder: props'.placeholder
           , rows: props'.rows

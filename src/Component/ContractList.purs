@@ -2,6 +2,7 @@ module Component.ContractList where
 
 import Prelude
 
+import Cardano as Cardano
 import CardanoMultiplatformLib (CborHex, bech32ToString)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
@@ -13,13 +14,12 @@ import Component.ContractTemplates.Swap as Swap
 import Component.CreateContract (ContractJsonString, runLiteTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (canInput)
-import Component.Types.ContractInfo as ContractInfo
-import Component.Types.ContractInfo (MarloweInfo(..), SomeContractInfo(..))
 import Component.Types (ContractInfo(..), MessageContent(..), MessageHub(..), MkComponentM, WalletInfo)
+import Component.Types.ContractInfo (MarloweInfo(..), SomeContractInfo(..))
+import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonWithIcon)
 import Component.Withdrawals as Withdrawals
-import Cardano as Cardano
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
 import Contrib.Fetch (FetchError)

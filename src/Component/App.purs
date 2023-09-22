@@ -361,7 +361,8 @@ mkApp = do
               , contractMapInitialized
               , notSyncedYetInserts
               , connectedWallet: possibleWalletInfo
-              , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
+              , possibleInitialModalAction: Just (NewContract Nothing)
+                  --(NewContract <<< Just) <$> props.possibleInitialContract
               }
         -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
 

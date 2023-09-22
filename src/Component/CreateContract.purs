@@ -20,7 +20,7 @@ import Contrib.Polyform.FormSpecs.StatelessFormSpec (StatelessFormSpec)
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatlessFormSpec
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
-import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, booleanField)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FieldLayout(..), LabelSpacing(..), StatelessBootstrapFormSpec, booleanField)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
 import Control.Error.Util (hoistMaybe)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
@@ -66,8 +66,8 @@ import Polyform.Batteries.Generic.Messages (placeholder)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
+import React.Basic.DOM (b, div, div_, hr, img, input, text) as DOOM
 import React.Basic.DOM (css)
-import React.Basic.DOM (div, div_, input, text, img) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
@@ -82,6 +82,7 @@ import Web.File.FileList (FileList)
 import Web.File.FileList as FileList
 import Web.HTML.HTMLInputElement (HTMLInputElement)
 import Web.HTML.HTMLInputElement as HTMLInputElement
+import Web.HTML.History (back)
 
 newtype ContractJsonString = ContractJsonString String
 
@@ -110,6 +111,9 @@ autoRunFieldId = FieldId "auto-run"
 
 type LabeledFormSpec validatorM = StatelessFormSpec validatorM (Array (FieldId /\ JSX)) String
 
+fullWidthLayout = MultiColumn { sm: Col12Label, md: Col12Label, lg: Col12Label }
+
+
 mkContractFormSpec :: (Maybe ContractJsonString /\ AutoRun) -> LabeledFormSpec Effect Query Result
 mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormSpecBuilder.evalBuilder Nothing $ do
   let
@@ -132,6 +136,7 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
           Nothing -> ""
           Just (ContractJsonString initialContract) -> formatPossibleJSON initialContract
       , label: mempty
+      , layout: fullWidthLayout
       , touched: isJust possibleInitialContract
       , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
           json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
@@ -140,14 +145,11 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
       , name: Just contractFieldId
       }
 
-    -- -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query a
     tags <- labelSubform tagFieldId $ StatelessFormSpecBuilders.textInput
-      { helpText: Just $ DOOM.div_
-          [ DOOM.text "Add Tags"
-          ]
+      { layout: MultiColumn { sm: Col12Label, md: Col12Label, lg: Col12Label }
       , initial: ""
-      , label: mempty
-      , placeholder: "Tags"
+      , label: Just $ DOOM.text "Add tags"
+      , placeholder: "tag1, tag2, tag3"
       , touched: false
       , validator: liftFn case _ of
           Nothing -> Tags Map.empty
@@ -158,14 +160,14 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
       , name: Just tagFieldId
       }
 
-    autoRun <- map AutoRun $ labelSubform autoRunFieldId $ booleanField
-      { label: DOOM.text ""
-      , helpText: DOOM.text "Auto-run contract"
-      , initial: initialAutoRun
-      , name: autoRunFieldId
-      }
+    -- autoRun <- map AutoRun $ labelSubform autoRunFieldId $ booleanField
+    --   { label: DOOM.text ""
+    --   , helpText: DOOM.text "Auto-run contract"
+    --   , initial: initialAutoRun
+    --   , name: autoRunFieldId
+    --   }
     in
-      contract /\ tags /\ autoRun
+      contract /\ tags /\ (AutoRun true)
 
 mkRolesConfigForm :: NonEmptyArray String -> CardanoMultiplatformLib.Lib -> StatelessBootstrapFormSpec Effect Query RolesConfig
 mkRolesConfigForm roleNames cardanoMultiplatformLib = FormSpecBuilder.evalBuilder Nothing $ Mint <<< Map.fromFoldable <$> for (NonEmptyArray.sort roleNames) \roleName -> ado
@@ -272,15 +274,7 @@ mkRoleTokensComponent = do
         formBody = DOM.div { className: "form-group" } fields
         formActions = DOOM.fragment
           [ DOM.div { className: "row" } $
-              [ DOM.div { className: "col-6 text-start" } $
-                  [ link
-                      { label: DOOM.text "Cancel"
-                      , onClick: onDismiss
-                      , showBorders: true
-                      , extraClassNames: "me-3"
-                      }
-                  ]
-              , DOM.div { className: "col-6 text-end" } $
+              [ DOM.div { className: "col-6 text-end" } $
                   [ DOM.button
                       do
                         let
@@ -293,12 +287,24 @@ mkRoleTokensComponent = do
                         }
                       [ R.text "Ok" ]
                   ]
+              , backToContractListLink onDismiss
               ]
           ]
       wrappedContentWithFooter formBody formActions
 
 runLiteTag :: String
 runLiteTag = "run-lite"
+
+backToContractListLink :: Effect Unit -> JSX
+backToContractListLink onDismiss = do
+  DOM.div { className: "col-12 text-center" } $
+    [ link
+        { label: DOM.b {} [DOOM.text "Back to contractList"]
+        , onClick: onDismiss
+        , showBorders: false
+        , extraClassNames: "mt-3"
+        }
+    ]
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
@@ -367,7 +373,7 @@ mkComponent = do
                 $ DOM.div { className: "col-12 text-end" }
                 $ do
                     let inputId = "contract-file-upload"
-                    [ DOM.label { htmlFor: inputId, className: "btn btn-primary" }
+                    [ DOM.label { htmlFor: inputId, className: "btn font-weight-bold me-2 btn-outline-primary" }
                         [ R.text "Upload JSON" ]
                     , loadFileHiddenInputComponent
                         { onFileload: case _ of
@@ -385,20 +391,13 @@ mkComponent = do
                         }
                     ]
             , lookupSubform contractFieldId
+            , DOOM.hr {}
             , lookupSubform tagFieldId
-            , lookupSubform autoRunFieldId
+            -- , lookupSubform autoRunFieldId
             ]
           formActions = fragment
             [ DOM.div { className: "row" } $
-                [ DOM.div { className: "col-6" } $
-                    [ link
-                        { label: DOOM.text "Cancel"
-                        , onClick: onDismiss
-                        , showBorders: true
-                        , extraClassNames: "me-3 w-100"
-                        }
-                    ]
-                , DOM.div { className: "col-6" } $
+                [ DOM.div { className: "col-12" } $
                     [ DOM.button
                         do
                           let
@@ -413,15 +412,17 @@ mkComponent = do
                         , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
                         ]
                     ]
+                , backToContractListLink onDismiss
                 ]
             ]
 
         BodyLayout.component
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
-          , content: wrappedContentWithFooter
-              formBody
-              formActions
+          , content: fragment
+              [ DOM.div { className: "p-3" } formBody
+              , DOM.div { className: "p-3 mt-auto" } formActions
+              ]
           }
 
       Machine.DefiningRoleTokens { roleNames } -> do
@@ -506,15 +507,7 @@ mkComponent = do
             Nothing -> mempty
             Just request -> DOOM.fragment
               [ DOM.div { className: "row" } $
-                  [ DOM.div { className: "col-6 text-start" } $
-                      [ link
-                          { label: DOOM.text "Cancel"
-                          , onClick: onDismiss
-                          , showBorders: true
-                          , extraClassNames: "me-3"
-                          }
-                      ]
-                  , DOM.div { className: "col-6 text-end" } $
+                  [ DOM.div { className: "col-12 text-end" } $
                       [ DOM.button
                           { className: "btn btn-primary"
                           , disabled: case currentRun of
@@ -530,6 +523,7 @@ mkComponent = do
                           }
                           [ R.text "Run" ]
                       ]
+                  , backToContractListLink onDismiss
                   ]
               ]
         BodyLayout.component
