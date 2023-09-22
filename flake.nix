@@ -4,9 +4,13 @@
 {
   description = "Change the description field in your flake.nix";
 
-
   inputs = {
     iogx.url = "github:input-output-hk/iogx";
+    n2c.url = "github:nlewo/nix2container";
+    std = {
+      url = "github:divnix/std";   
+      inputs.n2c.follows = "n2c";
+    };
     easyPSSrc = {
       flake = false;
       url = "github:justinwoo/easy-purescript-nix";
@@ -17,13 +21,17 @@
     };
   };
 
-
   outputs = inputs: inputs.iogx.lib.mkFlake {
     inherit inputs;
     repoRoot = ./.;
-    # systems = ["x86_64-linux" "x86_64-darwin"];
+    systems = ["x86_64-linux"];
+    nixpkgsConfig = {
+      permittedInsecurePackages = [
+        "nodejs-16.20.1"
+        "python-2.7.18.6"
+      ];
+    };
   };
-
 
   nixConfig = {
     extra-substituters = [

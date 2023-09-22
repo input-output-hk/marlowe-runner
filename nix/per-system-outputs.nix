@@ -4,11 +4,11 @@
 { iogxRepoRoot, repoRoot, inputs, inputs', pkgs, system, lib, projects ? null, ... }:
 
 {
-  # packages = { };
-  # checks = { };
-  # apps = { };
-  # operables = { };
-  # oci-images = { };
-  # nomadTasks = { };
-  # foobar = { };
+# packages = { };
+# checks = { };
+# apps = { };
+# operables = { };
+# oci-images = { };
+# nomadTasks = { };
+# foobar = { };
 }

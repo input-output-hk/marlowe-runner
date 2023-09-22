@@ -7,9 +7,9 @@ let
 
   easyPS = pkgs.callPackage inputs.easyPSSrc { inherit pkgs; };
   easyPSPaluh = pkgs.callPackage inputs.easyPSSrcPaluh { inherit pkgs; };
-# nodejs-16 = pkgs.writeShellScriptBin "nodejs-16" ''
-#   ${ pkgs.nodejs-16_x.out}/bin/node $@
-# '';
+  nodejs-16 = pkgs.writeShellScriptBin "nodejs-16" ''
+    ${ pkgs.nodejs-16_x.out}/bin/node $@
+  '';
 
 in
 
@@ -18,6 +18,8 @@ in
     # prompt = "$ ";
     welcomeMessage = "Marlowe Runner";
     packages = [
+      pkgs.node2nix
+      easyPS.spago2nix
       # Please update spago and purescript in `package.json` `scripts` section
       easyPSPaluh."purs-0_15_10_0"
       easyPSPaluh."purs-tidy"
@@ -27,7 +29,7 @@ in
       easyPS.pulp
       easyPS.spago
       pkgs.jq
-    # pkgs.docker
+      pkgs.docker
       pkgs.nodePackages.bower
       pkgs.nodePackages.jshint
       pkgs.nodePackages.nodemon
@@ -37,19 +39,19 @@ in
       pkgs.nodePackages.webpack-dev-server
       pkgs.dhall
       pkgs.nodejs-18_x
-    # nodejs-16
+      nodejs-16
       pkgs.pkg-config
       pkgs.postgresql
-    # pkgs.python27
+      pkgs.python27
       pkgs.python38
       pkgs.unzip
       pkgs.nixpacks
     ];
-    # scripts = { };
-    # env = { };
+  # scripts = { };
+  # env = { };
     enterShell = ''
       npm install
-      NODE_OPTIONS=--experimental-fetch --trace-warnings
-      export PATH=$PATH:./node_modules/.bin/:./bin
+      NODE_OPTIONS="--experimental-fetch --trace-warnings"
+      export PATH="$PATH:./node_modules/.bin/:./bin"
     '';
   }
