@@ -177,6 +177,7 @@ runLiteTags :: Tags -> Array String
 runLiteTags (Tags metadata) = case Map.lookup runLiteTag metadata >>= decodeJson >>> hush of
   Just arr ->
     Array.filter ((_ > 2) <<< length) -- ignoring short tags
+
       $ arr
   Nothing -> []
 
@@ -187,7 +188,6 @@ someContractTags (NotSyncedUpdatedContract { contractInfo }) = do
     ContractInfo { tags } = contractInfo
   runLiteTags tags
 someContractTags (NotSyncedCreatedContract { tags }) = runLiteTags tags
-
 
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
@@ -233,7 +233,7 @@ mkContractList = do
           sortedContracts = case ordering.orderBy of
             OrderByCreationDate -> Array.sortBy (compare `on` ContractInfo.createdAt) contracts
             OrderByLastUpdateDate -> Array.sortBy (compare `on` ContractInfo.updatedAt) contracts
-            -- OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contracts
+        -- OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contracts
         pure $
           if ordering.orderAsc then sortedContracts
           else Array.reverse sortedContracts
@@ -377,14 +377,49 @@ mkContractList = do
           , do
               let
                 spinner =
-                   DOM.div
-                     { className: "col-12 position-relative d-flex justify-content-center align-items-center blur-bg z-index-sticky" }
-                     $ loadingSpinnerLogo {}
-              case possibleContracts'', contractMapInitialized of
-                Nothing, _ -> spinner
-                Just [], false -> spinner
-                Just [], true -> DOOM.text "No contracts found yet for your wallet."
-                Just contracts, _ -> DOM.div { className: "row" } $ DOM.div { className: "col-12 mt-3" } do
+                  DOM.div
+                    { className: "col-12 position-relative d-flex justify-content-center align-items-center blur-bg z-index-sticky" }
+                    $ loadingSpinnerLogo {}
+                tableHeader =
+                  DOM.thead {} do
+                    let
+                      orderingTh = Table.orderingHeader ordering updateOrdering
+                      th label = DOM.th { className: "text-center text-muted" } [ label ]
+                    [ DOM.tr {}
+                        [ DOM.th { className: "text-center" } $ DOOM.img { src: "/images/calendar_month.svg" }
+                        , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/event_available.svg" }
+                        , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/fingerprint.svg" }
+                        , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/sell.svg" }
+                        , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/frame_65.svg" }
+                        ]
+                    , DOM.tr {}
+                        [ do
+                            let
+                              label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                            orderingTh label OrderByCreationDate
+                        , do
+                            let
+                              label = DOOM.fragment [ DOOM.text "Updated" ] --, DOOM.br {},  DOOM.text "(Block number)"]
+                            orderingTh label OrderByLastUpdateDate
+                        , DOM.th { className: "text-center w-16rem" } $ DOOM.text "Contract Id"
+                        , th $ DOOM.text "Tags"
+                        , th $ DOOM.text "Actions"
+                        ]
+                    ]
+                mkTable tbody = table { striped: Table.striped.boolean true, hover: true }
+                  [ tableHeader
+                  , tbody
+                  ]
+
+              DOM.div { className: "container shadow table-container" } $ DOM.div { className: "row" } $ case possibleContracts'', contractMapInitialized of
+                -- Pre search no started
+                Nothing, _ -> fragment [ mkTable mempty, spinner ]
+                -- Searching but nothing was found, still searching
+                Just [], false -> fragment [ mkTable mempty, spinner ]
+                -- Searching but nothing was found, search finished
+                Just [], true -> fragment [ mkTable mempty, DOM.div { className: "container" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12 text-center py-3 fw-bold" } $ DOOM.text "No contracts found" ]
+                -- Searching and something was found
+                Just contracts, _ -> DOM.div { className: "col-12 px-0" } do
                   let
                     tdCentered :: forall jsx. ToJSX jsx => jsx -> JSX
                     tdCentered = DOM.td { className: "text-center" }
@@ -437,33 +472,9 @@ mkContractList = do
                             $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
                         ]
 
-                  [ DOM.div { className: "container" } $ DOM.div { className: "row" } $ table { striped: Table.striped.boolean true, hover: true }
-                      [ DOM.thead {} do
-                          let
-                            orderingTh = Table.orderingHeader ordering updateOrdering
-                            th label = DOM.th { className: "text-center text-muted" } [ label ]
-                          [ DOM.tr {}
-                              [ DOM.th { className: "text-center" } $ DOOM.img { src: "/images/calendar_month.svg" }
-                              , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/event_available.svg" }
-                              , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/fingerprint.svg" }
-                              , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/sell.svg" }
-                              , DOM.th { className: "text-center" } $ DOOM.img { src: "/images/frame_65.svg" }
-                              ]
-                          , DOM.tr {}
-                              [ do
-                                  let
-                                    label = DOOM.fragment [ DOOM.text "Created" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                                  orderingTh label OrderByCreationDate
-                              , do
-                                  let
-                                    label = DOOM.fragment [ DOOM.text "Updated" ] --, DOOM.br {},  DOOM.text "(Block number)"]
-                                  orderingTh label OrderByLastUpdateDate
-                              , DOM.th { className: "text-center w-16rem" } $ DOOM.text "Contract Id"
-                              , th $ DOOM.text "Tags"
-                              , th $ DOOM.text "Actions"
-                              ]
-                          ]
-                      , DOM.tbody {} $ contracts <#> \someContract -> do
+                  [ mkTable
+                      $ DOM.tbody {}
+                      $ contracts <#> \someContract -> do
                           let
                             createdAt = ContractInfo.createdAt someContract
                             updatedAt = ContractInfo.updatedAt someContract
@@ -537,22 +548,22 @@ mkContractList = do
                                             }
                                           _ -> mempty
                                       _, _ -> mempty
-                                , case marloweInfo, possibleWalletContext of
-                                    Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
-                                      let
-                                        balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
-                                        roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
-                                      case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
-                                        Just { head, tail } -> buttonWithIcon
-                                          { icon: unsafeIcon mempty
-                                          , label: DOOM.text "Withdraw"
-                                          , extraClassNames: "font-weight-bold me-2 btn-outline-warning"
-                                          , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                          , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
-                                          }
-                                        _ -> mempty
-                                    _, _ -> mempty
-                                ]
+                                  , case marloweInfo, possibleWalletContext of
+                                      Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
+                                        let
+                                          balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
+                                          roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
+                                        case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
+                                          Just { head, tail } -> buttonWithIcon
+                                            { icon: unsafeIcon mempty
+                                            , label: DOOM.text "Withdraw"
+                                            , extraClassNames: "font-weight-bold me-2 btn-outline-warning"
+                                            , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                            , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                            }
+                                          _ -> mempty
+                                      _, _ -> mempty
+                                  ]
                               ]
                             NotSyncedCreatedContract {} -> do
                               [ tdInstant createdAt
@@ -573,7 +584,6 @@ mkContractList = do
                               , tdCentered ([ DOOM.text "Placeholder - UPDATED" ] :: Array JSX) -- FIXME: Withdrawals should be still possible
                               ]
 
-                      ]
                   ]
           ]
         _, _ -> mempty

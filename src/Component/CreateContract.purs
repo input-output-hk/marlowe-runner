@@ -20,6 +20,11 @@ import Contrib.Polyform.FormSpecs.StatelessFormSpec (StatelessFormSpec)
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatlessFormSpec
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
+import ReactBootstrap.Tab (tab)
+import ReactBootstrap.Tabs (tabs)
+import ReactBootstrap.Tabs as Tabs
+import ReactBootstrap.Types (eventKey)
+import Contrib.React.MarloweGraph (marloweGraph)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FieldLayout(..), LabelSpacing(..), StatelessBootstrapFormSpec, booleanField)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
 import Control.Error.Util (hoistMaybe)
@@ -66,7 +71,7 @@ import Polyform.Batteries.Generic.Messages (placeholder)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (b, div, div_, hr, img, input, text) as DOOM
+import React.Basic.DOM (b, div, div_, hr, img, input, text, span_) as DOOM
 import React.Basic.DOM (css)
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -80,6 +85,7 @@ import Web.DOM.Node (Node)
 import Web.File.File (File)
 import Web.File.FileList (FileList)
 import Web.File.FileList as FileList
+import Web.HTML.HTMLButtonElement (disabled)
 import Web.HTML.HTMLInputElement (HTMLInputElement)
 import Web.HTML.HTMLInputElement as HTMLInputElement
 import Web.HTML.History (back)
@@ -113,6 +119,29 @@ type LabeledFormSpec validatorM = StatelessFormSpec validatorM (Array (FieldId /
 
 fullWidthLayout = MultiColumn { sm: Col12Label, md: Col12Label, lg: Col12Label }
 
+contractSection contract state =
+  tabs { fill: false, justify: false, defaultActiveKey: "source", variant: Tabs.variant.pills } do
+    let
+      renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
+    [ renderTab
+        { eventKey: eventKey "graph"
+        , disabled: true
+        , title: DOOM.span_
+            -- [ Icons.toJSX $ unsafeIcon "diagram-2"
+            [ DOOM.text " Source graph"
+            ]
+        }
+        [ marloweGraph { contract: contract } ]
+    , renderTab
+        { eventKey: eventKey "source"
+        , disabled: false
+        , title: DOOM.span_
+            -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
+            [ DOOM.text " Source code"
+            ]
+        }
+        [ marloweYaml contract ]
+    ]
 
 mkContractFormSpec :: (Maybe ContractJsonString /\ AutoRun) -> LabeledFormSpec Effect Query Result
 mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormSpecBuilder.evalBuilder Nothing $ do
@@ -299,7 +328,7 @@ backToContractListLink :: Effect Unit -> JSX
 backToContractListLink onDismiss = do
   DOM.div { className: "col-12 text-center" } $
     [ link
-        { label: DOM.b {} [DOOM.text "Back to contractList"]
+        { label: DOM.b {} [ DOOM.text "Back to contractList" ]
         , onClick: onDismiss
         , showBorders: false
         , extraClassNames: "mt-3"
@@ -457,7 +486,6 @@ mkComponent = do
             , submittedAt
             , tags
             }
-
 
         BodyLayout.component
           { title: stateToTitle submissionState

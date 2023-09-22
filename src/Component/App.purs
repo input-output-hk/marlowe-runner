@@ -194,7 +194,7 @@ mkApp = do
               untilJust do
                 newSynced <- liftEffect $ contractStream.getLiveState
                 liftEffect $ updateContractInfoMap \(contractMap /\ initialized) ->
-                    (ContractInfoMap.updateSynced (Just newSynced) contractMap) /\ initialized
+                  (ContractInfoMap.updateSynced (Just newSynced) contractMap) /\ initialized
                 delay (Milliseconds 1_000.0)
                 pure Nothing
             contractStream.start
@@ -304,7 +304,7 @@ mkApp = do
                               { label: DOM.span { className: "h5" }
                                   [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
                                   , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
-                                    [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+                                      [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
                                   ]
                               , extraClassNames: "nav-link"
                               , onClick: setConfiguringWallet true
@@ -363,8 +363,7 @@ mkApp = do
               , contractMapInitialized
               , notSyncedYetInserts
               , connectedWallet: possibleWalletInfo
-              , possibleInitialModalAction: Just (NewContract Nothing)
-                  --(NewContract <<< Just) <$> props.possibleInitialContract
+              , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
               }
         -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
 
@@ -390,7 +389,7 @@ mkApp = do
         --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
         --              ]
         --          ]
-        , footer (Footer.Fixed false)
+        , footer (Footer.Fixed true)
         ]
 
 mkAppContractInfoMap :: Slotting -> Maybe WalletContext -> Maybe ContractWithTransactionsMap -> Maybe NotSyncedYet -> Maybe AppContractInfoMap

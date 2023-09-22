@@ -61,6 +61,10 @@ $link-color: #511CF7;
   table-layout: fixed;
 }
 
+.table-container {
+  border-radius: 0.875rem;
+}
+
 /* Center the content of the table headers */
 .table th, td {
   text-align: center;

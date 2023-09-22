@@ -63,8 +63,8 @@ import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
-import ReactBootstrap.Icons (unsafeIcon)
-import ReactBootstrap.Icons as Icons
+-- import ReactBootstrap.Icons (unsafeIcon)
+-- import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Tab (tab)
 import ReactBootstrap.Tabs (tabs)
 import ReactBootstrap.Tabs as Tabs
@@ -1030,6 +1030,7 @@ mkComponent = do
               , outputState: state
               , submittedAt
               }
+
             onSuccess' :: Effect Unit
             onSuccess' = onSuccess contractUpdated
           inputApplied onSuccess'
