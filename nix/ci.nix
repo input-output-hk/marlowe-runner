@@ -4,7 +4,7 @@
 { iogxRepoRoot, repoRoot, inputs, inputs', pkgs, system, lib, ... }:
 
 {
-  # includeDefaultOutputs = true;
-  # includedPaths = [];
-  # excludedPaths = [];
+# includeDefaultOutputs = true;
+# includedPaths = [];
+# excludedPaths = [];
 }

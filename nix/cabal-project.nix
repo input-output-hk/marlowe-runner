@@ -4,10 +4,10 @@
 { iogxRepoRoot, repoRoot, inputs, inputs', pkgs, system, lib, meta, config, ... }:
 
 {
-  # cabalProjectLocal = "";
-  # sha256map = {};
-  # shellWithHoogle = false; 
-  # shellBuildInputs = [];
-  # modules = {};
-  # overlays = [];
+# cabalProjectLocal = "";
+# sha256map = {};
+# shellWithHoogle = false; 
+# shellBuildInputs = [];
+# modules = {};
+# overlays = [];
 }
