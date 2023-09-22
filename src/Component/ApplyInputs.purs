@@ -110,30 +110,30 @@ submit witnesses serverUrl contractEndpoint = do
   put' serverUrl contractEndpoint req
 
 contractSection contract state =
-  tabs { fill: true, justify: true, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
+  tabs { fill: false, justify: false, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
     let
       renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
     [ renderTab
         { eventKey: eventKey "graph"
         , title: DOOM.span_
-            [ Icons.toJSX $ unsafeIcon "diagram-2"
-            , DOOM.text " Source graph"
+            -- [ Icons.toJSX $ unsafeIcon "diagram-2"
+            [ DOOM.text " Source graph"
             ]
         }
         [ marloweGraph { contract: contract } ]
     , renderTab
         { eventKey: eventKey "source"
         , title: DOOM.span_
-            [ Icons.toJSX $ unsafeIcon "filetype-yml"
-            , DOOM.text " Source code"
+            -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
+            [ DOOM.text " Source code"
             ]
         }
         [ marloweYaml contract ]
     , renderTab
         { eventKey: eventKey "state"
         , title: DOOM.span_
-            [ Icons.toJSX $ unsafeIcon "bank"
-            , DOOM.text " Contract state"
+            -- [ Icons.toJSX $ unsafeIcon "bank"
+            [ DOOM.text " Contract state"
             ]
         }
         [ marloweStateYaml state ]
