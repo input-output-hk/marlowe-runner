@@ -18,8 +18,7 @@ in
     # prompt = "$ ";
     welcomeMessage = "Marlowe Runner";
     packages = [
-      pkgs.node2nix
-      easyPS.spago2nix
+      pkgs.podman
       # Please update spago and purescript in `package.json` `scripts` section
       easyPSPaluh."purs-0_15_10_0"
       easyPSPaluh."purs-tidy"
