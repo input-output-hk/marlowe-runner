@@ -3,6 +3,7 @@ module Component.App where
 import Prelude
 
 import Cardano (AssetId(..), NonAdaAssets(..), nonAdaAssets)
+import CardanoMultiplatformLib (bech32ToString)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
@@ -298,16 +299,17 @@ mkApp = do
                               }
                           ]
                       , DOM.li { className: "nav-item" } $
-                          case possibleWalletInfo of
-                            Just (WalletInfo wallet) -> link
+                          case possibleWalletInfo, possibleWalletContext of
+                            Just (WalletInfo wallet), Just (WalletContext ctx) -> link
                               { label: DOM.span { className: "h5" }
                                   [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
-                                  , DOOM.span_ [ DOOM.text "TODO - Change Address" ]
+                                  , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
+                                    [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
                                   ]
                               , extraClassNames: "nav-link"
                               , onClick: setConfiguringWallet true
                               }
-                            Nothing -> linkWithIcon
+                            _, _ -> linkWithIcon
                               { icon: Icons.wallet2
                               , label: DOOM.text "Connect Wallet"
                               , extraClassNames: "nav-link"
