@@ -16,6 +16,15 @@ $link-color: #511CF7;
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/utilities";
 
+
+
+#app-root {
+  background: linear-gradient(to right, #F8F6FF 0%, #F8F6FF 50%,  white 50%, white 100%)
+}
+#app-root.contract-list-page {
+  background: white;
+}
+
 .card {
   border-radius: 10px;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);

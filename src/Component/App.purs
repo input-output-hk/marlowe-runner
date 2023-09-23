@@ -7,13 +7,12 @@ import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (ModalAction(..), NotSyncedYetInserts(..), mkContractList)
-import Component.CreateContract (ContractJsonString)
 import Component.Footer (footer)
 import Component.Footer as Footer
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
-import Component.Types (ContractInfo(..), MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
+import Component.Types (ContractInfo(..), MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page, WalletInfo(..), ContractJsonString(..))
 import Component.Types.ContractInfo (MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Types.ContractInfoMap as ContractInfoMap
@@ -121,7 +120,10 @@ newtype AppContractInfoMap = AppContractInfoMap
   , map :: ContractInfoMap
   }
 
-type Props = { possibleInitialContract :: Maybe ContractJsonString }
+type Props =
+  { possibleInitialContract :: Maybe ContractJsonString
+  , setPage :: Page -> Effect Unit
+  }
 
 mkApp :: MkComponentMBase () (Props -> JSX)
 mkApp = do
@@ -361,8 +363,10 @@ mkApp = do
               , contractMapInitialized
               , notSyncedYetInserts
               , connectedWallet: possibleWalletInfo
-              , possibleInitialModalAction: Just (NewContract Nothing)
-                  --(NewContract <<< Just) <$> props.possibleInitialContract
+              -- To start on create contract page:
+              -- , possibleInitialModalAction: Just (NewContract Nothing)
+              , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
+              , setPage: props.setPage
               }
         -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
 
@@ -437,3 +441,5 @@ mkAppContractInfoMap slotting walletContext possiblySynced possiblyNotSyncedYet 
           }
 
   pure $ AppContractInfoMap { walletContext, map: ns `Map.union` s }
+
+-- background: linear-gradient(    to right,    #F8F6FF 0%,    #F8F6FF 50%,    white 50%,    white 100%  )

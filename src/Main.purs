@@ -4,8 +4,9 @@ import Prelude
 
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.App (mkApp)
-import Component.CreateContract (ContractJsonString(..))
 import Component.MessageHub (mkMessageHub)
+import Component.Types (ContractJsonString(..), Page(..))
+import Contrib.Cardano (Slotting(..))
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
 import Contrib.JsonBigInt as JsonBigInt
@@ -32,11 +33,11 @@ import Parsing as Parsing
 import Partial.Unsafe (unsafePartial)
 import React.Basic (createContext)
 import React.Basic.DOM.Client (createRoot, renderRoot)
-import Contrib.Cardano (Slotting(..))
 import URI (RelativeRef(..), URI(..)) as URI
 import URI.Extra.QueryPairs (QueryPairs(..)) as URI
 import URI.URIRef as URIRef
 import Web.DOM (Element)
+import Web.DOM.Element (setAttribute)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.HTML (HTMLDocument, window)
 import Web.HTML.HTMLDocument (toNonElementParentNode)
@@ -117,9 +118,28 @@ main configJson = do
   possibleInitialContract <- processInitialURL
 
   doc :: HTMLDocument <- document =<< window
-  container :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<
+  appContainer :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<
     (getElementById "app-root" $ toNonElementParentNode doc)
-  reactRoot <- createRoot container
+
+  -- FIXME:
+  -- Currently `setPage` is triggered bottom up
+  -- but it should be triggered top down from the brower and routing events
+  -- Introduce: https://github.com/robertdp/purescript-web-router
+
+  let
+    setPageClass :: Page -> Effect Unit
+    setPageClass  ContarctListPage =
+      setAttribute "class" "contract-list-page" appContainer
+    setPageClass (CreateContractPage _) = do
+      setAttribute "class" "create-contract-page" appContainer
+    setPageClass OtherPage =
+      setAttribute "class" "" appContainer
+
+    setPage :: Page -> Effect Unit
+    setPage page = do
+      setPageClass page
+
+  reactRoot <- createRoot appContainer
   launchAff_ do
     HealthCheck { networkId } <- Marlowe.Runtime.Web.getHealthCheck serverURL >>= case _ of
       Left err -> liftEffect $ throw $ unsafeStringify err
@@ -148,5 +168,9 @@ main configJson = do
             , slotting
             }
 
+        liftEffect $ setPageClass $ case possibleInitialContract of
+          Nothing -> ContarctListPage
+          Just contractJson -> CreateContractPage (Just contractJson)
+
         app <- liftEffect $ runReaderT mkApp mkAppCtx
-        liftEffect $ renderRoot reactRoot $ msgHubComponent [ app { possibleInitialContract } ]
+        liftEffect $ renderRoot reactRoot $ msgHubComponent [ app { possibleInitialContract, setPage } ]

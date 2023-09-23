@@ -61,7 +61,7 @@ useMooreMachine initialSpec = React.coerceHook React.do
   { state, version: stateVersion } /\ setState <- useVersionedState' initialSpec.initialState
   stateRef <- useStateRef stateVersion state
 
-  { state: possibleRequest, version: requestTrigger } /\ setPossibleRequest <- useVersionedState' Nothing
+  { state: possibleRequest, version: requestTrigger } /\ setPossibleRequest <- useVersionedState' $ spec.driver state
   possibleRequestRef <- useStateRef requestTrigger possibleRequest
 
   let

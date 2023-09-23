@@ -9,6 +9,7 @@ import Component.InputHelper (ChoiceInput, DepositInput, NotifyInput, nextChoice
 import Component.Types (WalletInfo(..))
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Fetch (FetchError)
+import Control.Alt ((<|>))
 import Control.Alternative as Alternative
 import Control.Monad.Error.Class (catchError)
 import Data.Array as Array
@@ -18,7 +19,7 @@ import Data.DateTime.Instant (Instant, toDateTime)
 import Data.Either (Either(..), isLeft)
 import Data.Foldable (foldMap)
 import Data.Int as Int
-import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Variant (Variant)
 import Debug (traceM)
@@ -30,6 +31,7 @@ import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (PostContractsError, PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), ResourceWithLinks, Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
+import Unsafe.Coerce (unsafeCoerce)
 import Wallet as Wallet
 import WalletContext (WalletContext(..), walletContext)
 
@@ -37,6 +39,7 @@ type ClientError' = ClientError PostContractsError
 
 type WalletAddresses = { usedAddresses :: Array Bech32, changeAddress :: Bech32 }
 
+-- FIXME: wallet roles
 type RequiredWalletContext = WalletAddresses
 
 type AllInputsChoices = Either
@@ -70,11 +73,11 @@ data InputChoices
 newtype AutoRun = AutoRun Boolean
 
 data State
-  = PresentingContractDetails
-      { marloweContext :: MarloweContext
-      , transactionsEndpoint :: TransactionsEndpoint
-      }
-  | FetchingRequiredWalletContext
+  -- = PresentingContractDetails
+  --     { marloweContext :: MarloweContext
+  --     , transactionsEndpoint :: TransactionsEndpoint
+  --     }
+  = FetchingRequiredWalletContext
       { autoRun :: AutoRun
       , marloweContext :: MarloweContext
       , transactionsEndpoint :: TransactionsEndpoint
@@ -143,16 +146,16 @@ data State
       , submittedAt :: Instant
       }
 
-autoRunFromState :: State -> Maybe AutoRun
+autoRunFromState :: State -> AutoRun
 autoRunFromState = case _ of
-  PresentingContractDetails _ -> Nothing
-  FetchingRequiredWalletContext { autoRun } -> Just autoRun
-  ChoosingInputType { autoRun } -> Just autoRun
-  PickingInput { autoRun } -> Just autoRun
-  CreatingTx { autoRun } -> Just autoRun
-  SigningTx { autoRun } -> Just autoRun
-  SubmittingTx { autoRun } -> Just autoRun
-  InputApplied { autoRun } -> Just autoRun
+  -- PresentingContractDetails _ -> Nothing
+  FetchingRequiredWalletContext { autoRun } -> autoRun
+  ChoosingInputType { autoRun } -> autoRun
+  PickingInput { autoRun } -> autoRun
+  CreatingTx { autoRun } -> autoRun
+  SigningTx { autoRun } -> autoRun
+  SubmittingTx { autoRun } -> autoRun
+  InputApplied { autoRun } -> autoRun
 
 data Action
   = FetchRequiredWalletContext
@@ -185,29 +188,67 @@ data Action
 step :: State -> Action -> State
 step state action = do
   case state of
-    PresentingContractDetails _ -> case action of
-      FetchRequiredWalletContext { autoRun, marloweContext, transactionsEndpoint } -> FetchingRequiredWalletContext
-        { autoRun
-        , marloweContext
-        , transactionsEndpoint
-        , errors: Nothing
-        }
-      _ -> state
+    -- PresentingContractDetails _ -> case action of
+    --   FetchRequiredWalletContext { autoRun, marloweContext, transactionsEndpoint } -> FetchingRequiredWalletContext
+    --     { autoRun
+    --     , marloweContext
+    --     , transactionsEndpoint
+    --     , errors: Nothing
+    --     }
+    --   _ -> state
     FetchingRequiredWalletContext { errors: Just _ } -> case action of
       FetchRequiredWalletContext { autoRun, marloweContext, transactionsEndpoint } ->
         FetchingRequiredWalletContext $ { autoRun, marloweContext, transactionsEndpoint, errors: Nothing }
       _ -> state
     FetchingRequiredWalletContext r@{ autoRun, transactionsEndpoint, marloweContext } -> case action of
       FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
-      FetchRequiredWalletContextSucceeded { requiredWalletContext, allInputsChoices, environment } -> ChoosingInputType
-        { autoRun
-        , errors: Nothing
-        , allInputsChoices
-        , environment
-        , marloweContext
-        , requiredWalletContext
-        , transactionsEndpoint
-        }
+      FetchRequiredWalletContextSucceeded { requiredWalletContext, allInputsChoices, environment } -> case allInputsChoices of
+        Left contract -> do
+          let inputChoices  = AdvanceContract contract
+          PickingInput
+            { autoRun
+            , errors: Nothing
+            , allInputsChoices
+            , environment
+            , inputChoices
+            , marloweContext
+            , requiredWalletContext
+            , transactionsEndpoint
+            }
+        Right { deposits, choices, notify } -> do
+          let
+            inputTypesCount = do
+              let
+                countInputType :: forall a. Maybe a -> Int
+                countInputType = maybe 0 (const 1)
+              countInputType deposits + countInputType choices + countInputType notify 
+
+            possibleInputChoices :: Maybe InputChoices
+            possibleInputChoices  =
+              (DepositInputs <$> deposits)
+                <|> (ChoiceInputs <$> choices)
+                <|> (SpecificNotifyInput <$> notify)
+
+          case inputTypesCount, possibleInputChoices of
+            1, Just inputChoices -> PickingInput
+              { autoRun
+              , errors: Nothing
+              , allInputsChoices
+              , environment
+              , inputChoices
+              , marloweContext
+              , requiredWalletContext
+              , transactionsEndpoint
+              }
+            _, _ -> ChoosingInputType
+              { autoRun
+              , errors: Nothing
+              , allInputsChoices
+              , environment
+              , marloweContext
+              , requiredWalletContext
+              , transactionsEndpoint
+              }
       _ -> state
     ChoosingInputType r@{ errors: Just _ } -> case action of
       ChooseInputType -> ChoosingInputType r { errors = Nothing }
@@ -274,9 +315,9 @@ type Env =
   , runtime :: Runtime
   }
 
-initialState :: MarloweContext -> TransactionsEndpoint -> State
-initialState marloweContext transactionsEndpoint = PresentingContractDetails do
-  { marloweContext, transactionsEndpoint }
+initialState :: MarloweContext -> TransactionsEndpoint -> AutoRun -> State
+initialState marloweContext transactionsEndpoint autoRun = FetchingRequiredWalletContext do
+  { autoRun, marloweContext, transactionsEndpoint, errors: Nothing }
 
 type MarloweContext =
   { contract :: V1.Contract
@@ -320,11 +361,11 @@ nextRequest env state = do
   let
     { cardanoMultiplatformLib, connectedWallet: walletInfo, runtime } = env
     Runtime { serverURL } = runtime
-    AutoRun autoRun = fromMaybe (AutoRun false) $ autoRunFromState state
+    AutoRun autoRun = autoRunFromState state
   Alternative.guard autoRun
   case state of
-    PresentingContractDetails { marloweContext } ->
-      Just $ WalletRequest $ FetchWalletContextRequest { marloweContext, cardanoMultiplatformLib, walletInfo }
+    -- PresentingContractDetails { marloweContext } ->
+    --   Just $ WalletRequest $ FetchWalletContextRequest { marloweContext, cardanoMultiplatformLib, walletInfo }
     FetchingRequiredWalletContext { marloweContext, errors: Nothing } ->
       Just $ WalletRequest $ FetchWalletContextRequest { marloweContext, cardanoMultiplatformLib, walletInfo }
     CreatingTx { errors: Nothing, inputChoices, input, allInputsChoices, environment, requiredWalletContext, transactionsEndpoint } -> do
@@ -413,6 +454,7 @@ requestToAffAction = case _ of
 driver :: Env -> State -> Maybe (Aff Action)
 driver env state = do
   request <- nextRequest env state
+  traceM $ unsafeStringify request
   pure $ requestToAffAction request
 
 -- Lower level helpers

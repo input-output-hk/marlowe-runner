@@ -452,7 +452,7 @@ machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultipla
   --       notify = NonEmpty.head <$> NonEmpty.fromArray (nextNotify environment state contract)
   --     Right { deposits, choices, notify }
 
-  { initialState: Machine.initialState marloweContext transactionsEndpoint
+  { initialState: Machine.initialState marloweContext transactionsEndpoint (AutoRun true)
   , step: Machine.step
   , driver: Machine.driver env
   , output: identity
@@ -820,7 +820,7 @@ mkComponent = do
   runtime <- asks _.runtime
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
-  contractDetailsComponent <- mkContractDetailsComponent
+  -- contractDetailsComponent <- mkContractDetailsComponent
   depositFormComponent <- mkDepositFormComponent
   choiceFormComponent <- mkChoiceFormComponent
   notifyFormComponent <- mkNotifyFormComponent
@@ -828,7 +828,6 @@ mkComponent = do
 
   liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, marloweContext, contractInfo, transactionsEndpoint } -> React.do
     walletRef <- React.useRef connectedWallet
-    previewFlow /\ setPreviewFlow <- React.useState' $ DetailedFlow { showPrevStep: true }
     let
       WalletInfo { name: walletName } = connectedWallet
     React.useEffect walletName do
@@ -840,115 +839,93 @@ mkComponent = do
         props = machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime
       useMooreMachine props
 
-    let
-      setNextFlow = case previewFlow of
-        DetailedFlow { showPrevStep: true } -> do
-          setPreviewFlow $ DetailedFlow { showPrevStep: false }
-        DetailedFlow { showPrevStep: false } -> do
-          setPreviewFlow $ DetailedFlow { showPrevStep: true }
-        SimplifiedFlow -> pure unit
-
     pure $ case machine.state of
-      Machine.PresentingContractDetails {} -> do
+      Machine.FetchingRequiredWalletContext { errors } -> do
         let
-          onStepSuccess (AutoRun autoRun) = do
-            machine.applyAction $ Machine.FetchRequiredWalletContext { autoRun: AutoRun true, marloweContext, transactionsEndpoint }
-            traceM "AUTO RUN:"
-            traceM autoRun
-            if autoRun then setPreviewFlow SimplifiedFlow
-            else setPreviewFlow $ DetailedFlow { showPrevStep: true }
+          body = mempty
+          -- fragment $
+          --   [ contractSection marloweContext.contract marloweContext.state
+          --   , DOOM.hr {}
+          --   ]
+        showPossibleErrorAndDismiss "Fetching wallet context" "" body onDismiss errors
 
-        contractDetailsComponent { marloweContext, onSuccess: onStepSuccess, onDismiss }
-      Machine.FetchingRequiredWalletContext { errors } -> case previewFlow of
-        DetailedFlow _ -> fetchingRequiredWalletContextDetails marloweContext Nothing onDismiss Nothing
-        SimplifiedFlow ->
-          do
-            let
-              body = fragment $
-                [ contractSection marloweContext.contract marloweContext.state
-                , DOOM.hr {}
+      Machine.ChoosingInputType { allInputsChoices, requiredWalletContext } -> do
+      -- DetailedFlow { showPrevStep: true } -> do
+      --   fetchingRequiredWalletContextDetails marloweContext (Just setNextFlow) onDismiss $ Just requiredWalletContext
+        let
+          body = fragment $
+            [ contractSection marloweContext.contract marloweContext.state
+            ]
+
+          footer = DOM.div { className: "row" }
+            [ DOM.div { className: "col-6 text-start" } $
+                [ link
+                    { label: DOOM.text "Cancel"
+                    , onClick: onDismiss
+                    , showBorders: true
+                    , extraClassNames: "me-3"
+                    }
                 ]
-            showPossibleErrorAndDismiss "Fetching wallet context" "" body onDismiss errors
-
-      Machine.ChoosingInputType { allInputsChoices, requiredWalletContext } -> case previewFlow of
-        DetailedFlow { showPrevStep: true } -> do
-          fetchingRequiredWalletContextDetails marloweContext (Just setNextFlow) onDismiss $ Just requiredWalletContext
-        _ -> do
-          let
-            body = fragment $
-              [ contractSection marloweContext.contract marloweContext.state
-              ]
-
-            footer = DOM.div { className: "row" }
-              [ DOM.div { className: "col-6 text-start" } $
-                  [ link
-                      { label: DOOM.text "Cancel"
-                      , onClick: onDismiss
-                      , showBorders: true
-                      , extraClassNames: "me-3"
-                      }
-                  ]
-              , DOM.div { className: "col-6 text-end" } $ do
-                  [ DOM.button
-                      { className: "btn btn-primary me-2"
-                      , disabled: not $ Machine.canDeposit allInputsChoices
-                      , onClick: handler_ $ case allInputsChoices of
-                          Right { deposits: Just deposits } ->
-                            machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.DepositInputs deposits)
-                          _ -> pure unit
-                      }
-                      [ R.text "Deposit" ]
-                  , DOM.button
-                      { className: "btn btn-primary me-2"
-                      , disabled: not $ Machine.canChoose allInputsChoices
-                      , onClick: handler_ $ case allInputsChoices of
-                          Right { choices: Just choices } ->
-                            machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.ChoiceInputs choices)
-                          _ -> pure unit
-                      }
-                      [ R.text "Choice" ]
-                  , DOM.button
-                      { className: "btn btn-primary me-2"
-                      , disabled: not $ Machine.canNotify allInputsChoices
-                      , onClick: handler_ $ case allInputsChoices of
-                          Right { notify: Just notify } ->
-                            machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.SpecificNotifyInput notify)
-                          _ -> pure unit
-                      }
-                      [ R.text "Notify" ]
-                  , DOM.button
-                      { className: "btn btn-primary me-2"
-                      , disabled: not $ Machine.canAdvance allInputsChoices
-                      , onClick: handler_ $ case allInputsChoices of
-                          Left advanceContinuation ->
-                            machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.AdvanceContract advanceContinuation)
-                          _ -> pure unit
-                      }
-                      [ R.text "Advance" ]
-                  ]
-              ]
-          BodyLayout.component
-            { title: DOM.h3 {} $ DOOM.text "Select Input Type"
-            , description:
-                DOM.div {}
-                  [ DOM.p {}
-                      [ DOOM.text "You have reached a point in the contract where an input is required to proceed. The contract may allow for various types of inputs depending on its current state and the logic it contains. Below, you will find a selection of input types that you can choose from to interact with the contract. Note that not all input types may be available at this point in the contract. The available input types are enabled, while the others are disabled." ]
-                  , DOM.ul {}
-                      [ DOM.li {} [ DOM.strong {} [ DOOM.text "Deposit:" ], DOOM.text " If enabled, this option allows you to make a deposit into the contract. This might be required for certain conditions or actions within the contract." ]
-                      , DOM.li {} [ DOM.strong {} [ DOOM.text "Choice:" ], DOOM.text " If enabled, this option allows you to make a choice from a set of predefined options. This choice can affect the flow of the contract." ]
-                      , DOM.li {} [ DOM.strong {} [ DOOM.text "Notify:" ], DOOM.text " If enabled, this option allows you to notify the contract of a certain event or condition. This can be used to trigger specific actions within the contract." ]
-                      , DOM.li {} [ DOM.strong {} [ DOOM.text "Advance:" ], DOOM.text " If enabled, this option allows you to move the contract forward to the next state without making any other input." ]
-                      ]
-                  , DOM.p {}
-                      [ DOOM.text "Please select the appropriate input type based on the current state of the contract and the action you wish to take. After selecting an input type, you may be required to provide additional information or make a choice before the contract can proceed." ]
-                  ]
-            , content: wrappedContentWithFooter body footer
-            }
+            , DOM.div { className: "col-6 text-end" } $ do
+                [ DOM.button
+                    { className: "btn btn-primary me-2"
+                    , disabled: not $ Machine.canDeposit allInputsChoices
+                    , onClick: handler_ $ case allInputsChoices of
+                        Right { deposits: Just deposits } ->
+                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.DepositInputs deposits)
+                        _ -> pure unit
+                    }
+                    [ R.text "Deposit" ]
+                , DOM.button
+                    { className: "btn btn-primary me-2"
+                    , disabled: not $ Machine.canChoose allInputsChoices
+                    , onClick: handler_ $ case allInputsChoices of
+                        Right { choices: Just choices } ->
+                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.ChoiceInputs choices)
+                        _ -> pure unit
+                    }
+                    [ R.text "Choice" ]
+                , DOM.button
+                    { className: "btn btn-primary me-2"
+                    , disabled: not $ Machine.canNotify allInputsChoices
+                    , onClick: handler_ $ case allInputsChoices of
+                        Right { notify: Just notify } ->
+                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.SpecificNotifyInput notify)
+                        _ -> pure unit
+                    }
+                    [ R.text "Notify" ]
+                , DOM.button
+                    { className: "btn btn-primary me-2"
+                    , disabled: not $ Machine.canAdvance allInputsChoices
+                    , onClick: handler_ $ case allInputsChoices of
+                        Left advanceContinuation ->
+                          machine.applyAction (Machine.ChooseInputTypeSucceeded $ Machine.AdvanceContract advanceContinuation)
+                        _ -> pure unit
+                    }
+                    [ R.text "Advance" ]
+                ]
+            ]
+        BodyLayout.component
+          { title: DOM.h3 {} $ DOOM.text "Select Input Type"
+          , description:
+              DOM.div {}
+                [ DOM.p {}
+                    [ DOOM.text "You have reached a point in the contract where an input is required to proceed. The contract may allow for various types of inputs depending on its current state and the logic it contains. Below, you will find a selection of input types that you can choose from to interact with the contract. Note that not all input types may be available at this point in the contract. The available input types are enabled, while the others are disabled." ]
+                , DOM.ul {}
+                    [ DOM.li {} [ DOM.strong {} [ DOOM.text "Deposit:" ], DOOM.text " If enabled, this option allows you to make a deposit into the contract. This might be required for certain conditions or actions within the contract." ]
+                    , DOM.li {} [ DOM.strong {} [ DOOM.text "Choice:" ], DOOM.text " If enabled, this option allows you to make a choice from a set of predefined options. This choice can affect the flow of the contract." ]
+                    , DOM.li {} [ DOM.strong {} [ DOOM.text "Notify:" ], DOOM.text " If enabled, this option allows you to notify the contract of a certain event or condition. This can be used to trigger specific actions within the contract." ]
+                    , DOM.li {} [ DOM.strong {} [ DOOM.text "Advance:" ], DOOM.text " If enabled, this option allows you to move the contract forward to the next state without making any other input." ]
+                    ]
+                , DOM.p {}
+                    [ DOOM.text "Please select the appropriate input type based on the current state of the contract and the action you wish to take. After selecting an input type, you may be required to provide additional information or make a choice before the contract can proceed." ]
+                ]
+          , content: wrappedContentWithFooter body footer
+          }
 
       Machine.PickingInput { errors: Nothing, inputChoices, environment } -> do
         let
           applyPickInputSucceeded input = do
-            setNextFlow
             let
               V1.Environment { timeInterval } = environment
               transactionInput = V1.TransactionInput
@@ -974,65 +951,63 @@ mkComponent = do
             advanceFormComponent { marloweContext, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
       Machine.PickingInput { errors: Just error } -> do
         DOOM.text error
-      Machine.CreatingTx { errors } -> case previewFlow of
-        DetailedFlow _ -> do
-          creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
-            Just err -> Just $ err
-            Nothing -> Nothing
-        SimplifiedFlow -> do
-          let
-            body = DOOM.text "Auto creating tx..."
-          showPossibleErrorAndDismiss "Creating Transaction" "" body onDismiss errors
+      Machine.CreatingTx { errors } -> do
+        -- DetailedFlow _ -> do
+        --   creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
+        --     Just err -> Just $ err
+        --     Nothing -> Nothing
+        let
+          body = DOOM.text "Auto creating tx..."
+        showPossibleErrorAndDismiss "Creating Transaction" "" body onDismiss errors
       -- SimplifiedFlow -> BodyLayout.component
       --   { title: "Creating transaction"
       --   , description: DOOM.text "We are creating the initial transaction."
       --   , content: DOOM.text "Auto creating tx... (progress bar?)"
       --   }
-      Machine.SigningTx { createTxResponse, errors } -> case previewFlow of
-        DetailedFlow { showPrevStep: true } -> do
-          creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
-        DetailedFlow _ ->
-          signingTransaction Nothing onDismiss Nothing
-        SimplifiedFlow -> do
-          let
-            body = DOOM.text "Auto signing tx... (progress bar?)"
-          showPossibleErrorAndDismiss "Signing Transaction" "" body onDismiss errors
-      Machine.SubmittingTx { txWitnessSet, errors } -> case previewFlow of
-        DetailedFlow { showPrevStep: true } -> do
-          signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
-        DetailedFlow _ ->
-          submittingTransaction onDismiss "Final request placeholder" $ errors
-        SimplifiedFlow -> BodyLayout.component
+      Machine.SigningTx { createTxResponse, errors } -> do
+        -- DetailedFlow { showPrevStep: true } -> do
+        --   creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
+        -- DetailedFlow _ ->
+        --   signingTransaction Nothing onDismiss Nothing
+        let
+          body = DOOM.text "Auto signing tx... (progress bar?)"
+        showPossibleErrorAndDismiss "Signing Transaction" "" body onDismiss errors
+      Machine.SubmittingTx { txWitnessSet, errors } ->
+        -- DetailedFlow { showPrevStep: true } -> do
+        --   signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
+        -- DetailedFlow _ ->
+        --   submittingTransaction onDismiss "Final request placeholder" $ errors
+        BodyLayout.component
           { title: DOM.h3 {} $ DOOM.text "Submitting transaction"
           , description: DOOM.text "We are submitting the initial transaction."
           , content: DOOM.text "Auto submitting tx... (progress bar?)"
           }
-      Machine.InputApplied ia -> case previewFlow of
-        DetailedFlow { showPrevStep: true } -> do
-          submittingTransaction onDismiss "Final request placeholder" (Just "201")
-        _ -> do
-          let
-            { submittedAt
-            , input: possibleInput
-            , environment
-            , newMarloweContext: { state, contract }
-            } = ia
+      Machine.InputApplied ia -> do
+        -- DetailedFlow { showPrevStep: true } -> do
+        --   submittingTransaction onDismiss "Final request placeholder" (Just "201")
+        -- _ -> do
+        let
+          { submittedAt
+          , input: possibleInput
+          , environment
+          , newMarloweContext: { state, contract }
+          } = ia
 
-            V1.Environment { timeInterval } = environment
-            transactionInput = V1.TransactionInput
-              { inputs: foldr List.Cons List.Nil possibleInput
-              , interval: timeInterval
-              }
-            contractUpdated = ContractInfo.ContractUpdated
-              { contractInfo
-              , transactionInput
-              , outputContract: contract
-              , outputState: state
-              , submittedAt
-              }
-            onSuccess' :: Effect Unit
-            onSuccess' = onSuccess contractUpdated
-          inputApplied onSuccess'
+          V1.Environment { timeInterval } = environment
+          transactionInput = V1.TransactionInput
+            { inputs: foldr List.Cons List.Nil possibleInput
+            , interval: timeInterval
+            }
+          contractUpdated = ContractInfo.ContractUpdated
+            { contractInfo
+            , transactionInput
+            , outputContract: contract
+            , outputState: state
+            , submittedAt
+            }
+          onSuccess' :: Effect Unit
+          onSuccess' = onSuccess contractUpdated
+        inputApplied onSuccess'
 
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"

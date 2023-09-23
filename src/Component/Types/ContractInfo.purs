@@ -20,7 +20,7 @@ import Effect.Aff (Aff)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, getResource') as Runtime
 import Marlowe.Runtime.Web.Streaming (TxHeaderWithEndpoint)
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractHeader, ContractId, TransactionEndpoint, TransactionsEndpoint, Tx(..), TxId) as Runtime
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractHeader, ContractId, TransactionEndpoint, TransactionsEndpoint, Tx(..)) as Runtime
 import Marlowe.Runtime.Web.Types (Payout, ServerURL, Tags)
 
 data UserContractRole
@@ -138,6 +138,12 @@ data SomeContractInfo
   = SyncedConractInfo ContractInfo
   | NotSyncedCreatedContract ContractCreatedDetails
   | NotSyncedUpdatedContract ContractUpdatedDetails
+derive instance Eq SomeContractInfo
+
+someContractInfoContractId :: SomeContractInfo -> Runtime.ContractId
+someContractInfoContractId (SyncedConractInfo (ContractInfo { contractId })) = contractId
+someContractInfoContractId (NotSyncedCreatedContract { contractId }) = contractId
+someContractInfoContractId (NotSyncedUpdatedContract { contractInfo: ContractInfo { contractId } }) = contractId
 
 someContractInfoFromContractInfo :: ContractInfo -> SomeContractInfo
 someContractInfoFromContractInfo = SyncedConractInfo
