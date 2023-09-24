@@ -36,7 +36,7 @@ footer (Fixed fixed) = do
                             , target: "_blank"
                             , children:
                                 [ DOM.i { className: "h5 bi-globe2" }
-                                , DOM.text "  Marlowe Explorer"
+                                , DOM.text "  Marlowe Scan"
                                 ]
                             }
                         , DOM.a
