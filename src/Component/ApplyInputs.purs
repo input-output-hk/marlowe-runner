@@ -328,13 +328,12 @@ mkChoiceFormComponent = do
               ]
           ]
 
-      { title: DOM.h3 {} $ DOOM.text "Apply a Choice"
-      , description: DOM.div {}
-          [ DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "Select a choice from the dropdown menu to proceed. Each choice represents a decision that a participant can make at a particular point in the contract." ]
-          , DOM.p
-              { className: "white-color h5 pb-3" }
-              [ DOOM.text "Keep in mind that the choices available are defined within the Marlowe contract and may have different consequences or lead to different outcomes. Make sure you understand the implications of each choice before making a selection." ]
+      { title: DOM.div { className: "pe-3" }
+          [ DOM.div {} $ DOOM.img { src: "/images/magnifying_glass.svg" }
+          , DOM.span {} $ DOOM.text "Advance the contract"
           ]
+
+      , description: DOM.p {} "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
       , content: wrappedContentWithFooter body actions
       }
 
@@ -843,15 +842,15 @@ mkComponent = do
       Machine.FetchingRequiredWalletContext { errors } -> do
         let
           body = mempty
-          -- fragment $
-          --   [ contractSection marloweContext.contract marloweContext.state
-          --   , DOOM.hr {}
-          --   ]
+        -- fragment $
+        --   [ contractSection marloweContext.contract marloweContext.state
+        --   , DOOM.hr {}
+        --   ]
         showPossibleErrorAndDismiss "Fetching wallet context" "" body onDismiss errors
 
       Machine.ChoosingInputType { allInputsChoices, requiredWalletContext } -> do
-      -- DetailedFlow { showPrevStep: true } -> do
-      --   fetchingRequiredWalletContextDetails marloweContext (Just setNextFlow) onDismiss $ Just requiredWalletContext
+        -- DetailedFlow { showPrevStep: true } -> do
+        --   fetchingRequiredWalletContextDetails marloweContext (Just setNextFlow) onDismiss $ Just requiredWalletContext
         let
           body = fragment $
             [ contractSection marloweContext.contract marloweContext.state
@@ -1004,6 +1003,7 @@ mkComponent = do
             , outputState: state
             , submittedAt
             }
+
           onSuccess' :: Effect Unit
           onSuccess' = onSuccess contractUpdated
         inputApplied onSuccess'

@@ -20,8 +20,8 @@ component { title, description, content } =
   DOM.div { className: "container overflow-hidden" } $ do
     DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
       [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center" } $
-          [ title
-          , description
+          [ DOM.div { className: "fw-bold font-size-2rem my-3" } $ title
+          , DOM.div { className: "font-size-1rem" } $ description
           ]
       , DOM.div { className: "ps-3 col-9 bg-white" } content
       ]

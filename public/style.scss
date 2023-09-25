@@ -195,6 +195,14 @@ $link-color: #511CF7;
   animation: pulse 1s infinite;
 }
 
+.font-size-2rem {
+  font-size: 2rem;
+}
+
+.font-size-1rem {
+  font-size: 1rem;
+}
+
 @keyframes pulse {
   0% {
     transform: scale(1);
