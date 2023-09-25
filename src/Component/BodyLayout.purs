@@ -18,13 +18,12 @@ wrappedContentWithFooter body footer = fragment
 component :: { title :: JSX, description :: JSX, content :: JSX } -> JSX
 component { title, description, content } =
   DOM.div { className: "container overflow-hidden" } $ do
-    DOM.div { className: "row" }
-      [ DOM.div { className: "col-3 background-color-primary-light overflow-auto vh-100 px-0 pt-59px pb-71px d-flex flex-column justify-content-center" } $
-          DOM.div { className: "p-3" }
-            [ title
-            , description
-            ]
-      , DOM.div { className: "col-9 overflow-auto vh-100 pt-59px pb-71px d-flex flex-column bg-white" } content
+    DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
+      [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center" } $
+          [ title
+          , description
+          ]
+      , DOM.div { className: "ps-3 col-9 bg-white" } content
       ]
 
 descriptionLink :: { icon :: String, href :: String, label :: String } -> JSX

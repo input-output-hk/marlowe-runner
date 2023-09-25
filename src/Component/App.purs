@@ -13,7 +13,7 @@ import Component.Footer as Footer
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
-import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page, WalletInfo(..))
+import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
 import Component.Types.ContractInfo (MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Types.ContractInfoMap as ContractInfoMap
@@ -42,6 +42,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
+import Effect.Unsafe (unsafePerformEffect)
 import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsMap, ContractWithTransactionsStream(..), MaxPages(..), PollingInterval(..), RequestInterval(..))
 import Marlowe.Runtime.Web.Streaming as Streaming
@@ -274,44 +275,83 @@ mkApp = do
     let
       possibleContracts = Array.fromFoldable <$> ContractInfoMap.getContractsMap contractInfoMap
       topNavbar = provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-          [ DOM.nav { className: "navbar fixed-top navbar-expand-sm navbar-light bg-white" } $
-              DOM.div { className: "container d-flex justify-content-between" }
-                [ DOM.a { href: "#", className: "navbar-brand" }
-                    [ svgImg { src: marloweLogoUrl } ]
-                , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
-                    [ DOM.ul { className: "navbar-nav gap-2" } $
-                        [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
-                            [ linkWithIcon
-                                { icon: unsafeIcon "h5"
-                                , label: mempty
-                                , extraClassNames: "nav-link"
-                                , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
-                                , onClick: setCheckingNotifications true
-                                , disabled: List.null msgs
-                                }
-                            ]
-                        ] <> Monoid.guard (isJust possibleWalletInfo) do
-                               [ DOM.li { className: "nav-item" } $
-                                    case possibleWalletInfo, possibleWalletContext of
-                                      Just (WalletInfo wallet), Just (WalletContext ctx) -> link
-                                        { label: DOM.span { className: "h5" }
-                                            [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
-                                            , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
-                                                [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
-                                            ]
-                                        , extraClassNames: "nav-link"
-                                        , onClick: setConfiguringWallet true
-                                        }
-                                      _, _ -> linkWithIcon
-                                        { icon: Icons.wallet2
-                                        , label: DOOM.text "Connect Wallet"
-                                        , extraClassNames: "nav-link"
-                                        , onClick: setConfiguringWallet true
-                                        }
-                              ]
-                    ]
+        [ DOM.div { className: "container" }
+          [ DOM.div { className: "row" }
+            [ DOM.div
+                { className: "col-3 pt-2 pb-4 background-color-primary-light", id: "marlowe-logo-container" } $
+                DOM.a { href: "#" } [ svgImg { src: marloweLogoUrl } ]
+            , DOM.div { className: "col-9 pt-2 pb-4 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end" } $
+              [ DOM.li {} $ ReactContext.consumer msgHubProps.ctx \msgs ->
+                [ linkWithIcon
+                    { icon: unsafeIcon "h5"
+                    , label: mempty
+                    , extraClassNames: "nav-link"
+                    , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
+                    , onClick: setCheckingNotifications true
+                    , disabled: List.null msgs
+                    }
                 ]
+              ] <> Monoid.guard (isJust possibleWalletInfo) do
+              [ DOM.li { className: "nav-item" } $
+                  case possibleWalletInfo, possibleWalletContext of
+                    Just (WalletInfo wallet), Just (WalletContext ctx) -> link
+                      { label: DOM.span { className: "h5" }
+                        [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
+                        , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
+                            [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+                        ]
+                    , extraClassNames: "nav-link"
+                      , onClick: setConfiguringWallet true
+                      }
+                    _, _ -> linkWithIcon
+                      { icon: Icons.wallet2
+                      , label: DOOM.text "Connect Wallet"
+                      , extraClassNames: "nav-link"
+                      , onClick: setConfiguringWallet true
+                      }
+              ]
+            ]
           ]
+        ]
+
+          -- [ DOM.nav { className: "navbar navbar-expand-sm navbar-light bg-white" } $
+          --     DOM.div { className: "container d-flex justify-content-between" }
+          --       [ DOM.a { href: "#", className: "navbar-brand" }
+          --           [ svgImg { src: marloweLogoUrl } ]
+          --       , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
+          --           [ DOM.ul { className: "navbar-nav gap-2" } $
+          --               [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
+          --                   [ linkWithIcon
+          --                       { icon: unsafeIcon "h5"
+          --                       , label: mempty
+          --                       , extraClassNames: "nav-link"
+          --                       , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
+          --                       , onClick: setCheckingNotifications true
+          --                       , disabled: List.null msgs
+          --                       }
+          --                   ]
+          --               ] <> Monoid.guard (isJust possibleWalletInfo) do
+          --                      [ DOM.li { className: "nav-item" } $
+          --                           case possibleWalletInfo, possibleWalletContext of
+          --                             Just (WalletInfo wallet), Just (WalletContext ctx) -> link
+          --                               { label: DOM.span { className: "h5" }
+          --                                   [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
+          --                                   , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
+          --                                       [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+          --                                   ]
+          --                               , extraClassNames: "nav-link"
+          --                               , onClick: setConfiguringWallet true
+          --                               }
+          --                             _, _ -> linkWithIcon
+          --                               { icon: Icons.wallet2
+          --                               , label: DOOM.text "Connect Wallet"
+          --                               , extraClassNames: "nav-link"
+          --                               , onClick: setConfiguringWallet true
+          --                               }
+          --                     ]
+          --           ]
+          --       ]
+          -- ]
 
     pure $ case possibleWalletInfo of
       Nothing -> DOM.div {} $
@@ -320,7 +360,10 @@ mkApp = do
         ]
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
         [ topNavbar
-        , DOM.div { className: "position-fixed mt-2 position-left-50 transform-translate-x--50 z-index-popover" }
+        -- FIXME:
+        --  * we should probably move this whole container to message hub
+        --  * adding here margins etc. can break the layout consistency
+        , DOM.div { className: "position-left-50 transform-translate-x--50 z-index-popover" }
             $ DOM.div { className: "container-xl" }
             $ DOM.div { className: "row" }
             $ messagePreview msgHub
@@ -366,7 +409,10 @@ mkApp = do
               , notSyncedYetInserts
               , connectedWallet: possibleWalletInfo
               -- To start on create contract page:
-              -- , possibleInitialModalAction: Just (NewContract Nothing)
+              -- , possibleInitialModalAction: do
+              --     -- let
+              --     --    _ = unsafePerformEffect $ props.setPage $ CreateContractPage Nothing
+              --     Just (NewContract Nothing)
               , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
               , setPage: props.setPage
               }
@@ -394,7 +440,7 @@ mkApp = do
         --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
         --              ]
         --          ]
-        , footer (Footer.Fixed true)
+        , footer
         ]
 
 mkAppContractInfoMap :: Slotting -> Maybe WalletContext -> Maybe ContractWithTransactionsMap -> Maybe NotSyncedYet -> Maybe AppContractInfoMap

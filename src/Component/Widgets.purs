@@ -4,9 +4,11 @@ import Prelude
 
 import ConvertableOptions (defaults, class Defaults)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Undefined.NoProblem (Opt, fromOpt)
+import Data.Undefined.NoProblem.Closed as NoProblem
 import Effect (Effect)
+import Prim.Row as Row
 import React.Basic (JSX)
-import React.Basic.DOM (css)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM.Events (preventDefault)
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -16,6 +18,8 @@ import ReactBootstrap.Icons (Icon)
 import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Types (Placement)
 import ReactBootstrap.Types as OverlayTrigger
+import Record as Record
+import Type.Proxy (Proxy(..))
 
 spinner :: Maybe JSX -> JSX
 spinner possibleBody = DOM.div
@@ -140,3 +144,60 @@ buttonWithIcon provided = do
     , label
     ]
 
+--   newContractButton = buttonWithIcon
+--     { icon: unsafeIcon "h5 me-1"
+--     , label: DOOM.text "Create a contract"
+--     , extraClassNames: "font-weight-bold me-2 btn-outline-primary background-color-primary-light background-color-primary-hover"
+--     , disabled
+--     , onClick: do
+--         readRef possibleModalActionRef >>= case _ of
+--           Nothing -> setModalAction (NewContract Nothing)
+--           _ -> pure unit
+--     }
+
+data OutlineColoring
+  = OutlinePrimaryColoring
+
+outlineColoringToClassName :: OutlineColoring -> String
+outlineColoringToClassName = case _ of
+  OutlinePrimaryColoring -> "btn-outline-primary background-color-primary-light background-color-primary-hover"
+
+type ButtonOutlinedProps =
+  { coloring :: OutlineColoring
+  , label :: JSX
+  , onClick :: Effect Unit
+  , extraClassNames :: Opt String
+  -- FIXME: Add tooltip support
+  -- , disabled :: Opt Boolean
+  -- , tooltipText :: Opt String
+  -- , tooltipPlacement :: Opt Placement
+  }
+
+
+buttonOutlined :: forall props. NoProblem.Coerce props ButtonOutlinedProps => props -> JSX
+buttonOutlined props = do
+  let
+    props' :: ButtonOutlinedProps
+    props' = NoProblem.coerce props
+    { coloring, label, onClick } = props'
+    coloringClassName = outlineColoringToClassName coloring
+  DOM.button
+    { className: "btn font-weight-bold " <> coloringClassName <> " " <> fromOpt "" props'.extraClassNames
+    , onClick: handler preventDefault (const $ onClick)
+    , type: "button"
+    }
+    [ label
+    ]
+
+buttonOutlinedPrimary
+  :: forall props
+   . NoProblem.Coerce { coloring :: OutlineColoring | props } ButtonOutlinedProps
+   => Row.Lacks "coloring" props
+   => Row.Cons "coloring" OutlineColoring props (coloring :: OutlineColoring | props)
+   => { | props }
+   -> JSX
+buttonOutlinedPrimary props = do
+  let
+    props' :: { coloring :: OutlineColoring | props }
+    props' = Record.insert (Proxy :: Proxy "coloring") OutlinePrimaryColoring props
+  buttonOutlined props'

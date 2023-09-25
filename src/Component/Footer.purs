@@ -1,19 +1,14 @@
 module Component.Footer where
 
-import Prelude
-
 import React.Basic (JSX)
 import React.Basic.DOM as DOM
 
 newtype Fixed = Fixed Boolean
 
-footer :: Fixed -> JSX
-footer (Fixed fixed) = do
-  let
-    possibleFixedClass =
-      if fixed then "footer " else ""
+footer :: JSX
+footer = do
   DOM.footer
-    { className: possibleFixedClass <> "mt-auto py-2 bg-light shadow-top z-index-sticky"
+    { className: "mt-auto py-2 bg-light"
     , children:
         [ DOM.div
             { className: "container"

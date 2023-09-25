@@ -14,11 +14,11 @@ import Component.ContractTemplates.Swap as Swap
 import Component.CreateContract (runLiteTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (canInput)
-import Component.Types (ContractInfo(..), ContractJsonString(..), MessageContent(..), MessageHub(..), MkComponentM, Page(..), WalletInfo)
+import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(..), MessageHub(..), MkComponentM, Page(..), WalletInfo)
 import Component.Types.ContractInfo (MarloweInfo(..), SomeContractInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (buttonWithIcon)
+import Component.Widgets (buttonOutlinedPrimary, buttonWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
@@ -65,7 +65,6 @@ import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import Promise.Aff as Promise
 import React.Basic (fragment)
-import React.Basic (fragment) as DOOM
 import React.Basic.DOM (br, img, text) as DOOM
 import React.Basic.DOM (text)
 import React.Basic.DOM.Events (targetValue)
@@ -304,7 +303,7 @@ mkContractList = do
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
         filtered <|> possibleContracts'
 
-    pure $
+    pure $ DOM.div { className: "min-height-100vh" } do
       case possibleModalAction, connectedWallet of
         Just (NewContract possibleInitialContract), Just cw -> createContractComponent
           { connectedWallet: cw
@@ -370,14 +369,13 @@ mkContractList = do
           }
 
         Nothing, _ -> React.fragment
-          [ DOM.div { className: "container pt-5 mb-71px" } $ DOM.div { className: "row" } do
+          [ DOM.div { className: "container" } $ DOM.div { className: "row" } do
               let
                 disabled = isNothing connectedWallet
-                newContractButton = buttonWithIcon
-                  { icon: unsafeIcon "h5 me-1"
-                  , label: DOOM.text "Create a contract"
-                  , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
-                  , disabled
+                newContractButton = buttonOutlinedPrimary
+                  { label: DOOM.text "Create a contract"
+                  -- , extraClassNames: "font-weight-bold me-2 btn-outline-primary background-color-primary-light background-color-primary-hover"
+                  -- , disabled
                   , onClick: do
                       readRef possibleModalActionRef >>= case _ of
                         Nothing -> setModalAction (NewContract Nothing)
@@ -466,7 +464,7 @@ mkContractList = do
                   , tbody
                   ]
 
-              DOM.div { className: "container shadow rounded" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12 p-3" } $ case possibleContracts'', contractMapInitialized of
+              DOM.div { className: "container shadow rounded my-3" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12 p-3" } $ case possibleContracts'', contractMapInitialized of
                 -- Pre search no started
                 Nothing, _ -> fragment [ mkTable mempty, spinner ]
                 -- Searching but nothing was found, still searching
@@ -649,8 +647,6 @@ mkContractList = do
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
                             , tdCentered ([ DOOM.text "Placeholder - UPDATED" ] :: Array JSX) -- FIXME: Withdrawals should be still possible
                             ]
-
-                  
           ]
         _, _ -> mempty
 

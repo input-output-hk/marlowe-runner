@@ -320,7 +320,7 @@ backToContractListLink :: Effect Unit -> JSX
 backToContractListLink onDismiss = do
   DOM.div { className: "col-12 text-center" } $
     [ link
-        { label: DOM.b {} [ DOOM.text "Back to contractList" ]
+        { label: DOM.b {} [ DOOM.text "Back to contract list" ]
         , onClick: onDismiss
         , showBorders: false
         , extraClassNames: "mt-3"
@@ -441,8 +441,8 @@ mkComponent = do
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
           , content: fragment
-              [ DOM.div { className: "p-3" } formBody
-              , DOM.div { className: "p-3 mt-auto" } formActions
+              [ DOM.div { className: "px-3" } formBody
+              , DOM.div { className: "px-3 mt-auto" } formActions
               ]
           }
 
@@ -554,7 +554,7 @@ mkComponent = do
 
 stateToTitle :: Machine.State -> JSX
 stateToTitle state = case state of
-  Machine.DefiningContract -> DOM.div { className: "px-3 mx-3 fw-bold" }
+  Machine.DefiningContract -> DOM.div { className: "pe-3 fw-bold" }
     [ DOOM.img { src: "/images/magnifying_glass.svg" }
     , DOM.h3 {} $ DOOM.text "Create and submit your contract"
     ]
@@ -587,7 +587,7 @@ machineStateToStepIndex state = StepIndex $ case state of
 -- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]
 stateToDetailedDescription :: Machine.State -> JSX
 stateToDetailedDescription state = case state of
-  Machine.DefiningContract -> DOM.div { className: "px-3 mx-3" }
+  Machine.DefiningContract -> DOM.div { className: "pe-3" }
     [ DOM.p {} $ DOOM.text "Review your contract details before setting the terms to run it. Check the code and all details, this is your last chance to correct any errors before the contract is permanently live."
     ]
   Machine.DefiningRoleTokens {} -> DOOM.div_
