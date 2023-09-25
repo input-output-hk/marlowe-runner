@@ -5,13 +5,14 @@ import Prelude
 import Contrib.Data.Foldable (foldMapFlipped)
 import Control.Parallel (parTraverse)
 import Data.Array as Array
-import Data.DateTime.Instant as Instant
+import Data.Array.NonEmpty (some)
 import Data.DateTime.Instant (Instant)
+import Data.DateTime.Instant as Instant
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
-import Data.Map as Map
 import Data.Map (Map)
+import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested (type (/\), (/\))
@@ -88,7 +89,6 @@ fetchAppliedInputs serverURL transactionEndpoints = do
         Just _ -> inputs <#> \input -> Just (inputToInputContent input) /\ timeInterval
         Nothing -> [ Nothing /\ timeInterval ]
 
-
 -- After we submit of the tx we have to wait till streaming thread catches up
 -- so it is better to keep the information also in the state and display new
 -- contracts as they go.
@@ -138,6 +138,7 @@ data SomeContractInfo
   = SyncedConractInfo ContractInfo
   | NotSyncedCreatedContract ContractCreatedDetails
   | NotSyncedUpdatedContract ContractUpdatedDetails
+
 derive instance Eq SomeContractInfo
 
 someContractInfoContractId :: SomeContractInfo -> Runtime.ContractId
@@ -174,3 +175,8 @@ someContractContractId (SyncedConractInfo (ContractInfo { contractId: c })) = c
 someContractContractId (NotSyncedCreatedContract { contractId: c }) = c
 someContractContractId (NotSyncedUpdatedContract { contractInfo: ContractInfo { contractId: c } }) = c
 
+someContractCurrentContract :: SomeContractInfo -> Maybe V1.Contract
+someContractCurrentContract (SyncedConractInfo (ContractInfo { marloweInfo: Just (MarloweInfo { currentContract: c }) })) = c
+someContractCurrentContract (NotSyncedCreatedContract { contract: c }) = Just c
+someContractCurrentContract (NotSyncedUpdatedContract { outputContract: c }) = Just c
+someContractCurrentContract _ = Nothing

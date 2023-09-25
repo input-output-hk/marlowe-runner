@@ -7,6 +7,7 @@ $sucess: #00C48C;
 $warning: #E8740A;
 $danger: #F44336;
 $disabled: #BDBDBD;
+$secondary: #F7F7F8;
 $navbar-light-color: transparent;
 $navbar-light-bg: transparent;
 $link-color: #511CF7;
@@ -17,6 +18,11 @@ $link-color: #511CF7;
 @import "bootstrap/scss/utilities";
 
 // Replace with tilewind style!
+
+.table .border-bottom-white-4px {
+  border-bottom-color: white !important; /* Set the border color to white */
+  border-bottom-width: 4px !important;  /* Set the border width to 3px */
+}
 
 .table th, td {
   text-align: center;

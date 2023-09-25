@@ -57,6 +57,7 @@ import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
+import Language.Marlowe.Core.V1.Semantics (isClose)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
@@ -228,7 +229,6 @@ mkContractList = do
           reset
       pure (p /\ set' /\ reset')
 
-
     possibleModalActionRef <- useStateRef' possibleModalAction
     ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
     possibleQueryValue /\ setQueryValue <- useState' Nothing
@@ -247,8 +247,7 @@ mkContractList = do
               }
           ci@(ContractInfo contractInfo) <- flip findMap contracts case _ of
             SyncedConractInfo ci@(ContractInfo { contractId: contractId' }) ->
-              if contractId == contractId'
-              then Just ci
+              if contractId == contractId' then Just ci
               else Nothing
             _ -> Nothing
           MarloweInfo marloweInfo <- contractInfo.marloweInfo
@@ -276,6 +275,10 @@ mkContractList = do
       , validationDebounce: Duration.Seconds 0.5
       }
     let
+      isContractComplete Nothing = true
+      isContractComplete (Just V1.Close) = true
+      isContractComplete _ = false
+
       possibleContracts' :: Maybe (Array SomeContractInfo)
       possibleContracts' = do
         contracts <- possibleContracts
@@ -435,7 +438,7 @@ mkContractList = do
                   DOM.thead {} do
                     let
                       orderingTh = Table.orderingHeader ordering updateOrdering "background-color-primary-light border-0 text-centered"
-                      th content extraClassNames = DOM.th { className: "background-color-primary-light border-0 text-center " <> extraClassNames} [ content ]
+                      th content extraClassNames = DOM.th { className: "background-color-primary-light border-0 text-center " <> extraClassNames } [ content ]
                       thWithIcon src extraClassNames = th (DOOM.img { src }) extraClassNames
                       thWithLabel label extraClassNames = th (DOOM.text label) ("text-muted " <> extraClassNames)
                     [ DOM.tr {}
@@ -454,12 +457,12 @@ mkContractList = do
                             let
                               label = DOOM.text "Updated"
                             orderingTh label OrderByLastUpdateDate
-                        , thWithLabel  "Contract Id" "w-16rem"
+                        , thWithLabel "Contract Id" "w-16rem"
                         , thWithLabel "Tags" ""
                         , thWithLabel "Actions" ""
                         ]
                     ]
-                mkTable tbody = table { striped: Table.striped.boolean true, hover: true }
+                mkTable tbody = table { striped: Table.striped.boolean false, hover: true }
                   [ tableHeader
                   , tbody
                   ]
@@ -472,16 +475,17 @@ mkContractList = do
                 -- Searching but nothing was found, search finished
                 Just [], true -> fragment
                   [ mkTable mempty
-                  , DOM.div { className: "container" } $
-                      DOM.div { className: "row" } $
-                      DOM.div { className: "col-12 text-center py-3 fw-bold" } $
-                      DOOM.text "No contracts found"
+                  , DOM.div { className: "container" }
+                      $ DOM.div { className: "row" }
+                      $ DOM.div { className: "col-12 text-center py-3 fw-bold" }
+                      $
+                        DOOM.text "No contracts found"
                   ]
                 -- Searching and something was found
                 Just contracts, _ -> DOM.div { className: "col-12 px-0" } do
                   let
                     tdCentered :: forall jsx. ToJSX jsx => jsx -> JSX
-                    tdCentered = DOM.td { className: "text-center" }
+                    tdCentered = DOM.td { className: "text-center border-0" }
                     tdDateTime Nothing = tdCentered $ ([] :: Array JSX)
                     tdDateTime (Just dateTime) = tdCentered $ Array.singleton $ DOM.small {} do
                       let
@@ -538,8 +542,11 @@ mkContractList = do
                           updatedAt = ContractInfo.updatedAt someContract
                           tags = runLiteTags $ ContractInfo.someContractTags someContract
                           contractId = ContractInfo.someContractContractId someContract
+                          possibleContract = ContractInfo.someContractCurrentContract someContract
+                          isClosed = isContractComplete possibleContract
+                          trClassName = if isClosed then "align-middle bg-secondary border-bottom-white-4px" else "align-middle border-bottom-white-4px"
 
-                        DOM.tr { className: "align-middle" } $ case someContract of
+                        DOM.tr { className: trClassName } $ case someContract of
                           (SyncedConractInfo ci@(ContractInfo { _runtime, endpoints, marloweInfo })) -> do
                             let
                               ContractHeader { contractId } = _runtime.contractHeader
