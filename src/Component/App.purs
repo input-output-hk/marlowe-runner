@@ -276,82 +276,82 @@ mkApp = do
       possibleContracts = Array.fromFoldable <$> ContractInfoMap.getContractsMap contractInfoMap
       topNavbar = provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
         [ DOM.div { className: "container" }
-          [ DOM.div { className: "row" }
-            [ DOM.div
-                { className: "col-3 pt-2 pb-4 background-color-primary-light", id: "marlowe-logo-container" } $
-                DOM.a { href: "#" } [ svgImg { src: marloweLogoUrl } ]
-            , DOM.div { className: "col-9 pt-2 pb-4 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end" } $
-              [ DOM.li {} $ ReactContext.consumer msgHubProps.ctx \msgs ->
-                [ linkWithIcon
-                    { icon: unsafeIcon "h5"
-                    , label: mempty
-                    , extraClassNames: "nav-link"
-                    , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
-                    , onClick: setCheckingNotifications true
-                    , disabled: List.null msgs
-                    }
-                ]
-              ] <> Monoid.guard (isJust possibleWalletInfo) do
-              [ DOM.li { className: "nav-item" } $
-                  case possibleWalletInfo, possibleWalletContext of
-                    Just (WalletInfo wallet), Just (WalletContext ctx) -> link
-                      { label: DOM.span { className: "h5" }
-                        [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
-                        , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
-                            [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+            [ DOM.div { className: "row" }
+                [ DOM.div
+                    { className: "col-3 pt-2 pb-4 background-color-primary-light", id: "marlowe-logo-container" } $
+                    DOM.a { href: "#" } [ svgImg { src: marloweLogoUrl } ]
+                , DOM.div { className: "col-9 pt-2 pb-4 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end" } $
+                    [ DOM.li {} $ ReactContext.consumer msgHubProps.ctx \msgs ->
+                        [ linkWithIcon
+                            { icon: unsafeIcon "h5"
+                            , label: mempty
+                            , extraClassNames: "nav-link"
+                            , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
+                            , onClick: setCheckingNotifications true
+                            , disabled: List.null msgs
+                            }
                         ]
-                    , extraClassNames: "nav-link"
-                      , onClick: setConfiguringWallet true
-                      }
-                    _, _ -> linkWithIcon
-                      { icon: Icons.wallet2
-                      , label: DOOM.text "Connect Wallet"
-                      , extraClassNames: "nav-link"
-                      , onClick: setConfiguringWallet true
-                      }
-              ]
+                    ] <> Monoid.guard (isJust possibleWalletInfo) do
+                      [ DOM.li { className: "nav-item" } $
+                          case possibleWalletInfo, possibleWalletContext of
+                            Just (WalletInfo wallet), Just (WalletContext ctx) -> link
+                              { label: DOM.span { className: "h5 d-flex align-items-center" }
+                                  [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
+                                  , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
+                                      [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+                                  ]
+                              , extraClassNames: "nav-link"
+                              , onClick: setConfiguringWallet true
+                              }
+                            _, _ -> linkWithIcon
+                              { icon: Icons.wallet2
+                              , label: DOOM.text "Connect Wallet"
+                              , extraClassNames: "nav-link"
+                              , onClick: setConfiguringWallet true
+                              }
+                      ]
+                ]
             ]
-          ]
         ]
 
-          -- [ DOM.nav { className: "navbar navbar-expand-sm navbar-light bg-white" } $
-          --     DOM.div { className: "container d-flex justify-content-between" }
-          --       [ DOM.a { href: "#", className: "navbar-brand" }
-          --           [ svgImg { src: marloweLogoUrl } ]
-          --       , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
-          --           [ DOM.ul { className: "navbar-nav gap-2" } $
-          --               [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
-          --                   [ linkWithIcon
-          --                       { icon: unsafeIcon "h5"
-          --                       , label: mempty
-          --                       , extraClassNames: "nav-link"
-          --                       , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
-          --                       , onClick: setCheckingNotifications true
-          --                       , disabled: List.null msgs
-          --                       }
-          --                   ]
-          --               ] <> Monoid.guard (isJust possibleWalletInfo) do
-          --                      [ DOM.li { className: "nav-item" } $
-          --                           case possibleWalletInfo, possibleWalletContext of
-          --                             Just (WalletInfo wallet), Just (WalletContext ctx) -> link
-          --                               { label: DOM.span { className: "h5" }
-          --                                   [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
-          --                                   , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
-          --                                       [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
-          --                                   ]
-          --                               , extraClassNames: "nav-link"
-          --                               , onClick: setConfiguringWallet true
-          --                               }
-          --                             _, _ -> linkWithIcon
-          --                               { icon: Icons.wallet2
-          --                               , label: DOOM.text "Connect Wallet"
-          --                               , extraClassNames: "nav-link"
-          --                               , onClick: setConfiguringWallet true
-          --                               }
-          --                     ]
-          --           ]
-          --       ]
-          -- ]
+    -- [ DOM.nav { className: "navbar navbar-expand-sm navbar-light bg-white" } $
+    --     DOM.div { className: "container d-flex justify-content-between" }
+    --       [ DOM.a { href: "#", className: "navbar-brand" }
+    --           [ svgImg { src: marloweLogoUrl } ]
+    --       , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
+    --           [ DOM.ul { className: "navbar-nav gap-2" } $
+    --               [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
+    --                   [ linkWithIcon
+    --                       { icon: unsafeIcon "h5"
+    --                       , label: mempty
+    --                       , extraClassNames: "nav-link"
+    --                       , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
+    --                       , onClick: setCheckingNotifications true
+    --                       , disabled: List.null msgs
+    --                       }
+    --                   ]
+    --               ] <> Monoid.guard (isJust possibleWalletInfo) do
+    --                      [ DOM.li { className: "nav-item" } $
+    --                           case possibleWalletInfo, possibleWalletContext of
+    --                             Just (WalletInfo wallet), Just (WalletContext ctx) -> link
+    --                               { label: DOM.span { className: "h5" }
+    --                                   [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
+    --                                   , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
+    --                                       [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+    --                                   ]
+    --                               , extraClassNames: "nav-link"
+    --                               , onClick: setConfiguringWallet true
+    --                               }
+    --                             _, _ -> linkWithIcon
+    --                               { icon: Icons.wallet2
+    --                               , label: DOOM.text "Connect Wallet"
+    --                               , extraClassNames: "nav-link"
+    --                               , onClick: setConfiguringWallet true
+    --                               }
+    --                     ]
+    --           ]
+    --       ]
+    -- ]
 
     pure $ case possibleWalletInfo of
       Nothing -> DOM.div {} $
