@@ -147,6 +147,17 @@ type DepositFormComponentProps =
   , onSuccess :: V1.Input -> Effect Unit
   }
 
+backToContractListLink :: Effect Unit -> JSX
+backToContractListLink onDismiss = do
+  DOM.div { className: "col-12 text-center" } $
+    [ link
+        { label: DOM.b {} [ DOOM.text "Back to contract list" ]
+        , onClick: onDismiss
+        , showBorders: false
+        , extraClassNames: "mt-3"
+        }
+    ]
+
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
 mkDepositFormComponent = do
   liftEffect $ component "ApplyInputs.DepositFormComponent" \{ depositInputs, onDismiss, marloweContext, onSuccess } -> React.do
@@ -304,27 +315,22 @@ mkChoiceFormComponent = do
           ] <> [ DOM.div { className: "form-group" } fields ]
         actions = fragment
           [ DOM.div { className: "row" } $
-              [ DOM.div { className: "col-6 text-start" } $
-                  [ link
-                      { label: DOOM.text "Cancel"
-                      , onClick: onDismiss
-                      , showBorders: true
-                      , extraClassNames: "me-3"
-                      }
-                  ]
-              , DOM.div { className: "col-6 text-end" } $
+              [ DOM.div { className: "col-12" } $
                   [ DOM.button
                       do
                         let
                           disabled = case result of
                             Just (V (Right _) /\ _) -> false
                             _ -> true
-                        { className: "btn btn-primary"
+                        { className: "btn btn-primary w-100"
                         , onClick: onSubmit'
                         , disabled
                         }
-                      [ R.text "Submit" ]
+                      [ R.text "Advance contract"
+                      , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                      ]
                   ]
+              , backToContractListLink onDismiss
               ]
           ]
 
