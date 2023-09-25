@@ -8,13 +8,12 @@ import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (ModalAction(..), NotSyncedYetInserts(..), mkContractList)
-import Component.CreateContract (ContractJsonString)
 import Component.Footer (footer)
 import Component.Footer as Footer
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Modal (Size(..), mkModal)
-import Component.Types (ContractInfo(..), MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, WalletInfo(..))
+import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page, WalletInfo(..))
 import Component.Types.ContractInfo (MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Types.ContractInfoMap as ContractInfoMap
@@ -30,7 +29,7 @@ import Data.Either (Either(..))
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Newtype as Newtype
@@ -50,7 +49,7 @@ import Marlowe.Runtime.Web.Types (BlockHeader(..), BlockNumber(..), ContractHead
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX)
 import React.Basic as ReactContext
-import React.Basic.DOM (div, img, span_, text) as DOOM
+import React.Basic.DOM (div, img, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (component, provider, readRef, useState, useState')
 import React.Basic.Hooks as React
@@ -122,7 +121,10 @@ newtype AppContractInfoMap = AppContractInfoMap
   , map :: ContractInfoMap
   }
 
-type Props = { possibleInitialContract :: Maybe ContractJsonString }
+type Props =
+  { possibleInitialContract :: Maybe ContractJsonString
+  , setPage :: Page -> Effect Unit
+  }
 
 mkApp :: MkComponentMBase () (Props -> JSX)
 mkApp = do
@@ -271,53 +273,53 @@ mkApp = do
 
     let
       possibleContracts = Array.fromFoldable <$> ContractInfoMap.getContractsMap contractInfoMap
+      topNavbar = provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
+          [ DOM.nav { className: "navbar fixed-top navbar-expand-sm navbar-light bg-white" } $
+              DOM.div { className: "container d-flex justify-content-between" }
+                [ DOM.a { href: "#", className: "navbar-brand" }
+                    [ svgImg { src: marloweLogoUrl } ]
+                , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
+                    [ DOM.ul { className: "navbar-nav gap-2" } $
+                        [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
+                            [ linkWithIcon
+                                { icon: unsafeIcon "h5"
+                                , label: mempty
+                                , extraClassNames: "nav-link"
+                                , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
+                                , onClick: setCheckingNotifications true
+                                , disabled: List.null msgs
+                                }
+                            ]
+                        ] <> Monoid.guard (isJust possibleWalletInfo) do
+                               [ DOM.li { className: "nav-item" } $
+                                    case possibleWalletInfo, possibleWalletContext of
+                                      Just (WalletInfo wallet), Just (WalletContext ctx) -> link
+                                        { label: DOM.span { className: "h5" }
+                                            [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
+                                            , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
+                                                [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+                                            ]
+                                        , extraClassNames: "nav-link"
+                                        , onClick: setConfiguringWallet true
+                                        }
+                                      _, _ -> linkWithIcon
+                                        { icon: Icons.wallet2
+                                        , label: DOOM.text "Connect Wallet"
+                                        , extraClassNames: "nav-link"
+                                        , onClick: setConfiguringWallet true
+                                        }
+                              ]
+                    ]
+                ]
+          ]
 
     pure $ case possibleWalletInfo of
       Nothing -> DOM.div {} $
-        [ DOM.nav { className: "navbar navbar-expand-sm navbar-light position-absolute" } $
-            DOM.div { className: "container-fluid" }
-              [ DOM.a { href: "#", className: "navbar-brand" }
-                  [ svgImg { src: marloweLogoUrl } ]
-              ]
+        [ topNavbar
         , landingPage { setWalletInfo: setWalletInfo <<< Just }
         ]
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-        [ DOM.div {} $ DOM.nav { className: "navbar navbar-expand-sm navbar-light position-absolute w-100" } $
-            DOM.div { className: "container-fluid d-flex justify-content-between" }
-              [ DOM.a { href: "#", className: "navbar-brand" }
-                  [ svgImg { src: marloweLogoUrl } ]
-              , DOM.div { className: "navbar-collapse justify-content-end text-end" } $
-                  [ DOM.ul { className: "navbar-nav gap-2" }
-                      [ DOM.li { className: "nav-item" } $ ReactContext.consumer msgHubProps.ctx \msgs ->
-                          [ linkWithIcon
-                              { icon: unsafeIcon "h5"
-                              , label: mempty
-                              , extraClassNames: "nav-link"
-                              , tooltipText: Just $ if List.null msgs then "No new notifications" else "You have new notifications"
-                              , onClick: setCheckingNotifications true
-                              , disabled: List.null msgs
-                              }
-                          ]
-                      , DOM.li { className: "nav-item" } $
-                          case possibleWalletInfo, possibleWalletContext of
-                            Just (WalletInfo wallet), Just (WalletContext ctx) -> link
-                              { label: DOM.span { className: "h5" }
-                                  [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
-                                  , DOM.span { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block" }
-                                      [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
-                                  ]
-                              , extraClassNames: "nav-link"
-                              , onClick: setConfiguringWallet true
-                              }
-                            _, _ -> linkWithIcon
-                              { icon: Icons.wallet2
-                              , label: DOOM.text "Connect Wallet"
-                              , extraClassNames: "nav-link"
-                              , onClick: setConfiguringWallet true
-                              }
-                      ]
-                  ]
-              ]
+        [ topNavbar
         , DOM.div { className: "position-fixed mt-2 position-left-50 transform-translate-x--50 z-index-popover" }
             $ DOM.div { className: "container-xl" }
             $ DOM.div { className: "row" }
@@ -363,7 +365,10 @@ mkApp = do
               , contractMapInitialized
               , notSyncedYetInserts
               , connectedWallet: possibleWalletInfo
+              -- To start on create contract page:
+              -- , possibleInitialModalAction: Just (NewContract Nothing)
               , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
+              , setPage: props.setPage
               }
         -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
 
@@ -438,3 +443,5 @@ mkAppContractInfoMap slotting walletContext possiblySynced possiblyNotSyncedYet 
           }
 
   pure $ AppContractInfoMap { walletContext, map: ns `Map.union` s }
+
+-- background: linear-gradient(    to right,    #F8F6FF 0%,    #F8F6FF 50%,    white 50%,    white 100%  )

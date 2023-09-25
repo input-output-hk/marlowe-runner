@@ -1,11 +1,13 @@
 module Component.Types
-  ( MkContextBase(..)
+  ( ContractJsonString(..)
+  , MkContextBase(..)
   , MkComponentMBase(..)
   , MkComponentM
   , MessageHub(..)
   , Message(..)
   , MessageId(..)
   , MessageContent(..)
+  , Page(..)
   , WalletInfo(..)
   , module Exports
   ) where
@@ -74,4 +76,16 @@ type MkContextBase r =
 type MkComponentMBase r = ReaderT (MkContextBase r) Effect
 
 type MkComponentM = MkComponentMBase ()
+
+newtype ContractJsonString = ContractJsonString String
+
+derive instance Eq ContractJsonString
+derive instance Newtype ContractJsonString _
+
+data Page
+  = ContarctListPage
+  | CreateContractPage (Maybe ContractJsonString)
+  | OtherPage
+
+derive instance Eq Page
 
