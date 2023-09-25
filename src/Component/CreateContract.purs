@@ -9,7 +9,7 @@ import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.CreateContract.Machine as Machine
 import Component.MarloweYaml (marloweYaml)
-import Component.Types (MkComponentM, WalletInfo)
+import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
@@ -25,7 +25,7 @@ import ReactBootstrap.Tabs (tabs)
 import ReactBootstrap.Tabs as Tabs
 import ReactBootstrap.Types (eventKey)
 import Contrib.React.MarloweGraph (marloweGraph)
-import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FieldLayout(..), LabelSpacing(..), StatelessBootstrapFormSpec, booleanField)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FieldLayout(..), LabelSpacing(..), StatelessBootstrapFormSpec)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
 import Control.Error.Util (hoistMaybe)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
@@ -48,7 +48,7 @@ import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid.Disj (Disj(..))
-import Data.Newtype (class Newtype, un)
+import Data.Newtype (un)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Data.String (Pattern(..), split, trim)
@@ -67,11 +67,10 @@ import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
 import Marlowe.Runtime.Web.Types (PostContractsError, PostContractsResponseContent(..), RoleTokenConfig(..), RolesConfig(..), Tags(..))
 import Partial.Unsafe (unsafeCrashWith)
-import Polyform.Batteries.Generic.Messages (placeholder)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (b, div, div_, hr, img, input, text, span_) as DOOM
+import React.Basic.DOM (div, div_, hr, img, input, span_, text) as DOOM
 import React.Basic.DOM (css)
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -85,15 +84,8 @@ import Web.DOM.Node (Node)
 import Web.File.File (File)
 import Web.File.FileList (FileList)
 import Web.File.FileList as FileList
-import Web.HTML.HTMLButtonElement (disabled)
 import Web.HTML.HTMLInputElement (HTMLInputElement)
 import Web.HTML.HTMLInputElement as HTMLInputElement
-import Web.HTML.History (back)
-
-newtype ContractJsonString = ContractJsonString String
-
-derive instance Eq ContractJsonString
-derive instance Newtype ContractJsonString _
 
 type Props =
   { onDismiss :: Effect Unit
