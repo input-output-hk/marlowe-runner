@@ -328,12 +328,12 @@ mkChoiceFormComponent = do
               ]
           ]
 
-      { title: DOM.div { className: "pe-3" }
-          [ DOM.div {} $ DOOM.img { src: "/images/magnifying_glass.svg" }
-          , DOM.span {} $ DOOM.text "Advance the contract"
+      { title: DOM.div { className: "" }
+          [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
+          , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
           ]
 
-      , description: DOM.p {} "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
+      , description: DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
       , content: wrappedContentWithFooter body actions
       }
 

@@ -554,9 +554,9 @@ mkComponent = do
 
 stateToTitle :: Machine.State -> JSX
 stateToTitle state = case state of
-  Machine.DefiningContract -> DOM.div { className: "pe-3" }
-    [ DOM.div {} $ DOOM.img { src: "/images/magnifying_glass.svg" }
-    , DOM.span {} $ DOOM.text "Create and submit your contract"
+  Machine.DefiningContract -> DOM.div {}
+    [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
+    , DOM.span { className: "mb-3" } $ DOOM.text "Create and submit your contract"
     ]
   Machine.DefiningRoleTokens {} -> DOM.h3 {} $ DOOM.text "Defining role tokens"
   Machine.FetchingRequiredWalletContext {} -> DOM.h3 {} $ DOOM.text "Fetching required wallet context"
@@ -587,7 +587,7 @@ machineStateToStepIndex state = StepIndex $ case state of
 -- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]
 stateToDetailedDescription :: Machine.State -> JSX
 stateToDetailedDescription state = case state of
-  Machine.DefiningContract -> DOM.div { className: "pe-3" }
+  Machine.DefiningContract -> DOM.div { className: "pe-3 mb-3" }
     [ DOM.p {} $ DOOM.text "Review your contract details before setting the terms to run it. Check the code and all details, this is your last chance to correct any errors before the contract is permanently live."
     ]
   Machine.DefiningRoleTokens {} -> DOOM.div_

@@ -19,7 +19,7 @@ component :: { title :: JSX, description :: JSX, content :: JSX } -> JSX
 component { title, description, content } =
   DOM.div { className: "container overflow-hidden" } $ do
     DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
-      [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center" } $
+      [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center mb-3 pb-3" } $
           [ DOM.div { className: "fw-bold font-size-2rem my-3" } $ title
           , DOM.div { className: "font-size-1rem" } $ description
           ]
