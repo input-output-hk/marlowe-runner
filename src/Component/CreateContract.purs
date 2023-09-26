@@ -11,7 +11,7 @@ import Component.CreateContract.Machine as Machine
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (link, spinner)
+import Component.Widgets (OutlineColoring(..), buttonOutlinedClassNames, link, spinner)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
@@ -20,11 +20,8 @@ import Contrib.Polyform.FormSpecs.StatelessFormSpec (StatelessFormSpec)
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatlessFormSpec
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
-import ReactBootstrap.Tab (tab)
-import ReactBootstrap.Tabs (tabs)
-import ReactBootstrap.Tabs as Tabs
-import ReactBootstrap.Types (eventKey)
 import Contrib.React.MarloweGraph (marloweGraph)
+import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FieldLayout(..), LabelSpacing(..), StatelessBootstrapFormSpec)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
 import Control.Error.Util (hoistMaybe)
@@ -70,14 +67,18 @@ import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (div, div_, hr, img, input, span_, text) as DOOM
 import React.Basic.DOM (css)
+import React.Basic.DOM (div, div_, hr, img, input, span_, text) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, Ref, component, fragment, readRef, useRef, (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
+import ReactBootstrap.Tab (tab)
+import ReactBootstrap.Tabs (tabs)
+import ReactBootstrap.Tabs as Tabs
+import ReactBootstrap.Types (eventKey)
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 import Web.DOM.Node (Node)
@@ -247,10 +248,11 @@ mkLoadFileHiddenInputComponent =
     pure $ DOOM.input
       { type: "file", accept, id, onChange: handler_ onChange, ref, className: "d-none" }
 
-machineProps (AutoRun autoRun) connectedWallet cardanoMultiplatformLib runtime = do
+machineProps (AutoRun autoRun) connectedWallet cardanoMultiplatformLib onStateTransition runtime = do
   let
     env = { connectedWallet, cardanoMultiplatformLib, runtime }
   { initialState: Machine.initialState
+  , onStateTransition
   , step: Machine.step
   , driver:
       if autoRun then Machine.driver env
@@ -327,6 +329,24 @@ backToContractListLink onDismiss = do
         }
     ]
 
+-- We want to construct `ContractInfo.ContractCreated` and call `onSuccess` only
+onStateTransition onSuccess prevState (Machine.ContractCreated { contract, createTxResponse, submittedAt, tags }) = do
+  let
+    { resource: PostContractsResponseContent { contractId }
+    , links: { contract: contractEndpoint }
+    } = createTxResponse
+
+    contractCreated = ContractInfo.ContractCreated
+      { contract
+      , contractEndpoint
+      , contractId
+      , submittedAt
+      , tags
+      }
+  onSuccess contractCreated
+-- FIXME: paluh: handle error reporting
+onStateTransition _ _ _ = pure unit
+
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   runtime <- asks _.runtime
@@ -340,10 +360,13 @@ mkComponent = do
   loadFileHiddenInputComponent <- mkLoadFileHiddenInputComponent
 
   liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss, possibleInitialContract } -> React.do
+    let
+      onStateTransition' = onStateTransition onSuccess
+
     currentRun /\ setCurrentRun <- React.useState' Nothing
     { state: submissionState, applyAction, reset: resetStateMachine } <- do
       let
-        props = machineProps initialAutoRun connectedWallet cardanoMultiplatformLib runtime
+        props = machineProps initialAutoRun connectedWallet cardanoMultiplatformLib onStateTransition' runtime
       useMooreMachine props
 
     formSpec <- React.useMemo unit \_ -> mkContractFormSpec (possibleInitialContract /\ initialAutoRun)
@@ -353,7 +376,7 @@ mkComponent = do
       onSubmit = _.result >>> case _ of
         Just (V (Right (contract /\ tags /\ autoRun)) /\ _) -> do
           let
-            props = machineProps autoRun connectedWallet cardanoMultiplatformLib runtime
+            props = machineProps autoRun connectedWallet cardanoMultiplatformLib onStateTransition' runtime
           applyAction' <- resetStateMachine (Just props)
           case autoRun of
             AutoRun true -> do
@@ -382,6 +405,24 @@ mkComponent = do
         _ -> pure unit
       pure (pure unit)
 
+    let
+      spinner :: JSX
+      spinner = DOM.div { className: "container" } $ do
+        DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
+          DOM.div
+            { className: "offset-3 col-9 position-absolute d-flex justify-content-center align-items-center blur-bg z-index-sticky" }
+            $ loadingSpinnerLogo {}
+
+      spinnerContent = fragment
+        [ BodyLayout.component
+            { title: stateToTitle submissionState
+            , description: stateToDetailedDescription submissionState
+            , content: fragment
+               [ DOOM.text "I'm fixing this - this is throbber placeholder..."
+               ]
+            }
+        ]
+
     pure $ case submissionState of
       Machine.DefiningContract -> do
         let
@@ -390,11 +431,11 @@ mkComponent = do
             Foldable.lookup fieldId fields
 
           formBody = DOM.div { className: "form-group" }
-            [ DOM.div { className: "row mb-2" }
+            [ DOM.div { className: "row mb-4" }
                 $ DOM.div { className: "col-12 text-end" }
                 $ do
                     let inputId = "contract-file-upload"
-                    [ DOM.label { htmlFor: inputId, className: "btn font-weight-bold me-2 btn-outline-primary" }
+                    [ DOM.label { htmlFor: inputId, className: buttonOutlinedClassNames OutlinePrimaryColoring "" }
                         [ R.text "Upload JSON" ]
                     , loadFileHiddenInputComponent
                         { onFileload: case _ of
@@ -417,7 +458,7 @@ mkComponent = do
             -- , lookupSubform autoRunFieldId
             ]
           formActions = fragment
-            [ DOM.div { className: "row" } $
+            [ DOM.div { className: "row mt-5" } $
                 [ DOM.div { className: "col-12" } $
                     [ DOM.button
                         do
@@ -441,8 +482,8 @@ mkComponent = do
           { title: stateToTitle submissionState
           , description: stateToDetailedDescription submissionState
           , content: fragment
-              [ DOM.div { className: "px-3" } formBody
-              , DOM.div { className: "px-3 mt-auto" } formActions
+              [ formBody
+              , formActions
               ]
           }
 
@@ -465,105 +506,106 @@ mkComponent = do
               , roleNames
               }
           }
-      Machine.ContractCreated { contract, createTxResponse, submittedAt, tags } -> do
-        let
-          { resource: PostContractsResponseContent { contractId }
-          , links: { contract: contractEndpoint }
-          } = createTxResponse
+      _ -> spinnerContent
+      -- Machine.ContractCreated { contract, createTxResponse, submittedAt, tags } -> do
+      --   let
+      --     { resource: PostContractsResponseContent { contractId }
+      --     , links: { contract: contractEndpoint }
+      --     } = createTxResponse
 
-          contractCreated = ContractInfo.ContractCreated
-            { contract
-            , contractEndpoint
-            , contractId
-            , submittedAt
-            , tags
-            }
+      --     contractCreated = ContractInfo.ContractCreated
+      --       { contract
+      --       , contractEndpoint
+      --       , contractId
+      --       , submittedAt
+      --       , tags
+      --       }
 
-        BodyLayout.component
-          { title: stateToTitle submissionState
-          , description: stateToDetailedDescription submissionState
-          , content: wrappedContentWithFooter
-              do marloweYaml contract
-              do
-                DOOM.fragment
-                  [ DOM.div { className: "row" } $
-                      [ DOM.div { className: "col-12 text-end" } $
-                          [ DOM.button
-                              { className: "btn btn-primary w-100"
-                              , onClick: handler_ (onSuccess contractCreated)
-                              }
-                              [ R.text "Done" ]
-                          ]
-                      ]
-                  ]
-          }
+      --   BodyLayout.component
+      --     { title: stateToTitle submissionState
+      --     , description: stateToDetailedDescription submissionState
+      --     , content: wrappedContentWithFooter
+      --         do marloweYaml contract
+      --         do
+      --           DOOM.fragment
+      --             [ DOM.div { className: "row" } $
+      --                 [ DOM.div { className: "col-12 text-end" } $
+      --                     [ DOM.button
+      --                         { className: "btn btn-primary w-100"
+      --                         , onClick: handler_ (onSuccess contractCreated)
+      --                         }
+      --                         [ R.text "Done" ]
+      --                     ]
+      --                 ]
+      --             ]
+      --     }
 
-      machineState -> do
-        let
-          machineEnv = { connectedWallet, cardanoMultiplatformLib, runtime }
-          possibleRequest = currentRun >>= case _ of
-            Manual _ -> do
-              Machine.driver machineEnv machineState
-            _ -> Nothing
+      -- machineState -> do
+      --   let
+      --     machineEnv = { connectedWallet, cardanoMultiplatformLib, runtime }
+      --     possibleRequest = currentRun >>= case _ of
+      --       Manual _ -> do
+      --         Machine.driver machineEnv machineState
+      --       _ -> Nothing
 
-          body = fragment
-            [ do
-                let
-                  StepIndex index = (machineStateToStepIndex machineState)
-                if index < machineStepsCardinality then do
-                  let
-                    stepPercent = Int.ceil $ (Int.toNumber (index - 1) / Int.toNumber (machineStepsCardinality - 1)) * 100.0
-                    style = css { width: show stepPercent <> "%" }
-                  DOM.div { className: "progress mb-3" } $ do
-                    DOOM.div { className: "progress-bar", style, children: [] }
-                else mempty
-            , case currentRun of
-                Just (Manual true) -> do
-                  DOM.div { className: "d-flex justify-content-center" } $ spinner Nothing
-                _ -> mempty
-            ]
+      --     body = fragment
+      --       [ do
+      --           let
+      --             StepIndex index = (machineStateToStepIndex machineState)
+      --           if index < machineStepsCardinality then do
+      --             let
+      --               stepPercent = Int.ceil $ (Int.toNumber (index - 1) / Int.toNumber (machineStepsCardinality - 1)) * 100.0
+      --               style = css { width: show stepPercent <> "%" }
+      --             DOM.div { className: "progress mb-3" } $ do
+      --               DOOM.div { className: "progress-bar", style, children: [] }
+      --           else mempty
+      --       , case currentRun of
+      --           Just (Manual true) -> do
+      --             DOM.div { className: "d-flex justify-content-center" } $ spinner Nothing
+      --           _ -> mempty
+      --       ]
 
-          formActions = case possibleRequest of
-            Nothing -> mempty
-            Just request -> DOOM.fragment
-              [ DOM.div { className: "row" } $
-                  [ DOM.div { className: "col-12 text-end" } $
-                      [ DOM.button
-                          { className: "btn btn-primary"
-                          , disabled: case currentRun of
-                              Just (Manual b) -> b
-                              _ -> false
-                          , onClick: handler_ do
-                              setCurrentRun (Just $ Manual true)
-                              launchAff_ do
-                                action <- request
-                                liftEffect $ do
-                                  applyAction action
-                                  setCurrentRun (Just $ Manual false)
-                          }
-                          [ R.text "Run" ]
-                      ]
-                  , backToContractListLink onDismiss
-                  ]
-              ]
-        BodyLayout.component
-          { title: stateToTitle submissionState
-          , description: stateToDetailedDescription submissionState
-          , content: wrappedContentWithFooter body formActions
-          }
+      --     formActions = case possibleRequest of
+      --       Nothing -> mempty
+      --       Just request -> DOOM.fragment
+      --         [ DOM.div { className: "row" } $
+      --             [ DOM.div { className: "col-12 text-end" } $
+      --                 [ DOM.button
+      --                     { className: "btn btn-primary"
+      --                     , disabled: case currentRun of
+      --                         Just (Manual b) -> b
+      --                         _ -> false
+      --                     , onClick: handler_ do
+      --                         setCurrentRun (Just $ Manual true)
+      --                         launchAff_ do
+      --                           action <- request
+      --                           liftEffect $ do
+      --                             applyAction action
+      --                             setCurrentRun (Just $ Manual false)
+      --                     }
+      --                     [ R.text "Run" ]
+      --                 ]
+      --             , backToContractListLink onDismiss
+      --             ]
+      --         ]
+      --   BodyLayout.component
+      --     { title: stateToTitle submissionState
+      --     , description: stateToDetailedDescription submissionState
+      --     , content: wrappedContentWithFooter body formActions
+      --     }
 
 stateToTitle :: Machine.State -> JSX
 stateToTitle state = case state of
-  Machine.DefiningContract -> DOM.div {}
+  _ -> DOM.div {}
     [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
     , DOM.span { className: "mb-3" } $ DOOM.text "Create and submit your contract"
     ]
-  Machine.DefiningRoleTokens {} -> DOM.h3 {} $ DOOM.text "Defining role tokens"
-  Machine.FetchingRequiredWalletContext {} -> DOM.h3 {} $ DOOM.text "Fetching required wallet context"
-  Machine.CreatingTx {} -> DOM.h3 {} $ DOOM.text "Creating transaction"
-  Machine.SigningTx {} -> DOM.h3 {} $ DOOM.text "Signing transaction"
-  Machine.SubmittigTx {} -> DOM.h3 {} $ DOOM.text "Submitting transaction"
-  Machine.ContractCreated {} -> DOM.h3 {} $ DOOM.text "Contract created"
+  -- Machine.DefiningRoleTokens {} -> DOM.h3 {} $ DOOM.text "Defining role tokens"
+  -- Machine.FetchingRequiredWalletContext {} -> DOM.h3 {} $ DOOM.text "Fetching required wallet context"
+  -- Machine.CreatingTx {} -> DOM.h3 {} $ DOOM.text "Creating transaction"
+  -- Machine.SigningTx {} -> DOM.h3 {} $ DOOM.text "Signing transaction"
+  -- Machine.SubmittigTx {} -> DOM.h3 {} $ DOOM.text "Submitting transaction"
+  -- Machine.ContractCreated {} -> DOM.h3 {} $ DOOM.text "Contract created"
 
 -- To display progress bar
 newtype StepIndex = StepIndex Int
@@ -587,59 +629,59 @@ machineStateToStepIndex state = StepIndex $ case state of
 -- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]
 stateToDetailedDescription :: Machine.State -> JSX
 stateToDetailedDescription state = case state of
-  Machine.DefiningContract -> DOM.div { className: "pe-3 mb-3" }
+  _ -> DOM.div { className: "pe-3 mb-3" }
     [ DOM.p {} $ DOOM.text "Review your contract details before setting the terms to run it. Check the code and all details, this is your last chance to correct any errors before the contract is permanently live."
     ]
-  Machine.DefiningRoleTokens {} -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "NOT IMPLEMENTED YET"
-    ]
-  Machine.FetchingRequiredWalletContext { errors: Nothing } -> DOOM.div_
-    [ DOM.p {}
-        [ DOOM.text "We are currently fetching the required wallet context for creating the Marlowe Contract on chain." ]
-    , DOM.p {}
-        [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
-        , DOM.code {} [ DOOM.text "getUsedAddresses" ]
-        , DOOM.text " method from CIP-30. The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
-        , DOM.code {} [ DOOM.text "addr_test..." ]
-        , DOOM.text ")."
-        ]
-    , DOM.p {}
-        [ DOOM.text "Please wait while we fetch the wallet context. This process may take a few moments." ]
-    ]
-  Machine.FetchingRequiredWalletContext { errors: Just error } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "It seems that the provided wallet is lacking addresses or failed to execute the method:"
-    , DOM.p {} $ DOOM.text error
-    ]
-  Machine.CreatingTx { errors: Nothing } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "Utilizing the Marlowe-runtime, this interface enables you to generate an initial transaction. The generated transaction needs to be signed using the wallet you've connected. By doing so, you are authorizing and verifying the transaction's intent and ensuring its secure execution."
-    , DOM.p {} $ DOOM.text "Please review all the details carefully before proceeding with the transaction confirmation."
-    ]
-  Machine.CreatingTx { reqWalletContext, errors: Just error } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "It seems that the marlowe-runtime failed to create the initial transaction:"
-    , DOM.p {} $ DOOM.text error
-    , DOM.p {} $ DOOM.text "The wallet context we used:"
-    , DOM.p {} $ DOOM.text $ unsafeStringify reqWalletContext
-    ]
-  Machine.SigningTx { errors: Nothing } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "You are currently in the process of digitally signing your initial transaction. This step is critical in validating the transaction's authenticity, confirming that it has indeed originated from you. By signing, you are ensuring the transaction's integrity and non-repudiation."
-    , DOM.p {} $ DOOM.text "Carefully review all details to confirm they are correct before finalizing your signature."
-    ]
-  Machine.SigningTx { errors: Just error } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "It seems that the wallet failed to sign the initial transaction:"
-    , DOM.p {} $ DOOM.text error
-    ]
-  Machine.SubmittigTx { errors: Nothing } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "You have now reached the transaction submission phase. Having signed your initial transaction, it's time to submit it into the system for processing. This step essentially sends the transaction to the network where it's queued for inclusion in the blockchain. Please ensure all details are correct. Once submitted, the transaction is irreversible and will be permanently recorded."
-    , DOM.p {} $ DOOM.text "Your transaction journey is almost complete. Press 'Submit' when you are ready."
-    ]
-  Machine.SubmittigTx { errors: Just error } -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "It seems that the marlowe-runtime failed to submit the initial transaction:"
-    , DOM.p {} $ DOOM.text error
-    ]
-  Machine.ContractCreated _ -> DOOM.div_
-    [ DOM.p {} $ DOOM.text "Congratulations! Your contract has been successfully created and recorded on the blockchain. This marks the successful completion of your transaction, now encapsulated into a secure, immutable contract. From here, the contract's terms will govern the further actions and transactions. You may want to keep a record of the contract details for future reference. Remember, the blockchain's nature of immutability makes this contract permanent and transparent."
-    , DOM.p {} $ DOOM.text "Thank you for using our platform, and feel free to create more contracts as needed."
-    ]
+  -- Machine.DefiningRoleTokens {} -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "NOT IMPLEMENTED YET"
+  --   ]
+  -- Machine.FetchingRequiredWalletContext { errors: Nothing } -> DOOM.div_
+  --   [ DOM.p {}
+  --       [ DOOM.text "We are currently fetching the required wallet context for creating the Marlowe Contract on chain." ]
+  --   , DOM.p {}
+  --       [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
+  --       , DOM.code {} [ DOOM.text "getUsedAddresses" ]
+  --       , DOOM.text " method from CIP-30. The addresses are then re-encoded from the lower-level Cardano CBOR hex format into Bech32 format ("
+  --       , DOM.code {} [ DOOM.text "addr_test..." ]
+  --       , DOOM.text ")."
+  --       ]
+  --   , DOM.p {}
+  --       [ DOOM.text "Please wait while we fetch the wallet context. This process may take a few moments." ]
+  --   ]
+  -- Machine.FetchingRequiredWalletContext { errors: Just error } -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "It seems that the provided wallet is lacking addresses or failed to execute the method:"
+  --   , DOM.p {} $ DOOM.text error
+  --   ]
+  -- Machine.CreatingTx { errors: Nothing } -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "Utilizing the Marlowe-runtime, this interface enables you to generate an initial transaction. The generated transaction needs to be signed using the wallet you've connected. By doing so, you are authorizing and verifying the transaction's intent and ensuring its secure execution."
+  --   , DOM.p {} $ DOOM.text "Please review all the details carefully before proceeding with the transaction confirmation."
+  --   ]
+  -- Machine.CreatingTx { reqWalletContext, errors: Just error } -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "It seems that the marlowe-runtime failed to create the initial transaction:"
+  --   , DOM.p {} $ DOOM.text error
+  --   , DOM.p {} $ DOOM.text "The wallet context we used:"
+  --   , DOM.p {} $ DOOM.text $ unsafeStringify reqWalletContext
+  --   ]
+  -- Machine.SigningTx { errors: Nothing } -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "You are currently in the process of digitally signing your initial transaction. This step is critical in validating the transaction's authenticity, confirming that it has indeed originated from you. By signing, you are ensuring the transaction's integrity and non-repudiation."
+  --   , DOM.p {} $ DOOM.text "Carefully review all details to confirm they are correct before finalizing your signature."
+  --   ]
+  -- Machine.SigningTx { errors: Just error } -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "It seems that the wallet failed to sign the initial transaction:"
+  --   , DOM.p {} $ DOOM.text error
+  --   ]
+  -- Machine.SubmittigTx { errors: Nothing } -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "You have now reached the transaction submission phase. Having signed your initial transaction, it's time to submit it into the system for processing. This step essentially sends the transaction to the network where it's queued for inclusion in the blockchain. Please ensure all details are correct. Once submitted, the transaction is irreversible and will be permanently recorded."
+  --   , DOM.p {} $ DOOM.text "Your transaction journey is almost complete. Press 'Submit' when you are ready."
+  --   ]
+  -- Machine.SubmittigTx { errors: Just error } -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "It seems that the marlowe-runtime failed to submit the initial transaction:"
+  --   , DOM.p {} $ DOOM.text error
+  --   ]
+  -- Machine.ContractCreated _ -> DOOM.div_
+  --   [ DOM.p {} $ DOOM.text "Congratulations! Your contract has been successfully created and recorded on the blockchain. This marks the successful completion of your transaction, now encapsulated into a secure, immutable contract. From here, the contract's terms will govern the further actions and transactions. You may want to keep a record of the contract details for future reference. Remember, the blockchain's nature of immutability makes this contract permanent and transparent."
+  --   , DOM.p {} $ DOOM.text "Thank you for using our platform, and feel free to create more contracts as needed."
+  --   ]
 
 -- | Let's use error information and other details of the state to describe the sitution.
 -- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]

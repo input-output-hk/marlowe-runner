@@ -173,6 +173,9 @@ type ButtonOutlinedProps =
   -- , tooltipPlacement :: Opt Placement
   }
 
+buttonOutlinedClassNames :: OutlineColoring -> String -> String
+buttonOutlinedClassNames coloring extraClassNames =
+  "btn font-weight-bold " <> outlineColoringToClassName coloring <> " " <> extraClassNames
 
 buttonOutlined :: forall props. NoProblem.Coerce props ButtonOutlinedProps => props -> JSX
 buttonOutlined props = do
@@ -180,9 +183,8 @@ buttonOutlined props = do
     props' :: ButtonOutlinedProps
     props' = NoProblem.coerce props
     { coloring, label, onClick } = props'
-    coloringClassName = outlineColoringToClassName coloring
   DOM.button
-    { className: "btn font-weight-bold " <> coloringClassName <> " " <> fromOpt "" props'.extraClassNames
+    { className: buttonOutlinedClassNames coloring $ fromOpt "" props'.extraClassNames
     , onClick: handler preventDefault (const $ onClick)
     , type: "button"
     }

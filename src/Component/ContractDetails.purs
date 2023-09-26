@@ -89,7 +89,7 @@ mkComponent = do
             Nothing -> "graph"
             Just _ -> "source"
         React.fragment
-          [ tabs { fill: true, justify: true, defaultActiveKey, variant: Tabs.variant.pills } do
+          [ tabs { fill: false, justify: false, defaultActiveKey, variant: Tabs.variant.pills } do
               let
                 renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
               [ case contract of

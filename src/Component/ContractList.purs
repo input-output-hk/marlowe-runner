@@ -47,6 +47,7 @@ import Data.List (intercalate)
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
+import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Set as Set
 import Data.String (contains, length)
@@ -167,7 +168,6 @@ mkForm onFieldValueChange = evalBuilder' ado
         pure value
     , name: Just queryFieldId
     , placeholder: "Filter contracts..."
-    , sizing: Just FormControlLg
     }
   in
     { query }
@@ -377,8 +377,6 @@ mkContractList = do
                 disabled = isNothing connectedWallet
                 newContractButton = buttonOutlinedPrimary
                   { label: DOOM.text "Create a contract"
-                  -- , extraClassNames: "font-weight-bold me-2 btn-outline-primary background-color-primary-light background-color-primary-hover"
-                  -- , disabled
                   , onClick: do
                       readRef possibleModalActionRef >>= case _ of
                         Nothing -> setModalAction (NewContract Nothing)
@@ -467,7 +465,7 @@ mkContractList = do
                   , tbody
                   ]
 
-              DOM.div { className: "container shadow rounded my-3" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12 p-3" } $ case possibleContracts'', contractMapInitialized of
+              DOM.div { className: "container" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" } $ DOM.div { className: "p-3 shadow rounded my-3" } $ case possibleContracts'', contractMapInitialized of
                 -- Pre search no started
                 Nothing, _ -> fragment [ mkTable mempty, spinner ]
                 -- Searching but nothing was found, still searching
@@ -569,21 +567,17 @@ mkContractList = do
                                           timeInterval = V1.TimeInterval invalidBefore invalidHereafter
                                           environment = V1.Environment { timeInterval }
                                           balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
-                                          roles = map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
-                                        buttonWithIcon
-                                          { icon: unsafeIcon mempty
-                                          , label: DOOM.text "Advance"
-                                          , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
-                                          , tooltipText: Just "Apply available inputs to the contract"
-                                          , tooltipPlacement: Just placement.left
-                                          , disabled: not $ Array.any
-                                              (\role -> canInput (V1.Role role) environment state contract)
-                                              (catMaybes roles)
-                                          , onClick: do
-                                              let
-                                                marloweContext = { initialContract, state, contract }
-                                              setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
-                                          }
+                                          roles = catMaybes <<< map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
+                                        Monoid.guard
+                                          (Array.any (\role -> canInput (V1.Role role) environment state contract) roles)
+                                          buttonOutlinedPrimary
+                                            { label: DOOM.text "Advance"
+                                            , extraClassNames: "me-2"
+                                            , onClick: do
+                                                let
+                                                  marloweContext = { initialContract, state, contract }
+                                                setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
+                                            }
                                       Just transactionsEndpoint,
                                       Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }),
                                       Just { usedAddresses } -> do
@@ -591,17 +585,14 @@ mkContractList = do
                                           timeInterval = V1.TimeInterval invalidBefore invalidHereafter
                                           environment = V1.Environment { timeInterval }
                                           marloweContext = { initialContract, state, contract }
-                                        buttonWithIcon
-                                          { icon: unsafeIcon mempty
-                                          , label: DOOM.text "Advance"
-                                          , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
-                                          , tooltipText: Just "Apply available inputs to the contract"
-                                          , tooltipPlacement: Just placement.left
-                                          , disabled: not $ Array.any
-                                              (\addr -> canInput (V1.Address $ bech32ToString addr) environment state contract)
-                                              usedAddresses
-                                          , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
-                                          }
+
+                                        Monoid.guard
+                                          (Array.any (\addr -> canInput (V1.Address $ bech32ToString addr) environment state contract) usedAddresses)
+                                          buttonOutlinedPrimary
+                                            { label: DOOM.text "Advance"
+                                            , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
+                                            , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
+                                            }
                                       _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }), _ -> DOOM.text "Complete"
                                       _, _, _ -> DOM.div { className: "border border-dark rounded bg-white text-dark d-inline-block py-1 px-3 fw-bold" } do
                                         DOOM.text "Syncing"

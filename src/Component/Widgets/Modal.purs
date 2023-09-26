@@ -19,6 +19,7 @@ import Web.DOM.Element (removeAttribute, setAttribute)
 import Web.DOM.Element as Element
 import Web.DOM.HTMLCollection as HTMLCollection
 import Web.DOM.Node as Node
+import Web.DOM.Text as Text
 import Web.HTML (window)
 import Web.HTML.HTMLDocument (toDocument)
 import Web.HTML.Window (document)
@@ -120,3 +121,36 @@ mkModal = do
                 ]
             ]
         ]
+
+-- BROKEN: backdrop logo is not yet in place.
+-- mkBackdrop :: Effect ({} -> JSX)
+-- mkBackdrop = do
+--   component "Backdrop" \_ -> React.do
+--     useEffectOnce do
+--       doc <- (window >>= document) <#> toDocument
+--       getElementsByTagName "body" doc >>= HTMLCollection.toArray >>= case _ of
+--         [ root ] -> do
+--           -- | FIXME: We should not override the existing classes etc.
+--           -- setAttribute "style" "overflow: hidden; padding-right: 15px" root
+--           -- setAttribute "style" "position: hidden" root
+--           setAttribute "class" "modal-open" root
+--           backdrop <- Document.createElement "div" doc
+--           setAttribute "class" "modal-backdrop fade show bg-white" backdrop
+-- 
+--           logoContainer <- Document.createElement "div" doc
+-- 
+--           textNode <- Document.createTextNode "TEST" doc <#> Text.toNode
+--           Node.appendChild textNode (Element.toNode logoContainer)
+-- 
+--           let
+--             close = do
+--               log "Close Click"
+--               removeAttribute "style" root
+--               removeAttribute "class" root
+--               Node.removeChild (Element.toNode backdrop) (Element.toNode root)
+-- 
+--           Node.appendChild (Element.toNode backdrop) (Element.toNode root)
+--           Node.appendChild (Element.toNode logoContainer) (Element.toNode root)
+--           pure close
+--         _ -> pure (pure unit)
+--     pure mempty

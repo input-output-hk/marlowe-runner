@@ -5,7 +5,6 @@ import Prelude
 import Contrib.Data.Foldable (foldMapFlipped)
 import Control.Parallel (parTraverse)
 import Data.Array as Array
-import Data.Array.NonEmpty (some)
 import Data.DateTime.Instant (Instant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either(..))

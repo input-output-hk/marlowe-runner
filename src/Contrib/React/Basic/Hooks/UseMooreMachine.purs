@@ -5,7 +5,6 @@ import Prelude
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype)
 import Data.Tuple.Nested ((/\))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -24,6 +23,7 @@ type MooreMachineSpec state action output =
   , driver :: MooreMachineDriver state action
   -- , onStateTransition :: state -> state -> Effect Unit
   , output :: state -> output
+  , onStateTransition :: state -> state -> Effect Unit
   , step :: MooreMachineStep state action
   }
 
@@ -70,6 +70,7 @@ useMooreMachine initialSpec = React.coerceHook React.do
         state' = currSpec.step currState action
         possibleNextRequest' = currSpec.driver state'
       setState state'
+      currSpec.onStateTransition currState state'
       setPossibleRequest possibleNextRequest'
 
     applyAction action = do
