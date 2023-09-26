@@ -58,6 +58,19 @@ type Props =
   , inModal :: Boolean
   }
 
+renderWallets :: WalletInfo Wallet -> JSX
+renderWallets (WalletInfo { icon, name, wallet }) =
+  DOM.div { className: "row mt-2" }
+    [ DOM.div { className: "col-12 bordered-container", onClick: \_ -> unit }
+        [ DOOM.img { src: icon, alt: "Icon Before", className: "icon" }
+        , DOOM.text $ name <> " Wallet"
+        , DOM.div { className: "cardano-badge" }
+            [ DOOM.img { src: "images/cardano-logo.png", alt: "Icon After", className: "icon-after" }
+            , DOOM.text "Cardano"
+            ]
+        ]
+    ]
+
 mkConnectWallet :: MkComponentM (Props -> JSX)
 mkConnectWallet = do
   singleChoiceField <- liftEffect mkSingleChoiceField
@@ -173,11 +186,25 @@ mkConnectWallet = do
         ]
 
       else fragment
-        [ DOM.div { } [ DOOM.text "PLACEHOLDER" ]
-        , DOM.div { className: "card p-5 m-5" }
-            [ DOM.p { className: "h3 font-weight-bold" } [ DOOM.text "Choose a wallet" ]
-            , DOM.span { className: "h5 text-muted" } [ DOOM.text "Please select a wallet to deploy a contract" ]
-            , formBody
-            , formActions
+        [ DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
+            [ DOM.div { className: "col-12" }
+                [ DOM.div { className: "card" }
+                    [ DOM.div { className: "card-body" }
+                        [ DOM.div { className: "container" }
+                            [ DOM.div { className: "row" }
+                                [ DOM.div { className: "col-12" }
+                                    [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
+                                    , DOM.p { className: "card-help-text text-left" } [ DOOM.text "Please select a wallet to view rewards." ]
+                                    ]
+                                ]
+                            , fragment $ Array.map renderWallets (ArrayAL.toArray <$> possibleWallets)
+                            , DOM.div { className: "row mt-4 d-none" }
+                                [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#", children: [ DOOM.text "Learn more" ] } ]
+                                , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none", children: [ DOOM.text "I don't have a wallet" ] } ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
             ]
         ]
