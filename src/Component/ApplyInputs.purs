@@ -461,6 +461,7 @@ machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultipla
   , step: Machine.step
   , driver: Machine.driver env
   , output: identity
+  , onStateTransition: \_ _ -> pure unit
   }
 
 type ContractDetailsProps =
