@@ -182,12 +182,12 @@ type TextInputOptionalPropsRow r =
   , touched :: Boolean
 
   -- These make no sens in the context of a text input.
-  -- FIXME: We should switch to an easier to compose
-  -- representation of optional props (undefined-is-not-a-problem?)
+  -- FIXME: We are slowly switching to more convenient `Opt` representation
   , max :: Opt Number
   , min :: Opt Number
   , sizing :: Maybe FormControlSizing
   , step :: Opt Number
+  , inputExtraClassName :: Opt String
   | r
   )
 
@@ -208,6 +208,7 @@ defaultTextInputProps =
   , min: NoProblem.undefined
   , sizing: Nothing
   , step: NoProblem.undefined
+  , inputExtraClassName: NoProblem.undefined
   }
 
 type TextInputValidator m a = Batteries.Validator m String (Maybe String) a
@@ -242,6 +243,7 @@ renderTextInput
      , possibleLabel :: Maybe JSX
      , name :: FieldId
      , placeholder :: String
+     , extraClassName :: Maybe String
      , type :: String
      , sizing :: Maybe FormControlSizing
      , max :: Opt Number
@@ -251,7 +253,7 @@ renderTextInput
   -> InputState String
   -> JSX
 renderTextInput
-  props@{ layout, possibleLabel, possibleHelpText, name, placeholder, "type": type_, sizing }
+  props@{ layout, possibleLabel, possibleHelpText, name, placeholder, "type": type_, sizing, extraClassName }
   { value, errors, onChange, touched } = do
   let
     nameStr = un FieldId name
@@ -269,6 +271,7 @@ renderTextInput
               Nothing -> Nothing
               Just FormControlSm -> Just "form-control-sm"
               Just FormControlLg -> Just "form-control-lg"
+          , extraClassName
           ]
         input = Form.textInput
           { className
@@ -325,6 +328,7 @@ textInput props = formSpecBuilderT do
           , possibleLabel: props'.label
           , possibleHelpText: props'.helpText
           , name
+          , extraClassName: NoProblem.toMaybe props'.inputExtraClassName
           , placeholder: props'.placeholder
           , "type": props'."type"
           , max: props'.max
@@ -609,6 +613,7 @@ defaultTextAreaProps =
   , min: NoProblem.undefined
   , sizing: Nothing
   , step: NoProblem.undefined
+  , inputExtraClassName: NoProblem.undefined
   }
 
 type TextAreaProps m a =

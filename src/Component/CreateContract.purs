@@ -53,6 +53,7 @@ import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
+import Data.Undefined.NoProblem as NoProblem
 import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
 import Effect (Effect)
@@ -165,6 +166,7 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
           lmap (Array.singleton <<< show) (decodeJson json)
       , rows: 15
       , name: Just contractFieldId
+      , inputExtraClassName: NoProblem.opt "font-monospace"
       }
 
     tags <- labelSubform tagFieldId $ StatelessFormSpecBuilders.textInput
