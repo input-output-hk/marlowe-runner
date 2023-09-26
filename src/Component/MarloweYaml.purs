@@ -15,7 +15,7 @@ sortMarloweKeys a b = JsYaml.toJsOrdering $ compareMarloweJsonKeys a b
 
 marloweYaml :: V1.Contract -> JSX
 marloweYaml contract =
-  DOM.div { className: "child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent" }
+  DOM.div { className: "child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent border border-3 rounded" }
     [ yamlSyntaxHighlighter contract { sortKeys: mkFn2 sortMarloweKeys } ]
 
 -- Alphabetical order of keys
@@ -24,5 +24,5 @@ sortStateKeys a b = JsYaml.toJsOrdering $ a `compare` b
 
 marloweStateYaml :: V1.State -> JSX
 marloweStateYaml state =
-  DOM.div { className: "child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent" }
+  DOM.div { className: "child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent border border-3 rounded" }
     [ yamlSyntaxHighlighter state { sortKeys: mkFn2 sortMarloweKeys } ]

@@ -14,6 +14,7 @@ type SyntaxHighlighterPropsRow =
   ( language :: String
   , children :: String
   , wrapLongLines :: Opt Boolean
+  , showLineNumbers :: Opt Boolean
   )
 
 foreign import _SyntaxHighlighter :: ReactComponent { | SyntaxHighlighterPropsRow }
@@ -44,4 +45,5 @@ yamlSyntaxHighlighter a opts = do
     { language: "yaml"
     , children: JsYaml.dumpBigIntJson opts bigIntJson
     , wrapLongLines: true
+    , showLineNumbers: true
     }

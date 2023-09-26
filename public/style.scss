@@ -227,6 +227,15 @@ $link-color: #511CF7;
   height: 100%;
 }
 
+.hide-vertical-scroll {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.hide-vertical-scroll::-webkit-scrollbar { 
+    display: none;  /* Safari and Chrome */
+}
+
 .h-vh50 {
   height: 50vh !important;
 }

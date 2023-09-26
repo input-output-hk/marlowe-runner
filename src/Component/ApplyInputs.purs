@@ -112,7 +112,7 @@ submit witnesses serverUrl contractEndpoint = do
 contractSection contract state =
   tabs { fill: false, justify: false, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
     let
-      renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
+      renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto hide-vertical-scroll" } children
     [ renderTab
         { eventKey: eventKey "graph"
         , title: DOOM.span_
