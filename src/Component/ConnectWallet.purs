@@ -2,12 +2,11 @@ module Component.ConnectWallet where
 
 import Prelude
 
-import Component.Assets.Svgs as Svgs
 import Component.Types (MkComponentM, WalletInfo(..))
-import Component.Widgets (link, spinner)
+import Component.Widgets (link)
 import Component.Widgets.Form (mkSingleChoiceField)
 import Component.Widgets.Form as Form
-import Contrib.React.Svg (loadingSpinnerLogo, svgProgress)
+import Contrib.React.Svg (loadingSpinnerLogo)
 import Data.Array as Array
 import Data.Array.ArrayAL (ArrayAL)
 import Data.Array.ArrayAL as ArrayAL
@@ -23,7 +22,7 @@ import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import React.Basic (JSX, fragment)
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (button, h2_, img, span_, text) as DOOM
+import React.Basic.DOM (button, img, span_, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (component, useEffectOnce, useState', (/\))
@@ -57,6 +56,19 @@ type Props =
   , onWalletConnect :: Response -> Effect Unit
   , inModal :: Boolean
   }
+
+renderWallets :: WalletInfo Wallet -> JSX
+renderWallets (WalletInfo { icon, name, wallet }) =
+  DOM.div { className: "row mt-2" }
+    [ DOM.div { className: "col-12 bordered-container", onClick: handler_ $ pure unit }
+        [ DOOM.img { src: icon, alt: "Icon Before", className: "icon" }
+        , DOOM.text $ name <> " Wallet"
+        , DOM.div { className: "cardano-badge" }
+            [ DOOM.img { src: "images/cardano-logo.png", alt: "Icon After", className: "icon-after" }
+            , DOOM.text "Cardano"
+            ]
+        ]
+    ]
 
 mkConnectWallet :: MkComponentM (Props -> JSX)
 mkConnectWallet = do
@@ -173,11 +185,27 @@ mkConnectWallet = do
         ]
 
       else fragment
-        [ DOM.div { } [ DOOM.text "PLACEHOLDER" ]
-        , DOM.div { className: "card p-5 m-5" }
-            [ DOM.p { className: "h3 font-weight-bold" } [ DOOM.text "Choose a wallet" ]
-            , DOM.span { className: "h5 text-muted" } [ DOOM.text "Please select a wallet to deploy a contract" ]
-            , formBody
-            , formActions
+        [ DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
+            [ DOM.div { className: "col-12" }
+                [ DOM.div { className: "card" }
+                    [ DOM.div { className: "card-body" }
+                        [ DOM.div { className: "container" }
+                            [ DOM.div { className: "row" }
+                                [ DOM.div { className: "col-12" }
+                                    [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
+                                    , DOM.p { className: "card-help-text text-left" } [ DOOM.text "Please select a wallet to view rewards." ]
+                                    ]
+                                ]
+                            , case possibleWallets of
+                                Just wallets -> fragment $ map renderWallets (ArrayAL.toArray wallets)
+                                Nothing -> mempty
+                            , DOM.div { className: "row mt-4 d-none" }
+                                [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#" } [ DOOM.text "Learn more" ] ]
+                                , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none" } [ DOOM.text "I don't have a wallet" ] ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
             ]
         ]

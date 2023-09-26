@@ -40,6 +40,38 @@ $link-color: #511CF7;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
 }
 
+.bordered-container {
+  border: 1px solid #dee2e6; /* Bootstrap's border color */
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer; /* Optional: to indicate it's clickable */
+}
+
+.icon {
+  height: 20px; /* Adjust as needed */
+  margin-right: 10px; /* Space between icon and text */
+}
+
+.icon-after {
+  height: 20px; /* Adjust as needed */
+  margin-left: 10px; /* Space between text and icon */
+}
+
+
+.cardano-badge {
+  display: flex;
+  padding: 0.375rem 0.6875rem;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--primary-blue, #0038FF);
+  background: #FBFCFF;
+}
+
+
 .large-switch {
   font-size: 20px;
 }
