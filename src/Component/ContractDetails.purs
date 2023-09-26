@@ -8,6 +8,7 @@ import Component.InputHelper as InputHelper
 import Component.MarloweYaml (marloweYaml, marloweStateYaml)
 import Component.Types (MkComponentM)
 import Component.Types.ContractInfo (fetchAppliedInputs)
+import Component.Widgets (link)
 import Contrib.React.MarloweGraph (marloweGraph)
 import Control.Monad.Reader (asks)
 import Data.Array as Array
@@ -24,7 +25,7 @@ import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic as DOOM
 import React.Basic.DOM (css)
-import React.Basic.DOM (span_, text, img) as DOOM
+import React.Basic.DOM (div, span_, text, img) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, (/\))
@@ -142,13 +143,19 @@ mkComponent = do
       --         ]
       --     ]
       --   ]
-      footer = DOOM.fragment
-        [ DOM.button
-            { className: "btn btn-primary"
-            , onClick: handler_ onClose
-            }
-            [ DOOM.text "Ok" ]
-        ]
+      footer =
+        DOOM.fragment
+          [ DOM.div
+              { className: "col-12 text-center" } $
+              [ link
+                  { label: DOM.b {} [ DOOM.text "Back to contract list" ]
+                  , onClick: const onClose unit
+                  , showBorders: false
+                  , extraClassNames: "mt-3"
+                  }
+
+              ]
+          ]
 
       content = wrappedContentWithFooter body footer
 
