@@ -214,15 +214,7 @@ mkDepositFormComponent = do
           ] <> [ DOM.div { className: "form-group" } fields ]
         actions = fragment
           [ DOM.div { className: "row" } $
-              [ DOM.div { className: "col-6 text-start" } $
-                  [ link
-                      { label: DOOM.text "Cancel"
-                      , onClick: onDismiss
-                      , showBorders: true
-                      , extraClassNames: "me-3 w-100"
-                      }
-                  ]
-              , DOM.div { className: "col-6 text-end" } $
+              [ DOM.div { className: "col-12" } $
                   [ DOM.button
                       do
                         let
@@ -233,8 +225,11 @@ mkDepositFormComponent = do
                         , onClick: onSubmit'
                         , disabled
                         }
-                      [ R.text "Submit" ]
+                      [ R.text "Make deposit"
+                      , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                      ]
                   ]
+              , backToContractListLink onDismiss
               ]
           ]
 
