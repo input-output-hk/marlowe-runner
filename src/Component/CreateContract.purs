@@ -44,6 +44,7 @@ import Data.Identity (Identity)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Monoid as Monoid
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (un)
 import Data.Nullable (Nullable)
@@ -89,8 +90,13 @@ import Web.File.FileList as FileList
 import Web.HTML.HTMLInputElement (HTMLInputElement)
 import Web.HTML.HTMLInputElement as HTMLInputElement
 
+data CreateContractError = CreateContractError String
+
+data CreateContractDismissReason = CreateContractDismissReason String
+
 type Props =
   { onDismiss :: Effect Unit
+  , onError :: CreateContractDismissReason -> Effect Unit
   , onSuccess :: ContractInfo.ContractCreated -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , possibleInitialContract :: Maybe ContractJsonString
@@ -408,87 +414,84 @@ mkComponent = do
       pure (pure unit)
 
     let
-      spinner :: JSX
-      spinner = DOM.div { className: "container" } $ do
-        DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
-          DOM.div
-            { className: "offset-3 col-9 position-absolute d-flex justify-content-center align-items-center blur-bg z-index-sticky" }
-            $ loadingSpinnerLogo {}
+      fields = StatelessFormSpec.renderFormSpec formSpec formState
+      lookupSubform fieldId = fromMaybe mempty do
+        Foldable.lookup fieldId fields
 
-      spinnerContent = fragment
-        [ BodyLayout.component
-            { title: stateToTitle submissionState
-            , description: stateToDetailedDescription submissionState
-            , content: fragment
-               [ DOOM.text "I'm fixing this - this is throbber placeholder..."
-               ]
-            }
+      formBody = DOM.div { className: "form-group" }
+        [ DOM.div { className: "row mb-4" }
+            $ DOM.div { className: "col-12 text-end" }
+            $ do
+                let inputId = "contract-file-upload"
+                [ DOM.label { htmlFor: inputId, className: buttonOutlinedClassNames OutlinePrimaryColoring "" }
+                    [ R.text "Upload JSON" ]
+                , loadFileHiddenInputComponent
+                    { onFileload: case _ of
+                        Just str -> do
+                          let
+                            allFields = formState.fields
+                          void $ for (Map.lookup contractFieldId allFields) \{ onChange } -> do
+                            let
+                              str' = formatPossibleJSON str
+                            onChange [ str' ]
+
+                        Nothing -> traceM "No file"
+                    , id: inputId
+                    , accept: "application/json"
+                    }
+                ]
+        , lookupSubform contractFieldId
+        , DOOM.hr {}
+        , lookupSubform tagFieldId
+        -- , lookupSubform autoRunFieldId
+        ]
+      formActions = fragment
+        [ DOM.div { className: "row mt-5" } $
+            [ DOM.div { className: "col-12" } $
+                [ DOM.button
+                    do
+                      let
+                        disabled = case result of
+                          Just (V (Right _) /\ _) -> false
+                          _ -> true
+                      { className: "btn btn-primary w-100"
+                      , onClick: onSubmit'
+                      , disabled
+                      }
+                    [ R.text "Submit contract"
+                    , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                    ]
+                ]
+            , backToContractListLink onDismiss
+            ]
         ]
 
-    pure $ case submissionState of
-      Machine.DefiningContract -> do
+      spinner :: JSX
+      spinner = DOM.div
+        { className: "position-absolute top-0 min-height-100vh w-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky" }
+        $ loadingSpinnerLogo {}
+      content useSpinner = do
         let
-          fields = StatelessFormSpec.renderFormSpec formSpec formState
-          lookupSubform fieldId = fromMaybe mempty do
-            Foldable.lookup fieldId fields
-
-          formBody = DOM.div { className: "form-group" }
-            [ DOM.div { className: "row mb-4" }
-                $ DOM.div { className: "col-12 text-end" }
-                $ do
-                    let inputId = "contract-file-upload"
-                    [ DOM.label { htmlFor: inputId, className: buttonOutlinedClassNames OutlinePrimaryColoring "" }
-                        [ R.text "Upload JSON" ]
-                    , loadFileHiddenInputComponent
-                        { onFileload: case _ of
-                            Just str -> do
-                              let
-                                allFields = formState.fields
-                              void $ for (Map.lookup contractFieldId allFields) \{ onChange } -> do
-                                let
-                                  str' = formatPossibleJSON str
-                                onChange [ str' ]
-
-                            Nothing -> traceM "No file"
-                        , id: inputId
-                        , accept: "application/json"
-                        }
-                    ]
-            , lookupSubform contractFieldId
-            , DOOM.hr {}
-            , lookupSubform tagFieldId
-            -- , lookupSubform autoRunFieldId
-            ]
-          formActions = fragment
-            [ DOM.div { className: "row mt-5" } $
-                [ DOM.div { className: "col-12" } $
-                    [ DOM.button
-                        do
-                          let
-                            disabled = case result of
-                              Just (V (Right _) /\ _) -> false
-                              _ -> true
-                          { className: "btn btn-primary w-100"
-                          , onClick: onSubmit'
-                          , disabled
-                          }
-                        [ R.text "Submit contract"
-                        , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
-                        ]
-                    ]
-                , backToContractListLink onDismiss
-                ]
-            ]
-
-        BodyLayout.component
-          { title: stateToTitle submissionState
-          , description: stateToDetailedDescription submissionState
-          , content: fragment
+          title = stateToTitle submissionState
+          description = stateToDetailedDescription submissionState
+          formContent =
+            [ DOM.div { className: "ps-3" }
               [ formBody
               , formActions
               ]
-          }
+            ] <> Monoid.guard useSpinner [ spinner ]
+        -- Essentially this is a local copy of 
+        DOM.div { className: "container" } $ do
+          DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
+            [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center pb-3" } $
+                [ DOM.div { className: "fw-bold font-size-2rem my-3" } $ title
+                , DOM.div { className: "font-size-1rem" } $ description
+                ]
+            , DOM.div { className: "col-9 bg-white position-relative" } formContent
+            ]
 
+    pure $ case submissionState of
+      Machine.DefiningContract -> content false
       Machine.DefiningRoleTokens { roleNames } -> do
         let
           onSuccess' :: RolesConfig -> Effect Unit
@@ -508,40 +511,7 @@ mkComponent = do
               , roleNames
               }
           }
-      _ -> spinnerContent
-      -- Machine.ContractCreated { contract, createTxResponse, submittedAt, tags } -> do
-      --   let
-      --     { resource: PostContractsResponseContent { contractId }
-      --     , links: { contract: contractEndpoint }
-      --     } = createTxResponse
-
-      --     contractCreated = ContractInfo.ContractCreated
-      --       { contract
-      --       , contractEndpoint
-      --       , contractId
-      --       , submittedAt
-      --       , tags
-      --       }
-
-      --   BodyLayout.component
-      --     { title: stateToTitle submissionState
-      --     , description: stateToDetailedDescription submissionState
-      --     , content: wrappedContentWithFooter
-      --         do marloweYaml contract
-      --         do
-      --           DOOM.fragment
-      --             [ DOM.div { className: "row" } $
-      --                 [ DOM.div { className: "col-12 text-end" } $
-      --                     [ DOM.button
-      --                         { className: "btn btn-primary w-100"
-      --                         , onClick: handler_ (onSuccess contractCreated)
-      --                         }
-      --                         [ R.text "Done" ]
-      --                     ]
-      --                 ]
-      --             ]
-      --     }
-
+      _ -> content true
       -- machineState -> do
       --   let
       --     machineEnv = { connectedWallet, cardanoMultiplatformLib, runtime }

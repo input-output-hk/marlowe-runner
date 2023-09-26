@@ -318,6 +318,8 @@ mkContractList = do
                 ]
               resetModalAction
               notSyncedYetInserts.add contractCreated
+          , onError: \error -> do
+              msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission"]
           , possibleInitialContract
           }
         Just (ApplyInputs contractInfo transactionsEndpoint marloweContext), Just cw -> do
@@ -446,7 +448,7 @@ mkContractList = do
                         , thWithIcon "/images/sell.svg" ""
                         , thWithIcon "/images/frame_65.svg" "rounded-top"
                         ]
-                    , DOM.tr {}
+                    , DOM.tr { className: "border-bottom-white border-bottom-4px" }
                         [ do
                             let
                               label = DOOM.text "Created"
@@ -542,8 +544,7 @@ mkContractList = do
                           contractId = ContractInfo.someContractContractId someContract
                           possibleContract = ContractInfo.someContractCurrentContract someContract
                           isClosed = isContractComplete possibleContract
-                          trClassName = if isClosed then "align-middle bg-secondary border-bottom-white-4px" else "align-middle border-bottom-white-4px"
-
+                          trClassName = "align-middle border-bottom-white border-bottom-4px" <> Monoid.guard isClosed " bg-secondary"
                         DOM.tr { className: trClassName } $ case someContract of
                           (SyncedConractInfo ci@(ContractInfo { _runtime, endpoints, marloweInfo })) -> do
                             let

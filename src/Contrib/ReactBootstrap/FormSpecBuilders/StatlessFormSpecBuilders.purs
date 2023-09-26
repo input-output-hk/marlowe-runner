@@ -36,6 +36,7 @@ import Data.String as String
 import Data.Tuple (fst)
 import Data.Undefined.NoProblem (Opt, fromOpt)
 import Data.Undefined.NoProblem (toMaybe, undefined) as NoProblem
+import Data.Undefined.NoProblem as NoProblems
 import Data.Undefined.NoProblem.Closed (class Coerce, coerce) as NoProblem
 import Parsing (Parser, runParser) as Parsing
 import Parsing (fail)
@@ -631,10 +632,11 @@ renderTextArea
      , name :: FieldId
      , placeholder :: String
      , rows :: Int
+     , extraClassName :: Maybe String
      }
   -> InputState String
   -> JSX
-renderTextArea { layout, possibleLabel, helpText, name, placeholder, rows } { value, errors, onChange, touched } = do
+renderTextArea { extraClassName, layout, possibleLabel, helpText, name, placeholder, rows } { value, errors, onChange, touched } = do
   let
     nameStr = un FieldId name
 
@@ -663,6 +665,7 @@ renderTextArea { layout, possibleLabel, helpText, name, placeholder, rows } { va
         , rows
         , isValid
         , isInvalid
+        , className: fold extraClassName
         }
         <> do
           fold
@@ -690,6 +693,7 @@ textArea props = formSpecBuilderT do
       props'.initial
       ( Array.singleton <<< renderTextArea
           { possibleLabel: props'.label
+          , extraClassName: NoProblems.toMaybe props'.inputExtraClassName
           , name
           , layout: props'.layout
           , helpText: props'.helpText

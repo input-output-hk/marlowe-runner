@@ -17,12 +17,14 @@ $link-color: #511CF7;
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/utilities";
 
-// Replace with tilewind style!
-
-.table .border-bottom-white-4px {
-  border-bottom-color: white !important; /* Set the border color to white */
+.border-bottom-4px {
   border-bottom-width: 4px !important;  /* Set the border width to 3px */
 }
+.border-bottom-white {
+  border-bottom-color: white !important; /* Set the border color to white */
+}
+
+// Replace with tilewind style!
 
 .table th, td {
   text-align: center;
