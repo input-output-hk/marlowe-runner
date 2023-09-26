@@ -95,14 +95,16 @@ mkComponent = do
                 renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto hide-vertical-scroll" } children
               [ case contract of
                   Nothing -> mempty
-                  Just contract' -> renderTab
+                  Just contract' -> tab
                     { eventKey: eventKey "source"
                     , title: DOOM.span_
                         [ Icons.toJSX $ unsafeIcon "filetype-yml"
                         , DOOM.text " Source code"
                         ]
                     }
-                    [ marloweYaml contract' ]
+                    $ DOM.div
+                      { className: "w-100 h-vh50 overflow-auto hide-vertical-scroll border border-3 rounded mt-4" }
+                      [ marloweYaml contract' ]
               , case possibleExecutionPath of
                   Nothing -> mempty
                   Just executionPath ->

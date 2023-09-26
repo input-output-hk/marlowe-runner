@@ -295,9 +295,9 @@ mkApp = do
                       [ DOM.li { className: "nav-item" } $
                           case possibleWalletInfo, possibleWalletContext of
                             Just (WalletInfo wallet), Just (WalletContext ctx) -> link
-                              { label: DOM.span { className: "h5 d-flex align-items-center" }
+                              { label: DOM.span { className: "h6 d-flex align-items-center" }
                                   [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
-                                  , DOM.span { className: "cursor-pointer text-decoration-none text-decoration-underline-hover truncate-text text-color-gray w-16rem d-inline-block fw-bold" }
+                                  , DOM.span { className: "cursor-pointer text-decoration-none text-decoration-underline-hover truncate-text text-color-gray w-10rem d-inline-block fw-bold" }
                                       [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
                                   ]
                               , extraClassNames: "nav-link"
