@@ -357,22 +357,17 @@ mkNotifyFormComponent = do
           ]
         actions = fragment
           [ DOM.div { className: "row" } $
-              [ DOM.div { className: "col-6 text-start" } $
-                  [ link
-                      { label: DOOM.text "Cancel"
-                      , onClick: onDismiss
-                      , showBorders: true
-                      , extraClassNames: "me-3"
-                      }
-                  ]
-              , DOM.div { className: "col-6 text-end" } $
+              [ DOM.div { className: "col-12" } $
                   [ DOM.button
-                      { className: "btn btn-primary"
-                      , onClick: handler_ onSuccess
-                      , disabled: false
-                      }
-                      [ R.text "Submit" ]
+                      do
+                        { className: "btn btn-primary w-100"
+                        , onClick: handler_ onSuccess
+                        }
+                      [ R.text "Advance contract"
+                      , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                      ]
                   ]
+              , backToContractListLink onDismiss
               ]
           ]
 
