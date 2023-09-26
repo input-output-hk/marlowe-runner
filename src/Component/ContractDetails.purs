@@ -24,7 +24,7 @@ import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic as DOOM
 import React.Basic.DOM (css)
-import React.Basic.DOM (span_, text) as DOOM
+import React.Basic.DOM (span_, text, img) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, (/\))
@@ -153,17 +153,12 @@ mkComponent = do
       content = wrappedContentWithFooter body footer
 
     pure $ BodyLayout.component
-      { title: DOM.h3 {} $ DOOM.text "Contract details"
-      , description: DOM.div {}
-          [ DOM.p {} [ DOOM.text "This page shows the details of the selected contract. The page is divided into three tabs: Source Code, Source Graph, and Contract State. Each tab provides a different view of the contract." ]
-          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Code" ]
-          , DOM.p {} [ DOOM.text "In the Source Code tab, you can view the remaining part of the contract that is on the blockchain. This includes the logic and conditions that are yet to be executed. It's a textual representation of the contract, allowing you to understand the contract's structure and logic." ]
-          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Source Graph" ]
-          , DOM.p {} [ DOOM.text "The Source Graph tab provides a visual representation of the contract. It displays the contract as a graph, with nodes representing the different states and actions of the contract. The paths that have already been executed (transactions) are highlighted, allowing you to see the progression of the contract over time." ]
-          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Contract State" ]
-          , DOM.p {} [ DOOM.text "In the Contract State tab, you can view the current status of the participant's account, as well as the chosen values and variables that have been set within the contract (using 'let' statements). This tab provides a snapshot of the contract's current state and the participant's interaction with it." ]
-          , DOM.p { className: "h3 fw-bold my-3" } [ DOOM.text "Marlowe Explorer" ]
-          , DOM.p {} [ DOOM.text "To view the state of the contract on the Cardano blockchain, visit the ", DOM.a { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", target: "_blank", className: "white-color" } [ DOOM.text "Marlowe Explorer" ], DOOM.text "." ]
+      { title: DOM.div {}
+          [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
+          , DOM.span { className: "mb-3" } $ DOOM.text "Contract details"
+          ]
+      , description: DOM.div { className: "pe-3 mb-3" }
+          [ DOM.p {} $ DOOM.text "This page displays the details and current status of the contract that is on chain."
           ]
       , content
       }
