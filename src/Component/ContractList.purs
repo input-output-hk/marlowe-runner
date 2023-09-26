@@ -603,7 +603,9 @@ mkContractList = do
                                           , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
                                           }
                                       _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }), _ -> DOOM.text "Complete"
-                                      _, _, _ -> mempty
+                                      _, _, _ -> DOM.div { className: "border border-dark rounded bg-white text-dark d-inline-block py-1 px-3 fw-bold" } do
+                                        DOOM.text "Syncing"
+
                                 , case marloweInfo, possibleWalletContext of
                                     Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
                                       let
