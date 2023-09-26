@@ -84,6 +84,7 @@ derive instance Newtype ContractJsonString _
 
 data Page
   = ContarctListPage
+  | LoginPage
   | CreateContractPage (Maybe ContractJsonString)
   | OtherPage
 

@@ -21,7 +21,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, catchError, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error)
-import React.Basic (JSX)
+import React.Basic (JSX, fragment)
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (button, h2_, img, span_, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -172,10 +172,12 @@ mkConnectWallet = do
         , modalFooter {} formActions
         ]
 
-      else
-        DOM.div { className: "card p-5 m-5" }
-          [ DOM.p { className: "h3 font-weight-bold" } [ DOOM.text "Choose a wallet" ]
-          , DOM.span { className: "h5 text-muted" } [ DOOM.text "Please select a wallet to deploy a contract" ]
-          , formBody
-          , formActions
-          ]
+      else fragment
+        [ DOM.div { } [ DOOM.text "PLACEHOLDER" ]
+        , DOM.div { className: "card p-5 m-5" }
+            [ DOM.p { className: "h3 font-weight-bold" } [ DOOM.text "Choose a wallet" ]
+            , DOM.span { className: "h5 text-muted" } [ DOOM.text "Please select a wallet to deploy a contract" ]
+            , formBody
+            , formActions
+            ]
+        ]

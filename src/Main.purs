@@ -134,6 +134,8 @@ main configJson = do
       setAttribute "class" (origClasses <> " contract-list-page") appContainer
     setPageClass (CreateContractPage _) = do
       setAttribute "class" (origClasses <> " create-contract-page") appContainer
+    setPageClass LoginPage =
+      setAttribute "class" (origClasses <> " login-page") appContainer
     setPageClass OtherPage =
       setAttribute "class" "" appContainer
 
@@ -171,7 +173,7 @@ main configJson = do
             }
 
         liftEffect $ setPageClass $ case possibleInitialContract of
-          Nothing -> ContarctListPage
+          Nothing -> LoginPage
           Just contractJson -> CreateContractPage (Just contractJson)
 
         app <- liftEffect $ runReaderT mkApp mkAppCtx
