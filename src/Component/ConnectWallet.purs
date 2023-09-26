@@ -61,7 +61,7 @@ type Props =
 renderWallets :: WalletInfo Wallet -> JSX
 renderWallets (WalletInfo { icon, name, wallet }) =
   DOM.div { className: "row mt-2" }
-    [ DOM.div { className: "col-12 bordered-container", onClick: \_ -> unit }
+    [ DOM.div { className: "col-12 bordered-container", onClick: \_ -> handler_ unit }
         [ DOOM.img { src: icon, alt: "Icon Before", className: "icon" }
         , DOOM.text $ name <> " Wallet"
         , DOM.div { className: "cardano-badge" }
@@ -197,7 +197,9 @@ mkConnectWallet = do
                                     , DOM.p { className: "card-help-text text-left" } [ DOOM.text "Please select a wallet to view rewards." ]
                                     ]
                                 ]
-                            , fragment $ Array.map renderWallets (ArrayAL.toArray <$> possibleWallets)
+                            , case possibleWallets of
+                                Just wallets -> fragment $ map renderWallets (ArrayAL.toArray wallets)
+                                Nothing -> mempty
                             , DOM.div { className: "row mt-4 d-none" }
                                 [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#", children: [ DOOM.text "Learn more" ] } ]
                                 , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none", children: [ DOOM.text "I don't have a wallet" ] } ]
