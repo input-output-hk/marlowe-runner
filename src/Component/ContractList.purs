@@ -18,7 +18,7 @@ import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(..)
 import Component.Types.ContractInfo (MarloweInfo(..), SomeContractInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (buttonOutlinedPrimary, buttonWithIcon)
+import Component.Widgets (buttonOutlinedInactive, buttonOutlinedPrimary, buttonWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
@@ -590,12 +590,11 @@ mkContractList = do
                                           (Array.any (\addr -> canInput (V1.Address $ bech32ToString addr) environment state contract) usedAddresses)
                                           buttonOutlinedPrimary
                                             { label: DOOM.text "Advance"
-                                            , extraClassNames: "font-weight-bold me-2 btn-outline-primary"
+                                            , extraClassNames: "font-weight-bold btn-outline-primary"
                                             , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
                                             }
                                       _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }), _ -> DOOM.text "Complete"
-                                      _, _, _ -> DOM.div { className: "border border-dark rounded bg-white text-dark d-inline-block py-1 px-3 fw-bold" } do
-                                        DOOM.text "Syncing"
+                                      _, _, _ -> buttonOutlinedInactive { label: DOOM.text "Syncing" }
 
                                 , case marloweInfo, possibleWalletContext of
                                     Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
@@ -634,11 +633,11 @@ mkContractList = do
                             , tdInstant $ updatedAt <|> createdAt
                             , tdContractId contractId Nothing []
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered
-                                ( [ DOM.div { className: "border border-dark rounded bg-white text-dark d-inline-block py-2 px-3 fw-bold" } do
-                                      DOOM.text "Syncing"
-                                  ] :: Array JSX
-                                ) -- FIXME: Withdrawals should be still possible
+                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
+                                -- ( [ DOM.div { className: "border border-dark rounded bg-white text-dark d-inline-block py-2 px-3 fw-bold" } do
+                                --       DOOM.text "Syncing"
+                                --   ] :: Array JSX
+                                -- ) -- FIXME: Withdrawals should be still possible
                             ]
                           NotSyncedUpdatedContract { contractInfo } -> do
                             [ tdInstant createdAt

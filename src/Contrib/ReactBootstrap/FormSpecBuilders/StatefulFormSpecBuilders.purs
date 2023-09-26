@@ -2,76 +2,21 @@ module Contrib.ReactBootstrap.FormSpecBuilders.StatefulFormSpecBuilders where
 
 import Prelude
 
-import Contrib.Polyform.FormSpecBuilder (FieldIdPrefix(..), FormSpecBuilderM, FormSpecBuilderT, _fullPrefix, formSpecBuilderT, genId, unFormSpecBuilder)
+import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT, formSpecBuilderT)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
-import Contrib.Polyform.FormSpecs.StatefulFormSpec (InputState, StatefulFormSpec(..), liftStatelessFormSpec)
+import Contrib.Polyform.FormSpecs.StatefulFormSpec (StatefulFormSpec, liftStatelessFormSpec)
 import Contrib.Polyform.FormSpecs.StatefulFormSpec as StatefulFormSpec
-import Contrib.Polyform.FormSpecs.StatelessFormSpec (StatelessFormSpec(..))
-import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
-import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (TextInputOptionalProps, TextInputProps, _genFieldId, defaultTextInputProps, renderPossibleHelpText, renderTextInput)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (TextInputOptionalProps, TextInputProps, _genFieldId, defaultTextInputProps, renderTextInput)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
-import Control.Alternative as Alternative
-import Control.Monad.Reader (withReaderT)
 import Control.Monad.State (StateT)
 import ConvertableOptions (class Defaults, defaults)
 import Data.Array as Array
-import Data.Array.ArrayAL (ArrayAL)
-import Data.Array.ArrayAL as ArrayAL
-import Data.Bifunctor (bimap, lmap)
-import Data.Date (Date)
-import Data.DateTime (DateTime(..), Hour, Minute, Time(..))
-import Data.DateTime.ISO (parseISODate)
-import Data.Decimal (Decimal)
-import Data.Either (Either(..), either, note)
-import Data.Enum (class BoundedEnum, toEnum, upFromIncluding)
-import Data.Foldable (fold, foldMap, null, traverse_)
-import Data.FoldableWithIndex (foldMapWithIndex)
-import Data.FormURLEncoded.Query (FieldId(..), Query)
-import Data.FormURLEncoded.Query as FormURLEncoded
-import Data.Formatter.Parser.Number (parseDigit)
-import Data.Map (Map)
-import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, isJust)
-import Data.Monoid as Monoid
-import Data.Monoid.Disj (Disj(..))
-import Data.Newtype (class Newtype, un, unwrap)
-import Data.Profunctor (class Profunctor, dimap)
-import Data.Profunctor.Choice (class Choice, right)
-import Data.String as String
-import Data.Tuple (fst)
-import Data.Undefined.NoProblem (Opt, fromOpt)
-import Data.Undefined.NoProblem (toMaybe, undefined) as NoProblem
-import Data.Undefined.NoProblem.Closed (class Coerce, coerce) as NoProblem
-import Parsing (Parser, runParser) as Parsing
-import Parsing (fail)
-import Parsing.Combinators (optional, try) as Parsing
-import Parsing.String (char) as Parsing
-import Polyform (Validator)
+import Data.DateTime (DateTime)
+import Data.FormURLEncoded.Query (FieldId, Query)
+import Data.Maybe (Maybe)
+import Data.Undefined.NoProblem (toMaybe) as NoProblem
 import Polyform.Batteries as Batteries
-import Polyform.Batteries.Decimal as Batteries.Decimal
-import Polyform.Batteries.Int as Batteries.Int
-import Polyform.Batteries.Number as Batteries.Number
-import Polyform.Batteries.UrlEncoded as UrlEncoded
-import Polyform.Batteries.UrlEncoded as UrleEncoded
-import Polyform.Batteries.UrlEncoded.Duals as UrlEncoded.Duals
-import Polyform.Batteries.UrlEncoded.Types.Errors (ErrorId(..), Errors(..))
-import Polyform.Dual as Polyform.Dual
-import Polyform.Validator (liftFnEither)
-import Polyform.Validator as Validator
-import Polyform.Validator.Dual as Polyform.Validator.Dual
-import Prim.Row as Row
 import React.Basic (JSX)
-import React.Basic.DOM (div_, li_, text, ul_) as DOOM
-import React.Basic.DOM.Events (targetValue)
-import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (handler, handler_)
-import React.Basic.Hooks (type (/\), (/\))
-import ReactBootstrap.Form as Bootstrap.Form
-import ReactBootstrap.Form as Form
-import ReactBootstrap.Form.Check as Check
-import ReactBootstrap.Form.Control as Form.Control
-import Record as Record
-import Type.Prelude (Proxy(..))
 
 type StatefulBootstrapFormSpec validatorM st = StatefulFormSpec validatorM st (Array JSX) String
 
@@ -103,6 +48,7 @@ textInput props = formSpecBuilderT do
           , min: props'.min
           , sizing: props'.sizing
           , step: props'.step
+          , extraClassName: NoProblem.toMaybe props'.inputExtraClassName
           }
       )
       props'.touched

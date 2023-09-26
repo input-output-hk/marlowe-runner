@@ -157,15 +157,18 @@ buttonWithIcon provided = do
 
 data OutlineColoring
   = OutlinePrimaryColoring
+  | OutlineInactiveColoring -- We use this for syncing etc.
 
 outlineColoringToClassName :: OutlineColoring -> String
 outlineColoringToClassName = case _ of
   OutlinePrimaryColoring -> "btn-outline-primary background-color-primary-light background-color-primary-hover"
+  -- { className: "border border-dark rounded bg-white text-dark d-inline-block py-1 px-3 fw-bold" }
+  OutlineInactiveColoring -> "border-dark text-darg bg-secondary"
 
 type ButtonOutlinedProps =
   { coloring :: OutlineColoring
   , label :: JSX
-  , onClick :: Effect Unit
+  , onClick :: Opt (Effect Unit)
   , extraClassNames :: Opt String
   -- FIXME: Add tooltip support
   -- , disabled :: Opt Boolean
@@ -185,7 +188,7 @@ buttonOutlined props = do
     { coloring, label, onClick } = props'
   DOM.button
     { className: buttonOutlinedClassNames coloring $ fromOpt "" props'.extraClassNames
-    , onClick: handler preventDefault (const $ onClick)
+    , onClick: handler preventDefault (const $ fromOpt (pure unit) onClick)
     , type: "button"
     }
     [ label
@@ -202,4 +205,18 @@ buttonOutlinedPrimary props = do
   let
     props' :: { coloring :: OutlineColoring | props }
     props' = Record.insert (Proxy :: Proxy "coloring") OutlinePrimaryColoring props
+  buttonOutlined props'
+
+
+buttonOutlinedInactive
+  :: forall props
+   . NoProblem.Coerce { coloring :: OutlineColoring | props } ButtonOutlinedProps
+   => Row.Lacks "coloring" props
+   => Row.Cons "coloring" OutlineColoring props (coloring :: OutlineColoring | props)
+   => { | props }
+   -> JSX
+buttonOutlinedInactive props = do
+  let
+    props' :: { coloring :: OutlineColoring | props }
+    props' = Record.insert (Proxy :: Proxy "coloring") OutlineInactiveColoring props
   buttonOutlined props'
