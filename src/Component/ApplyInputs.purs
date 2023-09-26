@@ -402,33 +402,28 @@ mkAdvanceFormComponent = do
       let
         body = DOOM.div_ $
           [ contractSection marloweContext.contract marloweContext.state
-          , DOOM.hr {}
           ]
         actions = fragment
           [ DOM.div { className: "row" } $
-              [ DOM.div { className: "col-6 text-start" } $
-                  [ link
-                      { label: DOOM.text "Cancel"
-                      , onClick: onDismiss
-                      , showBorders: true
-                      , extraClassNames: "me-3"
-                      }
-                  ]
-              , DOM.div { className: "col-6 text-end" } $
+              [ DOM.div { className: "col-12" } $
                   [ DOM.button
-                      { className: "btn btn-primary"
-                      , onClick: handler_ onSuccess
-                      , disabled: false
-                      }
-                      [ R.text "Submit" ]
+                      do
+                        { className: "btn btn-primary w-100"
+                        , onClick: handler_ onSuccess
+                        }
+                      [ R.text "Advance contract"
+                      , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                      ]
                   ]
+              , backToContractListLink onDismiss
               ]
           ]
-      { title: DOM.h3 {} $ DOOM.text "Advance the Contract"
-      , description: DOM.div {}
-          [ DOM.p { className: "white-color h5 pb-5" } [ DOOM.text "Advancing the contract is a crucial action in Marlowe that moves the contract forward to its next state. This action is used when the contract is waiting for something to happen and needs to be manually pushed forward. It's like turning the page to the next chapter in a book. " ]
-          , DOM.p { className: "white-color h5 pb-5" } [ DOOM.text "This can be particularly useful in situations where the contract is waiting for an external data feed or an event to occur. By advancing the contract, you are ensuring that the contract stays on course and progresses through its intended sequence of states and actions." ]
+
+      { title: DOM.div { className: "" }
+          [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
+          , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
           ]
+      , description: DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
       , content: wrappedContentWithFooter body actions
       }
 
