@@ -144,7 +144,7 @@ type DepositFormComponentProps =
   , connectedWallet :: WalletInfo Wallet.Api
   , marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
-  , onSuccess :: V1.Input -> Effect Unit
+  , onSubmit :: V1.Input -> Effect Unit
   }
 
 backToContractListLink :: Effect Unit -> JSX
@@ -160,7 +160,7 @@ backToContractListLink onDismiss = do
 
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
 mkDepositFormComponent = do
-  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ depositInputs, onDismiss, marloweContext, onSuccess } -> React.do
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \props@{ depositInputs, onDismiss, marloweContext } -> React.do
     let
       choices = RadioButtonFieldChoices do
         let
@@ -196,7 +196,7 @@ mkDepositFormComponent = do
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _ of
         Just (V (Right deposit) /\ _) -> case toIDeposit deposit of
-          Just ideposit -> onSuccess $ NormalInput ideposit
+          Just ideposit -> props.onSubmit $ NormalInput ideposit
           Nothing -> pure unit
         _ -> pure unit
 
@@ -205,7 +205,7 @@ mkDepositFormComponent = do
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
-    pure $ BodyLayout.component do
+    pure do
       let
         fields = renderFormSpec formSpec formState
         body = fragment $
@@ -232,16 +232,7 @@ mkDepositFormComponent = do
               , backToContractListLink onDismiss
               ]
           ]
-
-      { title: DOM.h3 {} $ DOOM.text "Select a Deposit to Perform"
-      , description: fragment
-          [ DOM.p {}
-              [ DOOM.text "On the right, you can view all the deposits available for performance at this stage." ]
-          , DOM.p {}
-              [ DOOM.text "While it's relatively uncommon to have multiple deposit choices at a given point in the contract, it remains a feasible and potentially useful option in certain cases." ]
-          ]
-      , content: wrappedContentWithFooter body actions
-      }
+      wrappedContentWithFooter body actions
 
 type ChoiceFormComponentProps =
   { choiceInputs :: NonEmptyArray ChoiceInput
@@ -345,13 +336,13 @@ type NotifyFormComponentProps =
   , connectedWallet :: WalletInfo Wallet.Api
   , marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
-  , onSuccess :: Effect Unit
+  , onSubmit :: Effect Unit
   }
 
 mkNotifyFormComponent :: MkComponentM (NotifyFormComponentProps -> JSX)
 mkNotifyFormComponent = do
-  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ marloweContext, onDismiss, onSuccess } -> React.do
-    pure $ BodyLayout.component do
+  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ marloweContext, onDismiss, onSubmit } -> React.do
+    pure do
       let
         body = DOOM.div_ $
           [ contractSection marloweContext.contract marloweContext.state
@@ -363,7 +354,7 @@ mkNotifyFormComponent = do
                   [ DOM.button
                       do
                         { className: "btn btn-primary w-100"
-                        , onClick: handler_ onSuccess
+                        , onClick: handler_ onSubmit
                         }
                       [ R.text "Advance contract"
                       , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
@@ -372,14 +363,7 @@ mkNotifyFormComponent = do
               , backToContractListLink onDismiss
               ]
           ]
-
-      { title: DOM.h3 {} $ DOOM.text "Perform a Notify Action"
-      , description: DOM.div {}
-          [ DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "The Notify action in Marlowe is used to continue the execution of the contract when a certain condition is satisfied. It essentially acts as a gatekeeper, ensuring that the contract only proceeds when the specified observations hold true. " ]
-          , DOM.p { className: "white-color h5 pb-3" } [ DOOM.text "This is useful for creating contracts that have conditional flows, where the next steps depend on certain criteria being met. By performing a Notify action, you are signaling that the required conditions are fulfilled and the contract can move forward to the next state." ]
-          ]
-      , content: wrappedContentWithFooter body actions
-      }
+      wrappedContentWithFooter body actions
 
 type AdvanceFormComponentProps =
   { marloweContext :: Machine.MarloweContext
@@ -858,7 +842,7 @@ mkComponent = do
     submitting /\ setSubmitting <- useState' false
 
     let
-      shouldUseSpinner = if submitting then useSpinner else dontUseSpinner
+      shouldUseSpinner = UseSpinnerOverlay submitting
 
     pure $ case machine.state of
       Machine.FetchingRequiredWalletContext { errors } -> do
@@ -968,6 +952,7 @@ mkComponent = do
                       newMarloweContext = { initialContract, state: t.txOutState, contract: t.txOutContract }
                     machine.applyAction <<< Machine.PickInputSucceeded $ { input, newMarloweContext }
                   V1.Error err -> do
+                    traceM "Compute transaction error!"
                     machine.applyAction <<< Machine.PickInputFailed $ show err
             case inputChoices of
               ChoiceInputs choiceInputs -> applyInputBodyLayout shouldUseSpinner $ choiceFormComponent
@@ -979,10 +964,24 @@ mkComponent = do
                     setSubmitting true
                     applyPickInputSucceeded <<< Just $ input
                 }
-              DepositInputs depositInputs ->
-                depositFormComponent { depositInputs, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
-              SpecificNotifyInput notifyInput ->
-                notifyFormComponent { notifyInput, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
+              DepositInputs depositInputs -> applyInputBodyLayout shouldUseSpinner $ depositFormComponent
+                { depositInputs
+                , connectedWallet
+                , marloweContext
+                , onDismiss
+                , onSubmit: \input -> do
+                    setSubmitting true
+                    applyPickInputSucceeded <<< Just $ input
+                }
+              SpecificNotifyInput notifyInput -> applyInputBodyLayout shouldUseSpinner $ notifyFormComponent
+                { notifyInput
+                , connectedWallet
+                , marloweContext
+                , onDismiss
+                , onSubmit: do
+                    setSubmitting true
+                    applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify
+                }
               AdvanceContract _ -> applyInputBodyLayout shouldUseSpinner $ advanceFormComponent
                 { marloweContext
                 , onDismiss

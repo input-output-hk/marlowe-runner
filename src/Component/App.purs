@@ -158,6 +158,7 @@ mkApp = do
     (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
 
     -- FIXME: Larry we should drop this after finising testing the notifications desing
+    -- TESTING SANDBOX
     useAff unit do
       delay (Milliseconds 2000.0)
       liftEffect do

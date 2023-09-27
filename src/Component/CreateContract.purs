@@ -161,7 +161,7 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun initialAutoRun)) = FormS
       , layout: fullWidthLayout
       , touched: isJust possibleInitialContract
       , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
-          json <- lmap (const $ [ "Invalid JSON" ]) $ parseJson jsonString
+          json <- lmap (\err -> [ "Invalid JSON:" <> show err ]) $ parseJson jsonString
           lmap (Array.singleton <<< show) (decodeJson json)
       , rows: 15
       , name: Just contractFieldId
