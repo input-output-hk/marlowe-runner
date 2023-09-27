@@ -83,7 +83,7 @@ derive instance Eq ContractJsonString
 derive instance Newtype ContractJsonString _
 
 data Page
-  = ContarctListPage
+  = ContractListPage
   | LoginPage
   | CreateContractPage (Maybe ContractJsonString)
   | OtherPage

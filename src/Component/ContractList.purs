@@ -225,7 +225,7 @@ mkContractList = do
             props.setPage OtherPage
             set action
         reset' = do
-          props.setPage ContarctListPage
+          props.setPage ContractListPage
           reset
       pure (p /\ set' /\ reset')
 

@@ -9,10 +9,8 @@ import Component.ConnectWallet (mkConnectWallet, walletInfo)
 import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (ModalAction(..), NotSyncedYetInserts(..), mkContractList)
 import Component.Footer (footer)
-import Component.Footer as Footer
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
-import Component.Modal (Size(..), mkModal)
 import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
 import Component.Types.ContractInfo (MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
 import Component.Types.ContractInfo as ContractInfo
@@ -38,11 +36,11 @@ import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (uncurry)
 import Data.Tuple.Nested ((/\))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import Effect.Unsafe (unsafePerformEffect)
 import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsMap, ContractWithTransactionsStream(..), MaxPages(..), PollingInterval(..), RequestInterval(..))
 import Marlowe.Runtime.Web.Streaming as Streaming
@@ -50,7 +48,7 @@ import Marlowe.Runtime.Web.Types (BlockHeader(..), BlockNumber(..), ContractHead
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX)
 import React.Basic as ReactContext
-import React.Basic.DOM (div, img, text) as DOOM
+import React.Basic.DOM (img, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (component, provider, readRef, useState, useState')
 import React.Basic.Hooks as React
@@ -132,7 +130,7 @@ mkApp = do
   landingPage <- mkLandingPage
   messageBox <- liftEffect $ mkMessageBox
   messagePreview <- liftEffect $ mkMessagePreview
-  modal <- liftEffect $ mkModal
+  -- modal <- liftEffect $ mkModal
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   subcomponents <- do
     contractListComponent <- mkContractList
@@ -356,7 +354,11 @@ mkApp = do
     pure $ case possibleWalletInfo of
       Nothing -> DOM.div {} $
         [ topNavbar
-        , landingPage { setWalletInfo: setWalletInfo <<< Just }
+        , landingPage
+          { setWalletInfo: \info -> do
+              setWalletInfo <<< Just $ info
+              props.setPage ContractListPage
+          }
         ]
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
         [ topNavbar
@@ -376,14 +378,14 @@ mkApp = do
               }
               [ DOM.div { className: "p-3 overflow-auto" } $ messageBox msgHub
               ]
-        , Monoid.guard (displayOption == About)
-            $ modal
-            $
-              { onDismiss: setDisplayOption Default
-              , title: DOOM.text "Marlowe Run Light"
-              , body: DOOM.div { dangerouslySetInnerHTML: { __html: about } }
-              , size: Large
-              }
+        -- , Monoid.guard (displayOption == About)
+        --     $ modal
+        --     $
+        --       { onDismiss: setDisplayOption Default
+        --       , title: DOOM.text "Marlowe Run Light"
+        --       , body: DOOM.div { dangerouslySetInnerHTML: { __html: about } }
+        --       , size: Large
+        --       }
         , Monoid.guard configuringWallet do
             let
               jsx = subcomponents.connectWallet

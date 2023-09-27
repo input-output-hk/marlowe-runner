@@ -6,7 +6,7 @@ import Component.ConnectWallet (mkConnectWallet)
 import Component.ConnectWallet as ConnectWallet
 import Component.Types (ContractInfo, MkComponentMBase, WalletInfo)
 import Component.BodyLayout as BodyLayout
-import Contrib.React.Svg (SvgUrl(..), svgImg)
+import Contrib.React.Svg (SvgUrl(..))
 import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
