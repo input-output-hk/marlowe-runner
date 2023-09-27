@@ -161,7 +161,7 @@ mkApp = do
     useAff unit do
       delay (Milliseconds 2000.0)
       liftEffect do
-        msgHubProps.add $ Types.Error $ DOOM.text "Some exampel error"
+        -- msgHubProps.add $ Types.Error $ DOOM.text "Some exampel error"
         msgHubProps.add $ Types.Warning $ DOOM.text "Some exampel warning"
         -- msgHubProps.add $ Types.Success $ DOOM.text "Some exampel success"
         traceM "putting messages"
@@ -366,10 +366,10 @@ mkApp = do
       Nothing -> DOM.div {} $
         [ topNavbar
         , landingPage
-          { setWalletInfo: \info -> do
-              setWalletInfo <<< Just $ info
-              props.setPage ContractListPage
-          }
+            { setWalletInfo: \info -> do
+                setWalletInfo <<< Just $ info
+                props.setPage ContractListPage
+            }
         ]
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
         [ topNavbar
@@ -377,7 +377,7 @@ mkApp = do
         --  * we should probably move this whole container to message hub
         --  * adding here margins etc. can break the layout consistency
         -- FIXME: Larry this is message box which should be probably positioned using `position: fixed` or `sticky` or something like that ;-)
-        , DOM.div { className: "position-left-50 transform-translate-x--50 z-index-popover" }
+        , DOM.div { className: "container position-relative" } $ DOM.div { className: "row" } $ DOM.div { className: "col-6 mx-auto position-absolute top-0 start-50 translate-middle-x z-index-popover" }
             $ DOM.div { className: "container-xl" }
             $ DOM.div { className: "row" }
             $ messagePreview msgHub
