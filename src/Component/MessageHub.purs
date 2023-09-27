@@ -50,8 +50,8 @@ renderMsg onClose extraClassName { id, msg } = case msg of
     Success _ -> "border-success"
     Warning _ -> "border-warning"
     Error _ -> "border-danger"
-  className = extraClassName <> " d-flex align-items-center border border-3 rounded text-color-dark " <> colorClasses
-  icon = DOM.span { className: "me-2" } <<< Icons.toJSX
+  className = extraClassName <> " py-2 shadow-sm d-flex align-items-center border border-1 rounded text-color-dark " <> colorClasses
+  -- icon = DOM.span { className: "me-2" } <<< Icons.toJSX
   onClose' = onClose id
 
 mkMessagePreview :: Effect (MessageHub -> JSX)
@@ -104,7 +104,7 @@ mkMessagePreview = component "MessageBox" \(MessageHub { ctx, remove }) -> R.do
         , timeout: Milliseconds 2000.0
         , mountOnEnter: true
         , unmountOnExit: true
-        } $ DOOM.div_ [ renderMsg onClose "shadow" msg ]
+        } $ DOOM.div_ [ renderMsg onClose "" msg ]
 
 mkMessageBox :: Effect (MessageHub -> JSX)
 mkMessageBox = component "MessageBox" \(MessageHub { ctx, remove }) -> R.do

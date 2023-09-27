@@ -48,15 +48,6 @@ $link-color: #511CF7;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
 }
 
-.bordered-container {
-  border: 1px solid #dee2e6; /* Bootstrap's border color */
-  padding: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer; /* Optional: to indicate it's clickable */
-}
-
 .icon {
   height: 20px; /* Adjust as needed */
   margin-right: 10px; /* Space between icon and text */
@@ -258,6 +249,10 @@ $link-color: #511CF7;
   --bs-alert-color: #FF515B !important;
   --bs-alert-bg:#FFF8F8 !important;
   --bs-alert-border-color: #FF515B !important;
+}
+
+.alert-dismissible .btn-close {
+  padding: 0.65rem 0.5rem !important;
 }
 
 .loading {

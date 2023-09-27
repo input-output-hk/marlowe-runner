@@ -645,10 +645,6 @@ mkContractList = do
                             , tdContractId contractId Nothing []
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
                             , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
-                                -- ( [ DOM.div { className: "border border-dark rounded bg-white text-dark d-inline-block py-2 px-3 fw-bold" } do
-                                --       DOOM.text "Syncing"
-                                --   ] :: Array JSX
-                                -- ) -- FIXME: Withdrawals should be still possible
                             ]
                           NotSyncedUpdatedContract { contractInfo } -> do
                             [ tdInstant createdAt
@@ -659,11 +655,7 @@ mkContractList = do
                                   transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
                                 tdContractId contractId Nothing transactionEndpoints
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered
-                                ( [ DOM.div { className: "border border-dark rounded bg-white text-dark d-inline-block py-2 px-3 fw-bold" } do
-                                      DOOM.text "Syncing"
-                                  ] :: Array JSX
-                                ) -- FIXME: Withdrawals should be still possible
+                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
                             ]
           ]
         _, _ -> mempty

@@ -60,7 +60,7 @@ type Props =
 renderWallets :: WalletInfo Wallet -> JSX
 renderWallets (WalletInfo { icon, name, wallet }) =
   DOM.div { className: "row mt-2" }
-    [ DOM.div { className: "col-12 bordered-container", onClick: handler_ $ pure unit }
+    [ DOM.div { className: "col-12 d-flex rounded p-2 align-items-center border border-2 border-secondary justify-content-between cursor-pointer", onClick: handler_ $ pure unit }
         [ DOOM.img { src: icon, alt: "Icon Before", className: "icon" }
         , DOOM.text $ name <> " Wallet"
         , DOM.div { className: "cardano-badge" }
@@ -200,7 +200,7 @@ mkConnectWallet = do
                               [ DOM.div { className: "row" }
                                   [ DOM.div { className: "col-12" }
                                       [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
-                                      -- , DOM.p { className: "card-help-text text-left" } [ DOOM.text "Please select a wallet to view rewards." ]
+                                      , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please select a wallet to deploy a contract." ]
                                       ]
                                   ]
                               , case possibleWallets of
