@@ -67,7 +67,9 @@ mkMessagePreview = component "MessageBox" \(MessageHub { ctx, remove }) -> R.do
     if newItem then do
       setVisible true
       tId <- setTimeout 1200 do
-        setVisible false
+        -- FIXME: bring back auto close behavior
+        -- setVisible false
+        pure unit
       setTimeoutId $ Just tId
     else do
       setVisible false

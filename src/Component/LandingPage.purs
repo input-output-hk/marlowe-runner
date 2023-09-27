@@ -62,10 +62,10 @@ mkLandingPage = do
       , content: DOM.div {} $
           [ DOM.div { className: "container-fluid" }
               $ DOM.div { className: "row justify-content-center" }
-              $ DOM.div { className: "col-xl-5 col-lg-8 col-12" }
+              $ DOM.div { className: "col-xl-8 col-lg-10 col-12" }
                   [ case possibleErrors of
                       -- FIXME: Should we present errors on the connectWallet level?
-                      Just NoWallets -> DOOM.text "NO WALLETS?"
+                      Just NoWallets -> DOOM.text "It seems that you have no cardano wallets..."
                       Just (ConnectionError err) -> DOOM.text $ unsafeStringify err
                       Nothing -> connectWallet
                         { currentlyConnected: Nothing

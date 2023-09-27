@@ -11,7 +11,7 @@ import Component.CreateContract.Machine as Machine
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (OutlineColoring(..), buttonOutlinedClassNames, link, spinner)
+import Component.Widgets (OutlineColoring(..), SpinnerOverlayHeight(..), buttonOutlinedClassNames, link, spinnerOverlay)
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
@@ -21,7 +21,6 @@ import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatlessFormSpec
 import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
 import Contrib.React.MarloweGraph (marloweGraph)
-import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FieldLayout(..), LabelSpacing(..), StatelessBootstrapFormSpec)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders as StatelessFormSpecBuilders
 import Control.Error.Util (hoistMaybe)
@@ -61,7 +60,6 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError)
 import Marlowe.Runtime.Web.Types (PostContractsError, PostContractsResponseContent(..), RoleTokenConfig(..), RolesConfig(..), Tags(..))
@@ -69,8 +67,7 @@ import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (css)
-import React.Basic.DOM (div, div_, hr, img, input, span_, text) as DOOM
+import React.Basic.DOM (div_, hr, img, input, span_, text) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
@@ -90,13 +87,9 @@ import Web.File.FileList as FileList
 import Web.HTML.HTMLInputElement (HTMLInputElement)
 import Web.HTML.HTMLInputElement as HTMLInputElement
 
-data CreateContractError = CreateContractError String
-
-data CreateContractDismissReason = CreateContractDismissReason String
-
 type Props =
   { onDismiss :: Effect Unit
-  , onError :: CreateContractDismissReason -> Effect Unit
+  , onError :: String -> Effect Unit
   , onSuccess :: ContractInfo.ContractCreated -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , possibleInitialContract :: Maybe ContractJsonString
@@ -338,7 +331,7 @@ backToContractListLink onDismiss = do
     ]
 
 -- We want to construct `ContractInfo.ContractCreated` and call `onSuccess` only
-onStateTransition onSuccess prevState (Machine.ContractCreated { contract, createTxResponse, submittedAt, tags }) = do
+onStateTransition onSuccess _ prevState (Machine.ContractCreated { contract, createTxResponse, submittedAt, tags }) = do
   let
     { resource: PostContractsResponseContent { contractId }
     , links: { contract: contractEndpoint }
@@ -353,7 +346,8 @@ onStateTransition onSuccess prevState (Machine.ContractCreated { contract, creat
       }
   onSuccess contractCreated
 -- FIXME: paluh: handle error reporting
-onStateTransition _ _ _ = pure unit
+onStateTransition _ onErrors prev next = do
+  void $ for (Machine.stateErrors next) onErrors
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
@@ -367,9 +361,9 @@ mkComponent = do
   roleTokenComponent <- mkRoleTokensComponent
   loadFileHiddenInputComponent <- mkLoadFileHiddenInputComponent
 
-  liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onDismiss, possibleInitialContract } -> React.do
+  liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onError, onDismiss, possibleInitialContract } -> React.do
     let
-      onStateTransition' = onStateTransition onSuccess
+      onStateTransition' = onStateTransition onSuccess onError
 
     currentRun /\ setCurrentRun <- React.useState' Nothing
     { state: submissionState, applyAction, reset: resetStateMachine } <- do
@@ -466,10 +460,6 @@ mkComponent = do
             ]
         ]
 
-      spinner :: JSX
-      spinner = DOM.div
-        { className: "position-absolute top-0 min-height-100vh w-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky" }
-        $ loadingSpinnerLogo {}
       content useSpinner = do
         let
           title = stateToTitle submissionState
@@ -479,8 +469,10 @@ mkComponent = do
               [ formBody
               , formActions
               ]
-            ] <> Monoid.guard useSpinner [ spinner ]
-        -- Essentially this is a local copy of 
+            ] <> Monoid.guard useSpinner [ spinnerOverlay Spinner100VH ]
+        -- Essentially this is a local copy of `BodyLayout.component` but
+        -- we use `relative` positioning for the form content instead.
+        -- Should we just use it there?
         DOM.div { className: "container" } $ do
           DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
             [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center pb-3" } $

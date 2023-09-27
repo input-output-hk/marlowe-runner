@@ -12,6 +12,7 @@ import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
+import Component.Types as Types
 import Component.Types.ContractInfo (MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Types.ContractInfoMap as ContractInfoMap
@@ -50,7 +51,7 @@ import React.Basic (JSX)
 import React.Basic as ReactContext
 import React.Basic.DOM (img, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (component, provider, readRef, useState, useState')
+import React.Basic.Hooks (component, provider, readRef, useEffectOnce, useState, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import ReactBootstrap.Icons (unsafeIcon)
@@ -104,7 +105,7 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
 
 -- | Use this switch to autoconnect the wallet for testing.
 debugWallet :: Maybe WalletBrand
-debugWallet = Nothing -- Just Nami -- Just Lace -- Nami -- Eternl -- Nami -- Nothing
+debugWallet = Nothing -- | Just Nami -- Just Lace -- Nami -- Eternl -- Nami -- Nothing
 
 data DisplayOption = Default | About
 
@@ -155,6 +156,16 @@ mkApp = do
     possibleWalletContextRef <- useStateRef' possibleWalletContext
 
     (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
+
+    -- FIXME: Larry we should drop this after finising testing the notifications desing
+    useAff unit do
+      delay (Milliseconds 2000.0)
+      liftEffect do
+        msgHubProps.add $ Types.Error $ DOOM.text "Some exampel error"
+        msgHubProps.add $ Types.Warning $ DOOM.text "Some exampel warning"
+        -- msgHubProps.add $ Types.Success $ DOOM.text "Some exampel success"
+        traceM "putting messages"
+      pure unit
 
     let
       notSyncedYetInserts = NotSyncedYetInserts do
@@ -365,6 +376,7 @@ mkApp = do
         -- FIXME:
         --  * we should probably move this whole container to message hub
         --  * adding here margins etc. can break the layout consistency
+        -- FIXME: Larry this is message box which should be probably positioned using `position: fixed` or `sticky` or something like that ;-)
         , DOM.div { className: "position-left-50 transform-translate-x--50 z-index-popover" }
             $ DOM.div { className: "container-xl" }
             $ DOM.div { className: "row" }

@@ -28,7 +28,7 @@ import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
 import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.DropdownButton (dropdownButton)
 import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
-import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FormControlSizing(..), StatelessBootstrapFormSpec, textInput)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, textInput)
 import Control.Alt ((<|>))
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (decodeJson, encodeJson, stringify)
@@ -58,7 +58,6 @@ import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
-import Language.Marlowe.Core.V1.Semantics (isClose)
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
@@ -307,6 +306,10 @@ mkContractList = do
         filtered <|> possibleContracts'
 
     pure $ DOM.div { className: "min-height-100vh" } do
+      let
+        onError error = do
+          msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission: " <> error]
+          resetModalAction
       case possibleModalAction, connectedWallet of
         Just (NewContract possibleInitialContract), Just cw -> createContractComponent
           { connectedWallet: cw
@@ -318,8 +321,7 @@ mkContractList = do
                 ]
               resetModalAction
               notSyncedYetInserts.add contractCreated
-          , onError: \error -> do
-              msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission"]
+          , onError
           , possibleInitialContract
           }
         Just (ApplyInputs contractInfo transactionsEndpoint marloweContext), Just cw -> do
@@ -333,6 +335,7 @@ mkContractList = do
             { transactionsEndpoint
             , contractInfo
             , marloweContext
+            , onError
             , connectedWallet: cw
             , onSuccess
             , onDismiss: resetModalAction

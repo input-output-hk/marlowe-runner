@@ -93,6 +93,15 @@ data State
       , submittedAt :: Instant
       }
 
+stateErrors :: State -> Maybe String
+stateErrors DefiningContract = Nothing
+stateErrors (DefiningRoleTokens { errors }) = errors
+stateErrors (FetchingRequiredWalletContext { errors }) = errors
+stateErrors (CreatingTx { errors }) = errors
+stateErrors (SigningTx { errors }) = errors
+stateErrors (SubmittigTx { errors }) = errors
+stateErrors (ContractCreated {}) = Nothing
+
 data Action
   = TriggerSubmission V1.Contract Tags
   | DefineRoleTokens

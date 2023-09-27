@@ -184,28 +184,35 @@ mkConnectWallet = do
         , modalFooter {} formActions
         ]
 
-      else fragment
-        [ DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
-            [ DOM.div { className: "col-12" }
-                [ DOM.div { className: "card" }
-                    [ DOM.div { className: "card-body" }
-                        [ DOM.div { className: "container" }
-                            [ DOM.div { className: "row" }
-                                [ DOM.div { className: "col-12" }
-                                    [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
-                                    , DOM.p { className: "card-help-text text-left" } [ DOOM.text "Please select a wallet to view rewards." ]
-                                    ]
-                                ]
-                            , case possibleWallets of
-                                Just wallets -> fragment $ map renderWallets (ArrayAL.toArray wallets)
-                                Nothing -> mempty
-                            , DOM.div { className: "row mt-4 d-none" }
-                                [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#" } [ DOOM.text "Learn more" ] ]
-                                , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none" } [ DOOM.text "I don't have a wallet" ] ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
+      else fragment $
+       [ DOM.div { className: "card p-5 m-5" }
+           [ DOM.p { className: "h3 font-weight-bold" } [ DOOM.text "Choose a wallet" ]
+           , DOM.span { className: "h5 text-muted" } [ DOOM.text "Please select a wallet to deploy a contract" ]
+           , formBody
+           , formActions
+           ]
+        ] <>
+          [ DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
+              [ DOM.div { className: "col-12" }
+                  [ DOM.div { className: "card" }
+                      [ DOM.div { className: "card-body" }
+                          [ DOM.div { className: "container" }
+                              [ DOM.div { className: "row" }
+                                  [ DOM.div { className: "col-12" }
+                                      [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
+                                      -- , DOM.p { className: "card-help-text text-left" } [ DOOM.text "Please select a wallet to view rewards." ]
+                                      ]
+                                  ]
+                              , case possibleWallets of
+                                  Just wallets -> fragment $ map renderWallets (ArrayAL.toArray wallets)
+                                  Nothing -> mempty
+                              , DOM.div { className: "row mt-4 d-none" }
+                                  [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#" } [ DOOM.text "Learn more" ] ]
+                                  , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none" } [ DOOM.text "I don't have a wallet" ] ]
+                                  ]
+                              ]
+                          ]
+                      ]
+                  ]
+              ]
+          ]

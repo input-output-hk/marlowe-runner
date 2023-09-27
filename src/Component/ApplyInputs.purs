@@ -12,7 +12,7 @@ import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, to
 import Component.MarloweYaml (marloweStateYaml, marloweYaml)
 import Component.Types (ContractInfo, MkComponentM, WalletInfo(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (link)
+import Component.Widgets (SpinnerOverlayHeight(..), link, spinnerOverlay)
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
@@ -37,8 +37,10 @@ import Data.Int as Int
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
+import Data.Traversable (for)
 import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
 import Debug (traceM)
@@ -63,8 +65,6 @@ import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
--- import ReactBootstrap.Icons (unsafeIcon)
--- import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Tab (tab)
 import ReactBootstrap.Tabs (tabs)
 import ReactBootstrap.Tabs as Tabs
@@ -248,7 +248,7 @@ type ChoiceFormComponentProps =
   , connectedWallet :: WalletInfo Wallet.Api
   , marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
-  , onSuccess :: V1.Input -> Effect Unit
+  , onSubmit :: V1.Input -> Effect Unit
   }
 
 mkChoiceFormComponent :: MkComponentM (ChoiceFormComponentProps -> JSX)
@@ -257,7 +257,7 @@ mkChoiceFormComponent = do
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "ApplyInputs.DepositFormComponent" \{ choiceInputs, connectedWallet, marloweContext, onDismiss, onSuccess } -> React.do
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \props@{ choiceInputs, connectedWallet, marloweContext, onDismiss } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
     -- type ChoiceFieldProps validatorM a =
     --   { choices :: ChoiceFieldChoices
@@ -292,7 +292,7 @@ mkChoiceFormComponent = do
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _ of
         Just (V (Right { choice, value }) /\ _) -> case toIChoice choice (BigInt.fromInt value) of
-          Just ichoice -> onSuccess $ NormalInput ichoice
+          Just ichoice -> props.onSubmit $ NormalInput ichoice
           Nothing -> pure unit
         _ -> pure unit
 
@@ -301,42 +301,44 @@ mkChoiceFormComponent = do
       , onSubmit
       , validationDebounce: Seconds 0.5
       }
-    pure $ BodyLayout.component do
-      let
-        fields = renderFormSpec formSpec formState
-        body = DOOM.div_ $
-          [ contractSection marloweContext.contract marloweContext.state
-          , DOOM.hr {}
-          ] <> [ DOM.div { className: "form-group" } fields ]
-        actions = fragment
-          [ DOM.div { className: "row" } $
-              [ DOM.div { className: "col-12" } $
-                  [ DOM.button
-                      do
-                        let
-                          disabled = case result of
-                            Just (V (Right _) /\ _) -> false
-                            _ -> true
-                        { className: "btn btn-primary w-100"
-                        , onClick: onSubmit'
-                        , disabled
-                        }
-                      [ R.text "Advance contract"
-                      , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
-                      ]
-                  ]
-              , backToContractListLink onDismiss
-              ]
-          ]
+    let
+      fields = renderFormSpec formSpec formState
+      body = DOOM.div_ $
+        [ contractSection marloweContext.contract marloweContext.state
+        , DOOM.hr {}
+        ] <> [ DOM.div { className: "form-group" } fields ]
+      actions = fragment
+        [ DOM.div { className: "row" } $
+            [ DOM.div { className: "col-12" } $
+                [ DOM.button
+                    do
+                      let
+                        disabled = case result of
+                          Just (V (Right _) /\ _) -> false
+                          _ -> true
+                      { className: "btn btn-primary w-100"
+                      , onClick: onSubmit'
+                      , disabled
+                      }
+                    [ R.text "Advance contract"
+                    , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                    ]
+                ]
+            , backToContractListLink onDismiss
+            ]
+        ]
+    pure $ wrappedContentWithFooter body actions
 
-      { title: DOM.div { className: "" }
-          [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
-          , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
-          ]
+    -- pure $ BodyLayout.component do
 
-      , description: DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
-      , content: wrappedContentWithFooter body actions
-      }
+    --   { title: DOM.div { className: "" }
+    --       [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
+    --       , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
+    --       ]
+
+    --   , description: DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
+    --   , content: wrappedContentWithFooter body actions
+    --   }
 
 type NotifyFormComponentProps =
   { notifyInput :: NotifyInput
@@ -382,40 +384,32 @@ mkNotifyFormComponent = do
 type AdvanceFormComponentProps =
   { marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
-  , onSuccess :: Effect Unit
+  , onSubmit :: Effect Unit
   }
 
 mkAdvanceFormComponent :: MkComponentM (AdvanceFormComponentProps -> JSX)
 mkAdvanceFormComponent = do
-  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ marloweContext, onDismiss, onSuccess } -> React.do
-    pure $ BodyLayout.component do
-      let
-        body = DOOM.div_ $
-          [ contractSection marloweContext.contract marloweContext.state
-          ]
-        actions = fragment
-          [ DOM.div { className: "row" } $
-              [ DOM.div { className: "col-12" } $
-                  [ DOM.button
-                      do
-                        { className: "btn btn-primary w-100"
-                        , onClick: handler_ onSuccess
-                        }
-                      [ R.text "Advance contract"
-                      , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
-                      ]
-                  ]
-              , backToContractListLink onDismiss
-              ]
-          ]
-
-      { title: DOM.div { className: "" }
-          [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
-          , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
-          ]
-      , description: DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
-      , content: wrappedContentWithFooter body actions
-      }
+  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ marloweContext, onDismiss, onSubmit } -> React.do
+    let
+      body = DOOM.div_ $
+        [ contractSection marloweContext.contract marloweContext.state
+        ]
+      actions = fragment
+        [ DOM.div { className: "row" } $
+            [ DOM.div { className: "col-12" } $
+                [ DOM.button
+                    do
+                      { className: "btn btn-primary w-100"
+                      , onClick: handler_ onSubmit
+                      }
+                    [ R.text "Advance contract"
+                    , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                    ]
+                ]
+            , backToContractListLink onDismiss
+            ]
+        ]
+    pure $ wrappedContentWithFooter body actions
 
 data CreateInputStep
   = SelectingInputType
@@ -430,7 +424,7 @@ data Step = Creating CreateInputStep
 -- | Signing (Either String PostContractsResponseContent)
 -- | Signed (Either ClientError PostContractsResponseContent)
 
-machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime = do
+machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib onStateTransition runtime = do
   let
     env = { connectedWallet, cardanoMultiplatformLib, runtime }
   -- allInputsChoices = case nextTimeoutAdvance environment contract of
@@ -446,7 +440,7 @@ machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultipla
   , step: Machine.step
   , driver: Machine.driver env
   , output: identity
-  , onStateTransition: \_ _ -> pure unit
+  , onStateTransition
   }
 
 type ContractDetailsProps =
@@ -735,32 +729,6 @@ submittingTransaction onDismiss runtimeRequest possibleRuntimeResponse = do
     , content: wrappedContentWithFooter body footer
     }
 
-inputApplied :: Effect Unit -> JSX
-inputApplied onNext = do
-  let
-    body = DOM.div { className: "row" }
-      [ DOM.div { className: "col-6" }
-          [ DOM.p { className: "h3" } $ DOOM.text "Input applied successfully"
-          ]
-      , DOM.div { className: "col-6" } $ fragment
-          [ DOM.p { className: "h3" } $ DOOM.text "API response:"
-          , DOM.p {} $ DOOM.text $ unsafeStringify "201"
-          ]
-      ]
-    footer = fragment
-      [ DOM.button
-          { className: "btn btn-primary"
-          , onClick: handler_ onNext
-          , disabled: false
-          }
-          [ R.text "Ok" ]
-      ]
-  DOM.div { className: "row" } $ BodyLayout.component
-    { title: DOM.h3 {} $ DOOM.text "Inputs applied successfully"
-    , description: DOOM.text "We are submitting the final signed transaction."
-    , content: wrappedContentWithFooter body footer
-    }
-
 data PreviewMode
   = DetailedFlow { showPrevStep :: Boolean }
   | SimplifiedFlow
@@ -800,11 +768,67 @@ showPossibleErrorAndDismiss title description body onDismiss errors = do
 type Props =
   { onDismiss :: Effect Unit
   , onSuccess :: ContractInfo.ContractUpdated -> Effect Unit
+  , onError :: String -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , transactionsEndpoint :: TransactionsEndpoint
   , marloweContext :: Machine.MarloweContext
   , contractInfo :: ContractInfo
   }
+
+newtype UseSpinnerOverlay = UseSpinnerOverlay Boolean
+
+useSpinner :: UseSpinnerOverlay
+useSpinner = UseSpinnerOverlay true
+
+dontUseSpinner :: UseSpinnerOverlay
+dontUseSpinner = UseSpinnerOverlay false
+
+applyInputBodyLayout :: UseSpinnerOverlay -> JSX -> JSX
+applyInputBodyLayout (UseSpinnerOverlay useSpinnerOverlay) content = do
+  let
+    title = DOM.div { className: "" }
+      [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
+      , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
+      ]
+    description = DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
+    content' = fragment $
+      [ content ]
+        <> Monoid.guard useSpinnerOverlay [ spinnerOverlay Spinner100VH ]
+  -- Essentially this is a local copy of `BodyLayout.component` but
+  -- we use `relative` positioning for the form content instead.
+  -- Should we just use it there?
+  DOM.div { className: "container" } $ do
+    DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
+      [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center pb-3" } $
+          [ DOM.div { className: "fw-bold font-size-2rem my-3" } $ title
+          , DOM.div { className: "font-size-1rem" } $ description
+          ]
+      , DOM.div { className: "col-9 bg-white position-relative" } content'
+      ]
+
+onStateTransition contractInfo onSuccess _ prevState (Machine.InputApplied ia) = do
+  let
+    { submittedAt
+    , input: possibleInput
+    , environment
+    , newMarloweContext: { state, contract }
+    } = ia
+    V1.Environment { timeInterval } = environment
+    transactionInput = V1.TransactionInput
+      { inputs: foldr List.Cons List.Nil possibleInput
+      , interval: timeInterval
+      }
+    contractUpdated = ContractInfo.ContractUpdated
+      { contractInfo
+      , transactionInput
+      , outputContract: contract
+      , outputState: state
+      , submittedAt
+      }
+  onSuccess contractUpdated
+onStateTransition _ _ onErrors prev next = do
+  void $ for (Machine.stateErrors next) onErrors
+
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
@@ -817,7 +841,7 @@ mkComponent = do
   notifyFormComponent <- mkNotifyFormComponent
   advanceFormComponent <- mkAdvanceFormComponent
 
-  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onDismiss, marloweContext, contractInfo, transactionsEndpoint } -> React.do
+  liftEffect $ component "ApplyInputs" \{ connectedWallet, onSuccess, onError, onDismiss, marloweContext, contractInfo, transactionsEndpoint } -> React.do
     walletRef <- React.useRef connectedWallet
     let
       WalletInfo { name: walletName } = connectedWallet
@@ -827,8 +851,14 @@ mkComponent = do
 
     machine <- do
       let
-        props = machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib runtime
+        onStateTransition' = onStateTransition contractInfo onSuccess onError
+        props = machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib onStateTransition' runtime
       useMooreMachine props
+
+    submitting /\ setSubmitting <- useState' false
+
+    let
+      shouldUseSpinner = if submitting then useSpinner else dontUseSpinner
 
     pure $ case machine.state of
       Machine.FetchingRequiredWalletContext { errors } -> do
@@ -914,91 +944,85 @@ mkComponent = do
           , content: wrappedContentWithFooter body footer
           }
 
-      Machine.PickingInput { errors: Nothing, inputChoices, environment } -> do
+      _ -> do
         let
-          applyPickInputSucceeded input = do
+          ctx = do
+            environment <- Machine.stateEnvironment machine.state
+            inputChoices <- Machine.stateInputChoices machine.state
+            pure { environment, inputChoices }
+        case ctx  of
+          Nothing -> DOOM.text "Should rather not happen ;-)"
+          Just { environment, inputChoices } -> do
             let
-              V1.Environment { timeInterval } = environment
-              transactionInput = V1.TransactionInput
-                { inputs: foldr List.Cons List.Nil input
-                , interval: timeInterval
-                }
-              { initialContract, state, contract } = marloweContext
-            case V1.computeTransaction transactionInput state contract of
-              V1.TransactionOutput t -> do
+              applyPickInputSucceeded input = do
                 let
-                  newMarloweContext = { initialContract, state: t.txOutState, contract: t.txOutContract }
-                machine.applyAction <<< Machine.PickInputSucceeded $ { input, newMarloweContext }
-              V1.Error err -> do
-                machine.applyAction <<< Machine.PickInputFailed $ show err
-        case inputChoices of
-          DepositInputs depositInputs ->
-            depositFormComponent { depositInputs, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
-          ChoiceInputs choiceInputs ->
-            choiceFormComponent { choiceInputs, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
-          SpecificNotifyInput notifyInput ->
-            notifyFormComponent { notifyInput, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
-          AdvanceContract _ ->
-            advanceFormComponent { marloweContext, onDismiss, onSuccess: applyPickInputSucceeded Nothing }
-      Machine.PickingInput { errors: Just error } -> do
-        DOOM.text error
-      Machine.CreatingTx { errors } -> do
-        -- DetailedFlow _ -> do
-        --   creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
-        --     Just err -> Just $ err
-        --     Nothing -> Nothing
-        let
-          body = DOOM.text "Auto creating tx..."
-        showPossibleErrorAndDismiss "Creating Transaction" "" body onDismiss errors
-      -- SimplifiedFlow -> BodyLayout.component
-      --   { title: "Creating transaction"
-      --   , description: DOOM.text "We are creating the initial transaction."
-      --   , content: DOOM.text "Auto creating tx... (progress bar?)"
-      --   }
-      Machine.SigningTx { createTxResponse, errors } -> do
-        -- DetailedFlow { showPrevStep: true } -> do
-        --   creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
-        -- DetailedFlow _ ->
-        --   signingTransaction Nothing onDismiss Nothing
-        let
-          body = DOOM.text "Auto signing tx... (progress bar?)"
-        showPossibleErrorAndDismiss "Signing Transaction" "" body onDismiss errors
-      Machine.SubmittingTx { txWitnessSet, errors } ->
-        -- DetailedFlow { showPrevStep: true } -> do
-        --   signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
-        -- DetailedFlow _ ->
-        --   submittingTransaction onDismiss "Final request placeholder" $ errors
-        BodyLayout.component
-          { title: DOM.h3 {} $ DOOM.text "Submitting transaction"
-          , description: DOOM.text "We are submitting the initial transaction."
-          , content: DOOM.text "Auto submitting tx... (progress bar?)"
-          }
-      Machine.InputApplied ia -> do
-        -- DetailedFlow { showPrevStep: true } -> do
-        --   submittingTransaction onDismiss "Final request placeholder" (Just "201")
-        -- _ -> do
-        let
-          { submittedAt
-          , input: possibleInput
-          , environment
-          , newMarloweContext: { state, contract }
-          } = ia
-          V1.Environment { timeInterval } = environment
-          transactionInput = V1.TransactionInput
-            { inputs: foldr List.Cons List.Nil possibleInput
-            , interval: timeInterval
-            }
-          contractUpdated = ContractInfo.ContractUpdated
-            { contractInfo
-            , transactionInput
-            , outputContract: contract
-            , outputState: state
-            , submittedAt
-            }
-
-          onSuccess' :: Effect Unit
-          onSuccess' = onSuccess contractUpdated
-        inputApplied onSuccess'
+                  V1.Environment { timeInterval } = environment
+                  transactionInput = V1.TransactionInput
+                    { inputs: foldr List.Cons List.Nil input
+                    , interval: timeInterval
+                    }
+                  { initialContract, state, contract } = marloweContext
+                case V1.computeTransaction transactionInput state contract of
+                  V1.TransactionOutput t -> do
+                    let
+                      newMarloweContext = { initialContract, state: t.txOutState, contract: t.txOutContract }
+                    machine.applyAction <<< Machine.PickInputSucceeded $ { input, newMarloweContext }
+                  V1.Error err -> do
+                    machine.applyAction <<< Machine.PickInputFailed $ show err
+            case inputChoices of
+              ChoiceInputs choiceInputs -> applyInputBodyLayout shouldUseSpinner $ choiceFormComponent
+                { choiceInputs
+                , connectedWallet
+                , marloweContext
+                , onDismiss
+                , onSubmit: \input -> do
+                    setSubmitting true
+                    applyPickInputSucceeded <<< Just $ input
+                }
+              DepositInputs depositInputs ->
+                depositFormComponent { depositInputs, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just }
+              SpecificNotifyInput notifyInput ->
+                notifyFormComponent { notifyInput, connectedWallet, marloweContext, onDismiss, onSuccess: applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify }
+              AdvanceContract _ -> applyInputBodyLayout shouldUseSpinner $ advanceFormComponent
+                { marloweContext
+                , onDismiss
+                , onSubmit: do
+                    setSubmitting true
+                    applyPickInputSucceeded Nothing
+                }
+      -- Machine.PickingInput { errors: Just error } -> do
+      --   DOOM.text error
+      -- Machine.CreatingTx { errors } -> do
+      --   -- DetailedFlow _ -> do
+      --   --   creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
+      --   --     Just err -> Just $ err
+      --   --     Nothing -> Nothing
+      --   let
+      --     body = DOOM.text "Auto creating tx..."
+      --   showPossibleErrorAndDismiss "Creating Transaction" "" body onDismiss errors
+      -- -- SimplifiedFlow -> BodyLayout.component
+      -- --   { title: "Creating transaction"
+      -- --   , description: DOOM.text "We are creating the initial transaction."
+      -- --   , content: DOOM.text "Auto creating tx... (progress bar?)"
+      -- --   }
+      -- Machine.SigningTx { createTxResponse, errors } -> do
+      --   -- DetailedFlow { showPrevStep: true } -> do
+      --   --   creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
+      --   -- DetailedFlow _ ->
+      --   --   signingTransaction Nothing onDismiss Nothing
+      --   let
+      --     body = DOOM.text "Auto signing tx... (progress bar?)"
+      --   showPossibleErrorAndDismiss "Signing Transaction" "" body onDismiss errors
+      -- Machine.SubmittingTx { txWitnessSet, errors } ->
+      --   -- DetailedFlow { showPrevStep: true } -> do
+      --   --   signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
+      --   -- DetailedFlow _ ->
+      --   --   submittingTransaction onDismiss "Final request placeholder" $ errors
+      --   BodyLayout.component
+      --     { title: DOM.h3 {} $ DOOM.text "Submitting transaction"
+      --     , description: DOOM.text "We are submitting the initial transaction."
+      --     , content: DOOM.text "Auto submitting tx... (progress bar?)"
+      --     }
 
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"

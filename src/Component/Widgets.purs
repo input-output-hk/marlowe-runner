@@ -2,6 +2,7 @@ module Component.Widgets where
 
 import Prelude
 
+import Contrib.React.Svg (loadingSpinnerLogo)
 import ConvertableOptions (defaults, class Defaults)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Undefined.NoProblem (Opt, fromOpt)
@@ -220,3 +221,18 @@ buttonOutlinedInactive props = do
     props' :: { coloring :: OutlineColoring | props }
     props' = Record.insert (Proxy :: Proxy "coloring") OutlineInactiveColoring props
   buttonOutlined props'
+
+data SpinnerOverlayHeight = Spinner100VH | SpinnerHeight100Percent
+
+heightToClassName :: SpinnerOverlayHeight -> String
+heightToClassName = case _ of
+  Spinner100VH -> "min-height-100vh"
+  SpinnerHeight100Percent -> "min-height-100-percent"
+
+spinnerOverlay :: SpinnerOverlayHeight -> JSX
+spinnerOverlay height = do
+  let
+    heightClassName = heightToClassName height
+  DOM.div
+    { className: "position-absolute top-0 w-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky " <> heightClassName }
+    $ loadingSpinnerLogo {}

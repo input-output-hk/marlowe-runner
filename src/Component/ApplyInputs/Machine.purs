@@ -31,7 +31,6 @@ import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (PostContractsError, PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), ResourceWithLinks, Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
-import Unsafe.Coerce (unsafeCoerce)
 import Wallet as Wallet
 import WalletContext (WalletContext(..), walletContext)
 
@@ -145,6 +144,36 @@ data State
       , createTxResponse :: ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint)
       , submittedAt :: Instant
       }
+
+stateInputChoices :: State -> Maybe InputChoices
+stateInputChoices = case _ of
+  FetchingRequiredWalletContext _ -> Nothing
+  ChoosingInputType {} -> Nothing
+  PickingInput { inputChoices } -> Just inputChoices
+  CreatingTx { inputChoices } -> Just inputChoices
+  SigningTx { inputChoices } -> Just inputChoices
+  SubmittingTx { inputChoices } -> Just inputChoices
+  InputApplied { inputChoices } -> Just inputChoices
+
+stateErrors :: State -> Maybe String
+stateErrors = case _ of
+  FetchingRequiredWalletContext { errors } -> errors
+  ChoosingInputType { errors } -> errors
+  PickingInput { errors } -> errors
+  CreatingTx { errors } -> errors
+  SigningTx { errors } -> errors
+  SubmittingTx { errors } -> errors
+  InputApplied _ -> Nothing
+
+stateEnvironment :: State -> Maybe V1.Environment
+stateEnvironment = case _ of
+  FetchingRequiredWalletContext _ -> Nothing
+  ChoosingInputType {} -> Nothing
+  PickingInput { environment } -> Just environment
+  CreatingTx { environment } -> Just environment
+  SigningTx { environment } -> Just environment
+  SubmittingTx { environment } -> Just environment
+  InputApplied { environment } -> Just environment
 
 autoRunFromState :: State -> AutoRun
 autoRunFromState = case _ of
