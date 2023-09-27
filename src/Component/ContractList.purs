@@ -38,7 +38,7 @@ import Data.Array.NonEmpty as NonEmptyArray
 import Data.DateTime.Instant (Instant, instant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either, hush)
-import Data.Foldable (findMap, fold, or)
+import Data.Foldable (findMap, fold, for_, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
 import Data.Int as Int
@@ -55,6 +55,7 @@ import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
@@ -440,7 +441,7 @@ mkContractList = do
                 tableHeader =
                   DOM.thead {} do
                     let
-                      orderingTh = Table.orderingHeader ordering updateOrdering "background-color-primary-light border-0 text-centered"
+                      orderingTh = Table.orderingHeader ordering updateOrdering "background-color-primary-light border-0 text-centered text-muted"
                       th content extraClassNames = DOM.th { className: "background-color-primary-light border-0 text-center " <> extraClassNames } [ content ]
                       thWithIcon src extraClassNames = th (DOOM.img { src }) extraClassNames
                       thWithLabel label extraClassNames = th (DOOM.text label) ("text-muted " <> extraClassNames)
@@ -511,24 +512,23 @@ mkContractList = do
                           launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
 
                       tdCentered $ DOM.span { className: "d-flex" }
-                        [ DOM.a
-                            do
-                              let
-                                onClick = case possibleMarloweInfo of
-                                  Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
-                                    setModalAction $ ContractDetails
-                                      { contract: currentContract
-                                      , state
-                                      , initialState: initialState
-                                      , initialContract: initialContract
-                                      , transactionEndpoints
-                                      }
-                                  _ -> pure unit
-                              { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
-                              , onClick: handler_ onClick
-                              -- , disabled
-                              }
-                            [ text conractIdStr ]
+                        [ case possibleMarloweInfo of
+                            Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
+                              DOM.a
+                                  do
+                                    let
+                                      onClick = setModalAction $ ContractDetails
+                                        { contract: currentContract
+                                        , state
+                                        , initialState: initialState
+                                        , initialContract: initialContract
+                                        , transactionEndpoints
+                                        }
+                                    { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
+                                    , onClick: handler_ onClick
+                                    }
+                                  [ text conractIdStr ]
+                            Nothing -> DOM.span {  className: "text-muted truncate-text w-16rem" } $ text conractIdStr
                         , DOM.a
                             { href: "#"
                             , onClick: handler_ copyToClipboard
@@ -603,6 +603,13 @@ mkContractList = do
                                 , case marloweInfo, possibleWalletContext of
                                     Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
                                       let
+                                        x = case unclaimedPayouts of
+                                          [] -> Nothing
+                                          unclaimedPayouts -> do
+                                            for_ unclaimedPayouts \up -> do
+                                              traceM "Uncalimed payout"
+                                              traceM up
+                                            Nothing
                                         balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
                                         roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
                                       case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of

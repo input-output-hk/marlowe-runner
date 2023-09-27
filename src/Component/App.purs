@@ -373,15 +373,15 @@ mkApp = do
             }
         ]
       _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-        [ topNavbar
+        [ DOM.div { className: "container" } $ DOM.div { className: "row position-relative" } $ DOM.div { className: "col-6 mx-auto position-absolute top-10 start-50 translate-middle-x z-index-popover" }
+            $ DOM.div { className: "container-xl" }
+            $ DOM.div { className: "row" }
+            $ messagePreview msgHub
+        , topNavbar
         -- FIXME:
         --  * we should probably move this whole container to message hub
         --  * adding here margins etc. can break the layout consistency
         -- FIXME: Larry this is message box which should be probably positioned using `position: fixed` or `sticky` or something like that ;-)
-        , DOM.div { className: "container position-relative" } $ DOM.div { className: "row" } $ DOM.div { className: "col-6 mx-auto position-absolute top-0 start-50 translate-middle-x z-index-popover" }
-            $ DOM.div { className: "container-xl" }
-            $ DOM.div { className: "row" }
-            $ messagePreview msgHub
         , ReactContext.consumer msgHubProps.ctx \_ ->
             pure $ offcanvas
               { onHide: setCheckingNotifications false
