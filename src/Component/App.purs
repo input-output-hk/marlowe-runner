@@ -30,7 +30,7 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid as Monoid
-import Data.Newtype (un)
+import Data.Newtype (un, unwrap)
 import Data.Newtype as Newtype
 import Data.Profunctor.Strong ((&&&))
 import Data.Time.Duration (Milliseconds(..))
@@ -39,7 +39,7 @@ import Data.Tuple (uncurry)
 import Data.Tuple.Nested ((/\))
 import Debug (traceM)
 import Effect (Effect)
-import Effect.Aff (Aff, delay, forkAff, supervise)
+import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
@@ -155,6 +155,8 @@ mkApp = do
     possibleWalletContext /\ setWalletContext <- useState' Nothing
     possibleWalletContextRef <- useStateRef' possibleWalletContext
 
+    (possibleSyncFn /\ setSyncFn) <- useState' Nothing
+
     (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
 
     -- FIXME: Larry we should drop this after finising testing the notifications desing
@@ -173,12 +175,24 @@ mkApp = do
         let
           add :: ContractInfo.ContractCreated -> Effect Unit
           add cc = do
+            case possibleSyncFn of
+              Just sync -> launchAff_ do
+                delay (Milliseconds 5000.0)
+                sync (unwrap cc).contractId
+              Nothing -> pure unit
             updateContractInfoMap $ \(contractMap /\ initialized) ->
               ContractInfoMap.insertContractCreated cc contractMap /\ initialized
 
           update :: ContractInfo.ContractUpdated -> Effect Unit
-          update cu = updateContractInfoMap $ \(contractMap /\ initialized) ->
-            ContractInfoMap.insertContractUpdated cu contractMap /\ initialized
+          update cu = do
+            case possibleSyncFn of
+              Just sync -> launchAff_ do
+                delay (Milliseconds 5000.0)
+                sync (unwrap (unwrap cu).contractInfo).contractId
+              Nothing -> pure unit
+            updateContractInfoMap $ \(contractMap /\ initialized) ->
+              ContractInfoMap.insertContractUpdated cu contractMap /\ initialized
+
         { add, update }
 
     let
@@ -198,6 +212,7 @@ mkApp = do
             params = { partyAddresses: ctx.usedAddresses, partyRoles: tokens, tags: [] }
 
           ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages runtime.serverURL
+
           supervise do
             void $ forkAff do
               _ <- contractStream.getState
@@ -210,6 +225,8 @@ mkApp = do
                   (ContractInfoMap.updateSynced (Just newSynced) contractMap) /\ initialized
                 delay (Milliseconds 1_000.0)
                 pure Nothing
+
+            liftEffect $ setSyncFn (Just contractStream.sync)
             contractStream.start
         Nothing -> pure unit
 

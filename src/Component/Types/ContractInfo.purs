@@ -102,6 +102,8 @@ type ContractCreatedDetails =
 
 newtype ContractCreated = ContractCreated ContractCreatedDetails
 
+derive instance Newtype ContractCreated _
+
 type ContractUpdatedDetails =
   { contractInfo :: ContractInfo
   , transactionInput :: V1.TransactionInput
@@ -111,6 +113,8 @@ type ContractUpdatedDetails =
   }
 
 newtype ContractUpdated = ContractUpdated ContractUpdatedDetails
+
+derive instance Newtype ContractUpdated _
 
 newtype NotSyncedYet = NotSyncedYet
   { created :: Map Runtime.ContractId ContractCreated

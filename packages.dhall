@@ -425,7 +425,7 @@ in  upstream
        , "web-html"
        ]
        "https://github.com/input-output-hk/purescript-marlowe-runtime-client.git"
-       "v0.0.3"
+       "v0.0.4"
   with
     errors =
       mkPackage
