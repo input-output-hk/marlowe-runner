@@ -24,20 +24,33 @@ import React.Basic.DOM (div_) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (component, readRef, useContext, useEffect, useRef, useState, useState', writeRef, (/\))
 import React.Basic.Hooks as R
+import ReactBootstrap (alert)
+import ReactBootstrap.Collapse (collapse, dimension)
+import ReactBootstrap.Icons as Icons
+import ReactBootstrap.Types (color, variant)
 import Utils.React.Basic.Hooks (useEmitter, useStateRef')
 
 renderMsg :: (MessageId -> Effect Unit) -> String -> Message -> JSX
 renderMsg onClose extraClassName { id, msg } = case msg of
   Info msg' -> alert { className, variant: variant.info, dismissible: true, transition: false, onClose: onClose' }
-    [ icon Icons.infoCircleFill, msg' ]
+    -- [ icon Icons.infoCircleFill, msg' ]
+    [ msg' ]
   Success msg' -> alert { className, variant: variant.success, dismissible: true, onClose: onClose' }
-    [ icon Icons.checkCircleFill, msg' ]
+    -- [ icon Icons.checkCircleFill, msg' ]
+    [ msg' ]
   Warning msg' -> alert { className, variant: variant.warning, dismissible: true, onClose: onClose' }
-    [ icon Icons.exclamationTriangleFill, msg' ]
+    -- [ icon Icons.exclamationTriangleFill, msg' ]
+    [ msg' ]
   Error msg' -> alert { className, variant: variant.danger, dismissible: true, onClose: onClose' }
-    [ icon Icons.exclamationTriangleFill, msg' ]
+    -- [ icon Icons.exclamationTriangleFill, msg' ]
+    [ msg' ]
   where
-  className = extraClassName <> " d-flex align-items-center"
+  colorClasses = case msg of
+    Info _ -> "border-info"
+    Success _ -> "border-success"
+    Warning _ -> "border-warning"
+    Error _ -> "border-danger"
+  className = extraClassName <> " d-flex align-items-center border border-3 rounded text-color-dark " <> colorClasses
   icon = DOM.span { className: "me-2" } <<< Icons.toJSX
   onClose' = onClose id
 
@@ -91,7 +104,7 @@ mkMessagePreview = component "MessageBox" \(MessageHub { ctx, remove }) -> R.do
         , timeout: Milliseconds 2000.0
         , mountOnEnter: true
         , unmountOnExit: true
-        } $ DOOM.div_ [ renderMsg onClose "shadow-lg" msg ]
+        } $ DOOM.div_ [ renderMsg onClose "shadow" msg ]
 
 mkMessageBox :: Effect (MessageHub -> JSX)
 mkMessageBox = component "MessageBox" \(MessageHub { ctx, remove }) -> R.do

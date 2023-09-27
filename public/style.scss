@@ -3,7 +3,7 @@
 
 $font-family-base: 'Outfit', sans-serif;
 $primary: #511CF7;
-$sucess: #17A98F;
+$success: #17A98F;
 $warning: #E8740A;
 $danger: #FF515B;
 $disabled: #BDBDBD;
@@ -202,6 +202,10 @@ $link-color: #511CF7;
   color: $primary;
 }
 
+.text-color-dark {
+  color: #000 !important;
+}
+
 .text-color-gray {
   color: #5A5A5A !important;
 }
@@ -223,7 +227,7 @@ $link-color: #511CF7;
 }
 
 .success-color {
-  color: $sucess;
+  color: $success;
 }
 
 .warning-color {
@@ -236,6 +240,24 @@ $link-color: #511CF7;
 
 .white-color {
   color: #fff;
+}
+
+.alert-success {
+  --bs-alert-color:#17A98F !important;
+  --bs-alert-bg:#F8FFFB !important;
+  --bs-alert-border-color: #17A98F !important;
+}
+
+.alert-warning {
+  --bs-alert-color: #E8740A !important;
+  --bs-alert-bg:#FFFCF9 !important;
+  --bs-alert-border-color: #E8740A !important;
+}
+
+.alert-danger {
+  --bs-alert-color: #FF515B !important;
+  --bs-alert-bg:#FFF8F8 !important;
+  --bs-alert-border-color: #FF515B !important;
 }
 
 .loading {
