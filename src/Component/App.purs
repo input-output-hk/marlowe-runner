@@ -22,9 +22,11 @@ import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Loops (untilJust)
 import Control.Monad.Reader.Class (asks)
+import Data.Array ((..))
 import Data.Array as Array
 import Data.DateTime.Instant (Instant)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
@@ -42,6 +44,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
+import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsMap, ContractWithTransactionsStream(..), MaxPages(..), PollingInterval(..), RequestInterval(..))
 import Marlowe.Runtime.Web.Streaming as Streaming
@@ -159,37 +162,28 @@ mkApp = do
 
     (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
 
-    -- FIXME: Larry we should drop this after finising testing the notifications desing
-    -- TESTING SANDBOX
-    useAff unit do
-      delay (Milliseconds 2000.0)
-      liftEffect do
-        -- msgHubProps.add $ Types.Error $ DOOM.text "Some exampel error"
-        msgHubProps.add $ Types.Warning $ DOOM.text "Some exampel warning"
-        -- msgHubProps.add $ Types.Success $ DOOM.text "Some exampel success"
-        traceM "putting messages"
-      pure unit
-
     let
       notSyncedYetInserts = NotSyncedYetInserts do
         let
-          add :: ContractInfo.ContractCreated -> Effect Unit
-          add cc = do
-            case possibleSyncFn of
-              Just sync -> launchAff_ do
-                delay (Milliseconds 5000.0)
-                sync (unwrap cc).contractId
+          -- FIXME: Make this loop a bit smarter and after some time stop trying and notify
+          -- the user that we give up.
+          resyncLoop contractId = case possibleSyncFn of
               Nothing -> pure unit
-            updateContractInfoMap $ \(contractMap /\ initialized) ->
+              Just sync -> for_ (1..30) \_ -> do
+                delay (Milliseconds 5000.0)
+                sync contractId `catchError` \err -> do
+                  traceM $ "error during sync" <> unsafeStringify err
+                  pure unit
+
+          add :: ContractInfo.ContractCreated -> Effect Unit
+          add cc@(ContractInfo.ContractCreated { contractId }) = do
+            launchAff_ $ resyncLoop contractId
+            updateContractInfoMap $ \(contractMap /\ initialized) -> do
               ContractInfoMap.insertContractCreated cc contractMap /\ initialized
 
           update :: ContractInfo.ContractUpdated -> Effect Unit
-          update cu = do
-            case possibleSyncFn of
-              Just sync -> launchAff_ do
-                delay (Milliseconds 5000.0)
-                sync (unwrap (unwrap cu).contractInfo).contractId
-              Nothing -> pure unit
+          update cu@(ContractInfo.ContractUpdated { contractInfo: ContractInfo { contractId }}) = do
+            launchAff_ $ resyncLoop contractId
             updateContractInfoMap $ \(contractMap /\ initialized) ->
               ContractInfoMap.insertContractUpdated cu contractMap /\ initialized
 

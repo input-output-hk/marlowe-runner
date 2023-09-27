@@ -606,9 +606,9 @@ mkContractList = do
                                         x = case unclaimedPayouts of
                                           [] -> Nothing
                                           unclaimedPayouts -> do
-                                            for_ unclaimedPayouts \up -> do
+                                            for_ unclaimedPayouts \(Payout p) -> do
                                               traceM "Uncalimed payout"
-                                              traceM up
+                                              traceM p.role
                                             Nothing
                                         balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
                                         roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
