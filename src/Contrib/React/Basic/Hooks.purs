@@ -196,8 +196,8 @@ useVersionedStateWithRef
   :: forall a
    . a
   -> Hook
-      (UseVersionedStateWithRef a)
-      ({ state :: a, version :: Int } /\ Ref a /\ ((a -> a) -> Effect Unit))
+       (UseVersionedStateWithRef a)
+       ({ state :: a, version :: Int } /\ Ref a /\ ((a -> a) -> Effect Unit))
 useVersionedStateWithRef a = React.coerceHook React.do
   currState /\ updateState <- useVersionedState a
   stateRef <- useStateRef currState.version currState.state

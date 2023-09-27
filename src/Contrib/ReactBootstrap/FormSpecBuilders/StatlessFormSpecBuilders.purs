@@ -628,7 +628,7 @@ type TextAreaProps m a =
 renderTextArea
   :: { helpText :: Maybe JSX
      , possibleLabel :: Maybe JSX
-      , layout :: FieldLayout
+     , layout :: FieldLayout
      , name :: FieldId
      , placeholder :: String
      , rows :: Int
@@ -656,25 +656,26 @@ renderTextArea { extraClassName, layout, possibleLabel, helpText, name, placehol
               DOM.div { className: inputColClass }
         { errors: errors', isValid, isInvalid } = fieldValidity touched value errors
 
-      wrapper $ Form.Control.textArea
-        { id: nameStr
-        , name: nameStr
-        , placeholder
-        , value
-        , onChange: handler targetValue (onChange <<< fromMaybe "")
-        , rows
-        , isValid
-        , isInvalid
-        , className: fold extraClassName
-        }
-        <> do
-          fold
-            [ Monoid.guard isInvalid do
-                DOM.div { className: "invalid-feedback" }
-                  [ DOOM.ul_ $ map (DOOM.li_ <<< Array.singleton <<< DOOM.text) errors' ]
-            , Monoid.guard (isJust helpText && not isInvalid) $
-                renderPossibleHelpText helpText
-            ]
+      wrapper $
+        Form.Control.textArea
+          { id: nameStr
+          , name: nameStr
+          , placeholder
+          , value
+          , onChange: handler targetValue (onChange <<< fromMaybe "")
+          , rows
+          , isValid
+          , isInvalid
+          , className: fold extraClassName
+          }
+          <> do
+            fold
+              [ Monoid.guard isInvalid do
+                  DOM.div { className: "invalid-feedback" }
+                    [ DOOM.ul_ $ map (DOOM.li_ <<< Array.singleton <<< DOOM.text) errors' ]
+              , Monoid.guard (isJust helpText && not isInvalid) $
+                  renderPossibleHelpText helpText
+              ]
   DOM.div { className: "mb-2 row" } [ label, body ]
 
 textArea

@@ -127,7 +127,7 @@ main configJson = do
 
   let
     setPageClass :: Page -> Effect Unit
-    setPageClass  ContractListPage =
+    setPageClass ContractListPage =
       setAttribute "class" (origClasses <> " contract-list-page") appContainer
     setPageClass (CreateContractPage _) = do
       setAttribute "class" (origClasses <> " create-contract-page") appContainer

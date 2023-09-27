@@ -167,12 +167,12 @@ mkApp = do
           -- FIXME: Make this loop a bit smarter and after some time stop trying and notify
           -- the user that we give up.
           resyncLoop contractId = case possibleSyncFn of
-              Nothing -> pure unit
-              Just sync -> for_ (1..30) \_ -> do
-                delay (Milliseconds 5000.0)
-                sync contractId `catchError` \err -> do
-                  traceM $ "error during sync" <> unsafeStringify err
-                  pure unit
+            Nothing -> pure unit
+            Just sync -> for_ (1 .. 30) \_ -> do
+              delay (Milliseconds 5000.0)
+              sync contractId `catchError` \err -> do
+                traceM $ "error during sync" <> unsafeStringify err
+                pure unit
 
           add :: ContractInfo.ContractCreated -> Effect Unit
           add cc@(ContractInfo.ContractCreated { contractId }) = do
@@ -181,7 +181,7 @@ mkApp = do
               ContractInfoMap.insertContractCreated cc contractMap /\ initialized
 
           update :: ContractInfo.ContractUpdated -> Effect Unit
-          update cu@(ContractInfo.ContractUpdated { contractInfo: ContractInfo { contractId }}) = do
+          update cu@(ContractInfo.ContractUpdated { contractInfo: ContractInfo { contractId } }) = do
             launchAff_ $ resyncLoop contractId
             updateContractInfoMap $ \(contractMap /\ initialized) ->
               ContractInfoMap.insertContractUpdated cu contractMap /\ initialized

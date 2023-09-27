@@ -198,24 +198,23 @@ buttonOutlined props = do
 buttonOutlinedPrimary
   :: forall props
    . NoProblem.Coerce { coloring :: OutlineColoring | props } ButtonOutlinedProps
-   => Row.Lacks "coloring" props
-   => Row.Cons "coloring" OutlineColoring props (coloring :: OutlineColoring | props)
-   => { | props }
-   -> JSX
+  => Row.Lacks "coloring" props
+  => Row.Cons "coloring" OutlineColoring props (coloring :: OutlineColoring | props)
+  => { | props }
+  -> JSX
 buttonOutlinedPrimary props = do
   let
     props' :: { coloring :: OutlineColoring | props }
     props' = Record.insert (Proxy :: Proxy "coloring") OutlinePrimaryColoring props
   buttonOutlined props'
 
-
 buttonOutlinedInactive
   :: forall props
    . NoProblem.Coerce { coloring :: OutlineColoring | props } ButtonOutlinedProps
-   => Row.Lacks "coloring" props
-   => Row.Cons "coloring" OutlineColoring props (coloring :: OutlineColoring | props)
-   => { | props }
-   -> JSX
+  => Row.Lacks "coloring" props
+  => Row.Cons "coloring" OutlineColoring props (coloring :: OutlineColoring | props)
+  => { | props }
+  -> JSX
 buttonOutlinedInactive props = do
   let
     props' :: { coloring :: OutlineColoring | props }
