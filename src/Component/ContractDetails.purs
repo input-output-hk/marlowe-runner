@@ -95,24 +95,25 @@ mkComponent = do
                 renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto hide-vertical-scroll" } children
               [ case contract of
                   Nothing -> mempty
-                  Just contract' -> tab
-                    { eventKey: eventKey "source"
-                    , title: DOOM.span_
-                        [ Icons.toJSX $ unsafeIcon "filetype-yml"
-                        , DOOM.text " Source code"
-                        ]
-                    }
-                    $ DOM.div
-                      { className: "w-100 h-vh50 overflow-auto hide-vertical-scroll border border-3 rounded mt-4" }
-                      [ marloweYaml contract' ]
+                  Just contract' ->
+                    tab
+                      { eventKey: eventKey "source"
+                      , title: DOOM.span_
+                          -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
+                          [ DOOM.text " Source code"
+                          ]
+                      }
+                      $ DOM.div
+                          { className: "w-100 h-vh50 overflow-auto hide-vertical-scroll border border-3 rounded mt-4" }
+                          [ marloweYaml contract' ]
               , case possibleExecutionPath of
                   Nothing -> mempty
                   Just executionPath ->
                     renderTab
                       { eventKey: eventKey "graph"
                       , title: DOOM.span_
-                          [ Icons.toJSX $ unsafeIcon "diagram-2"
-                          , DOOM.text " Source graph"
+                          -- [ Icons.toJSX $ unsafeIcon "diagram-2"
+                          [ DOOM.text " Source graph"
                           ]
                       }
                       [ marloweGraph { contract: initialContract, executionPath } ]
@@ -121,8 +122,8 @@ mkComponent = do
                   Just state -> renderTab
                     { eventKey: eventKey "state"
                     , title: DOOM.span_
-                        [ Icons.toJSX $ unsafeIcon "bank"
-                        , DOOM.text " Contract state"
+                        -- [ Icons.toJSX $ unsafeIcon "bank"
+                        [ DOOM.text " Contract state"
                         ]
                     }
                     [ marloweStateYaml state ]
