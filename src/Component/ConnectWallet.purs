@@ -61,8 +61,8 @@ renderWallets :: Effect Unit -> WalletInfo Wallet -> JSX
 renderWallets onSubmit (walletInfo@(WalletInfo { icon, name, wallet })) =
   DOM.div { className: "row mt-2" }
     [ DOM.div { className: "col-12 d-flex rounded p-2 align-items-center border border-2 border-secondary justify-content-between cursor-pointer", onClick: handler_  onSubmit }
-        [ DOOM.img { src: icon, alt: "Icon Before", className: "icon flex-1" }
-        , DOM.span { className: "flex-1" } $ DOOM.text name
+        [ DOOM.img { src: icon, alt: "Icon Before", className: "icon" }
+        , DOM.span { className: "text-start" } $ DOOM.text name
         , DOM.div { className: "cardano-badge flex-8" }
             [ DOOM.img { src: "images/cardano-logo.png", alt: "Icon After", className: "icon-after" }
             , DOOM.text "Cardano"
