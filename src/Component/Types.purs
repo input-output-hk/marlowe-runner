@@ -64,7 +64,6 @@ type MkContextBase r =
   , logger :: String -> Effect Unit
   , runtime :: Runtime
   , msgHub :: MessageHub
-  , aboutMarkdown :: String
   , slotting :: Slotting
   | r
   }

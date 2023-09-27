@@ -51,7 +51,6 @@ import Web.HTML.Window as Window
 type Config =
   { marloweWebServerUrl :: ServerURL
   , develMode :: Boolean
-  , aboutMarkdown :: String
   }
 
 decodeConfig :: JsonParser Config
@@ -59,11 +58,9 @@ decodeConfig json = do
   obj <- decodeJson json
   marloweWebServerUrl <- obj .: "marloweWebServerUrl"
   develMode <- obj .: "develMode"
-  aboutMarkdown <- obj .: "aboutMarkdown"
   pure
     { marloweWebServerUrl: ServerURL marloweWebServerUrl
     , develMode
-    , aboutMarkdown
     }
 
 -- We extract a possible contract json from the URL here:
@@ -168,7 +165,6 @@ main configJson = do
             , logger
             , msgHub
             , runtime
-            , aboutMarkdown: config.aboutMarkdown
             , slotting
             }
 

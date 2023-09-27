@@ -146,7 +146,6 @@ mkApp = do
   msgHub@(MessageHub msgHubProps) <- asks _.msgHub
   slotting <- asks _.slotting
 
-  about <- asks _.aboutMarkdown
   Runtime runtime <- asks _.runtime
 
   liftEffect $ component "App" \props -> React.do
@@ -363,14 +362,6 @@ mkApp = do
               }
               [ DOM.div { className: "p-3 overflow-auto" } $ messageBox msgHub
               ]
-        -- , Monoid.guard (displayOption == About)
-        --     $ modal
-        --     $
-        --       { onDismiss: setDisplayOption Default
-        --       , title: DOOM.text "Marlowe Run Light"
-        --       , body: DOOM.div { dangerouslySetInnerHTML: { __html: about } }
-        --       , size: Large
-        --       }
         , Monoid.guard configuringWallet do
             let
               jsx = subcomponents.connectWallet
