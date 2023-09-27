@@ -3,12 +3,22 @@
 
 { iogxRepoRoot, repoRoot, inputs, inputs', pkgs, system, lib, projects ? null, ... }:
 
+let
+
+  marlowe-runner = repoRoot.nix.marlowe-runner.default;
+
+in
+
 {
-# packages = { };
-# checks = { };
-# apps = { };
-# operables = { };
-# oci-images = { };
-# nomadTasks = { };
-# foobar = { };
+  packages = {
+    marlowe-runner = marlowe-runner;
+  };
+  # checks = { };
+  # apps = { };
+  operables = repoRoot.nix.marlowe-runner.deploy.operable;
+  oci-images =
+    lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux
+      repoRoot.nix.marlowe-runner.deploy.oci-image;
+  # nomadTasks = { };
+  # foobar = { };
 }

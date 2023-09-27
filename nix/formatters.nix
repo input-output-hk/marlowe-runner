@@ -4,33 +4,33 @@
 { iogxRepoRoot, repoRoot, inputs, inputs', pkgs, system, lib, ... }:
 
 {
-# cabal-fmt.enable = false;
-# cabal-fmt.extraOptions = "";
+  # cabal-fmt.enable = false;
+  # cabal-fmt.extraOptions = "";
 
-# stylish-haskell.enable = false;
-# stylish-haskell.extraOptions = "";
+  # stylish-haskell.enable = false;
+  # stylish-haskell.extraOptions = "";
 
-# shellcheck.enable = false;
-# shellcheck.extraOptions = "";
+  shellcheck.enable = true;
+  shellcheck.extraOptions = "";
 
-# prettier.enable = false;
-# prettier.extraOptions = "";
+  # prettier.enable = false;
+  # prettier.extraOptions = "";
 
-# editorconfig-checker.enable = false;
-# editorconfig-checker.extraOptions = "";
+  # editorconfig-checker.enable = false;
+  # editorconfig-checker.extraOptions = "";
 
-  nixpkgs-fmt.enable = false;
+  nixpkgs-fmt.enable = true;
   nixpkgs-fmt.extraOptions = "";
 
-# png-optimization.enable = false;
-# png-optimization.extraOptions = "";
+  # png-optimization.enable = false;
+  # png-optimization.extraOptions = "";
 
-# fourmolu.enable = false;
-# fourmolu.extraOptions = "";
+  # fourmolu.enable = false;
+  # fourmolu.extraOptions = "";
 
-  purs-tidy.enable = false;
+  purs-tidy.enable = true;
   purs-tidy.extraOptions = "";
 
-# hlint.enable = false;
-# hlint.extraOptions = "";
+  # hlint.enable = false;
+  # hlint.extraOptions = "";
 }
