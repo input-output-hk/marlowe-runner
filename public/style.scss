@@ -17,6 +17,10 @@ $link-color: #511CF7;
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/utilities";
 
+.margin-top-minus-1 {
+  margin-top: -1px !important;
+}
+
 .border-bottom-4px {
   border-bottom-width: 4px !important;  /* Set the border width to 3px */
 }
@@ -58,7 +62,6 @@ $link-color: #511CF7;
   height: 20px; /* Adjust as needed */
   margin-left: 10px; /* Space between text and icon */
 }
-
 
 .cardano-badge {
   display: flex;

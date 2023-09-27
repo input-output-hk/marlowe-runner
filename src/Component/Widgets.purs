@@ -234,5 +234,5 @@ spinnerOverlay height = do
   let
     heightClassName = heightToClassName height
   DOM.div
-    { className: "position-absolute top-0 w-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky " <> heightClassName }
+    { className: "margin-top-minus-1 position-absolute top-0 w-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky " <> heightClassName }
     $ loadingSpinnerLogo {}
