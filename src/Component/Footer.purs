@@ -18,15 +18,6 @@ footer = do
                     , children:
                         [ DOM.a
                             { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
-                            , href: "/about"
-                            , target: "_blank"
-                            , children:
-                                [ DOM.i { className: "h5 bi-info-circle-fill" }
-                                , DOM.text "  About"
-                                ]
-                            }
-                        , DOM.a
-                            { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
                             , href: "http://marlowescan.com"
                             , target: "_blank"
                             , children:
