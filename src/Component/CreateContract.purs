@@ -496,8 +496,14 @@ mkComponent = do
               applyAction action
 
         BodyLayout.component
-          { title: stateToTitle submissionState
-          , description: stateToDetailedDescription submissionState
+          { title: DOM.div { className: "px-3 mx-3 fw-bold" }
+              [ DOOM.img { src: "/images/twotone_wallet.svg" }
+              , DOM.h3 { className: "fw-bold" } $ DOOM.text "Mint and send role tokens"
+              ]
+          , description: DOM.div { className: "px-3 mx-3" }
+              [ DOM.p {} [ DOOM.text "This contract uses roles represented as NFTs. They are minted during the creation step and sent to participants. Please provide the addresses of the participants who should receive the role tokens." ]
+              ]
+
           , content: roleTokenComponent
               { onDismiss
               , onSuccess: onSuccess'
