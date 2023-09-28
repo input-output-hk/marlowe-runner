@@ -12,6 +12,7 @@ import Contrib.Polyform.FormSpecBuilder (evalBuilder)
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), choiceField, radioFieldChoice)
 import Control.Monad.Reader.Class (asks)
+import Data.Array (filter)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.BigInt.Argonaut as BigInt
@@ -50,7 +51,6 @@ type Props =
   , connectedWallet :: WalletInfo Wallet.Api
   , withdrawalsEndpoint :: WithdrawalsEndpoint
   , roles :: NonEmptyArray String
-  , contractId :: TxOutRef
   , unclaimedPayouts :: Array Payout
   }
 
@@ -60,7 +60,7 @@ mkComponent = do
   modal <- liftEffect mkModal
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, roles, contractId, withdrawalsEndpoint, unclaimedPayouts } -> React.do
+  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, roles, withdrawalsEndpoint, unclaimedPayouts } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
 
     let
@@ -83,11 +83,11 @@ mkComponent = do
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _, possibleWalletContext of
 
-        Just (V (Right { role }) /\ _), Just { changeAddress, usedAddresses } -> do
+        Just (V (Right { role: selectedRole }) /\ _), Just { changeAddress, usedAddresses } -> do
           let
             withdrawalContext = WithdrawalContext
               { wallet: { changeAddress, usedAddresses }
-              , payouts: unclaimedPayouts
+              , payouts: filter (\(Payout { role }) -> role == selectedRole) unclaimedPayouts
               }
           do
             launchAff_ $ do
@@ -113,8 +113,7 @@ mkComponent = do
                 Left err ->
                   traceM $ "Error: " <> show err
             traceM "withdrawal"
-            -- traceM role
-            traceM contractId
+            traceM unclaimedPayouts
             pure unit
         _, _ -> do
           -- Rather improbable path because we disable submit button if the form is invalid

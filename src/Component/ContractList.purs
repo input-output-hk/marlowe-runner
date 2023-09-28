@@ -351,7 +351,6 @@ mkContractList = do
             { inModal: true
             , withdrawalsEndpoint
             , roles
-            , contractId
             , connectedWallet: cw
             , onSuccess
             , onDismiss: resetModalAction
