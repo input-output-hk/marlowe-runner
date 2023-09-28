@@ -320,16 +320,16 @@ mkChoiceFormComponent = do
         ]
     pure $ wrappedContentWithFooter body actions
 
-    -- pure $ BodyLayout.component do
+-- pure $ BodyLayout.component do
 
-    --   { title: DOM.div { className: "" }
-    --       [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
-    --       , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
-    --       ]
+--   { title: DOM.div { className: "" }
+--       [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
+--       , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
+--       ]
 
-    --   , description: DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
-    --   , content: wrappedContentWithFooter body actions
-    --   }
+--   , description: DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
+--   , content: wrappedContentWithFooter body actions
+--   }
 
 type NotifyFormComponentProps =
   { notifyInput :: NotifyInput
@@ -813,7 +813,6 @@ onStateTransition contractInfo onSuccess _ prevState (Machine.InputApplied ia) =
 onStateTransition _ _ onErrors prev next = do
   void $ for (Machine.stateErrors next) onErrors
 
-
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   runtime <- asks _.runtime
@@ -934,7 +933,7 @@ mkComponent = do
             environment <- Machine.stateEnvironment machine.state
             inputChoices <- Machine.stateInputChoices machine.state
             pure { environment, inputChoices }
-        case ctx  of
+        case ctx of
           Nothing -> DOOM.text "Should rather not happen ;-)"
           Just { environment, inputChoices } -> do
             let
@@ -989,39 +988,40 @@ mkComponent = do
                     setSubmitting true
                     applyPickInputSucceeded Nothing
                 }
-      -- Machine.PickingInput { errors: Just error } -> do
-      --   DOOM.text error
-      -- Machine.CreatingTx { errors } -> do
-      --   -- DetailedFlow _ -> do
-      --   --   creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
-      --   --     Just err -> Just $ err
-      --   --     Nothing -> Nothing
-      --   let
-      --     body = DOOM.text "Auto creating tx..."
-      --   showPossibleErrorAndDismiss "Creating Transaction" "" body onDismiss errors
-      -- -- SimplifiedFlow -> BodyLayout.component
-      -- --   { title: "Creating transaction"
-      -- --   , description: DOOM.text "We are creating the initial transaction."
-      -- --   , content: DOOM.text "Auto creating tx... (progress bar?)"
-      -- --   }
-      -- Machine.SigningTx { createTxResponse, errors } -> do
-      --   -- DetailedFlow { showPrevStep: true } -> do
-      --   --   creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
-      --   -- DetailedFlow _ ->
-      --   --   signingTransaction Nothing onDismiss Nothing
-      --   let
-      --     body = DOOM.text "Auto signing tx... (progress bar?)"
-      --   showPossibleErrorAndDismiss "Signing Transaction" "" body onDismiss errors
-      -- Machine.SubmittingTx { txWitnessSet, errors } ->
-      --   -- DetailedFlow { showPrevStep: true } -> do
-      --   --   signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
-      --   -- DetailedFlow _ ->
-      --   --   submittingTransaction onDismiss "Final request placeholder" $ errors
-      --   BodyLayout.component
-      --     { title: DOM.h3 {} $ DOOM.text "Submitting transaction"
-      --     , description: DOOM.text "We are submitting the initial transaction."
-      --     , content: DOOM.text "Auto submitting tx... (progress bar?)"
-      --     }
+
+-- Machine.PickingInput { errors: Just error } -> do
+--   DOOM.text error
+-- Machine.CreatingTx { errors } -> do
+--   -- DetailedFlow _ -> do
+--   --   creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
+--   --     Just err -> Just $ err
+--   --     Nothing -> Nothing
+--   let
+--     body = DOOM.text "Auto creating tx..."
+--   showPossibleErrorAndDismiss "Creating Transaction" "" body onDismiss errors
+-- -- SimplifiedFlow -> BodyLayout.component
+-- --   { title: "Creating transaction"
+-- --   , description: DOOM.text "We are creating the initial transaction."
+-- --   , content: DOOM.text "Auto creating tx... (progress bar?)"
+-- --   }
+-- Machine.SigningTx { createTxResponse, errors } -> do
+--   -- DetailedFlow { showPrevStep: true } -> do
+--   --   creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
+--   -- DetailedFlow _ ->
+--   --   signingTransaction Nothing onDismiss Nothing
+--   let
+--     body = DOOM.text "Auto signing tx... (progress bar?)"
+--   showPossibleErrorAndDismiss "Signing Transaction" "" body onDismiss errors
+-- Machine.SubmittingTx { txWitnessSet, errors } ->
+--   -- DetailedFlow { showPrevStep: true } -> do
+--   --   signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
+--   -- DetailedFlow _ ->
+--   --   submittingTransaction onDismiss "Final request placeholder" $ errors
+--   BodyLayout.component
+--     { title: DOM.h3 {} $ DOOM.text "Submitting transaction"
+--     , description: DOOM.text "We are submitting the initial transaction."
+--     , content: DOOM.text "Auto submitting tx... (progress bar?)"
+--     }
 
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"

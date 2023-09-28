@@ -309,7 +309,7 @@ mkContractList = do
     pure $ DOM.div { className: "min-height-100vh" } do
       let
         onError error = do
-          msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission: " <> error]
+          msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission: " <> error ]
           resetModalAction
       case possibleModalAction, connectedWallet of
         Just (NewContract possibleInitialContract), Just cw -> createContractComponent
@@ -515,20 +515,20 @@ mkContractList = do
                         [ case possibleMarloweInfo of
                             Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
                               DOM.a
-                                  do
-                                    let
-                                      onClick = setModalAction $ ContractDetails
-                                        { contract: currentContract
-                                        , state
-                                        , initialState: initialState
-                                        , initialContract: initialContract
-                                        , transactionEndpoints
-                                        }
-                                    { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
-                                    , onClick: handler_ onClick
-                                    }
-                                  [ text conractIdStr ]
-                            Nothing -> DOM.span {  className: "text-muted truncate-text w-16rem" } $ text conractIdStr
+                                do
+                                  let
+                                    onClick = setModalAction $ ContractDetails
+                                      { contract: currentContract
+                                      , state
+                                      , initialState: initialState
+                                      , initialContract: initialContract
+                                      , transactionEndpoints
+                                      }
+                                  { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
+                                  , onClick: handler_ onClick
+                                  }
+                                [ text conractIdStr ]
+                            Nothing -> DOM.span { className: "text-muted truncate-text w-16rem" } $ text conractIdStr
                         , DOM.a
                             { href: "#"
                             , onClick: handler_ copyToClipboard
@@ -575,13 +575,13 @@ mkContractList = do
                                         Monoid.guard
                                           (Array.any (\role -> canInput (V1.Role role) environment state contract) roles)
                                           buttonOutlinedPrimary
-                                            { label: DOOM.text "Advance"
-                                            , extraClassNames: "me-2"
-                                            , onClick: do
-                                                let
-                                                  marloweContext = { initialContract, state, contract }
-                                                setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
-                                            }
+                                          { label: DOOM.text "Advance"
+                                          , extraClassNames: "me-2"
+                                          , onClick: do
+                                              let
+                                                marloweContext = { initialContract, state, contract }
+                                              setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
+                                          }
                                       Just transactionsEndpoint,
                                       Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }),
                                       Just { usedAddresses } -> do
@@ -593,10 +593,10 @@ mkContractList = do
                                         Monoid.guard
                                           (Array.any (\addr -> canInput (V1.Address $ bech32ToString addr) environment state contract) usedAddresses)
                                           buttonOutlinedPrimary
-                                            { label: DOOM.text "Advance"
-                                            , extraClassNames: "font-weight-bold btn-outline-primary"
-                                            , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
-                                            }
+                                          { label: DOOM.text "Advance"
+                                          , extraClassNames: "font-weight-bold btn-outline-primary"
+                                          , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint marloweContext
+                                          }
                                       _, Just (MarloweInfo { state: Nothing, currentContract: Nothing }), _ -> DOOM.text "Complete"
                                       _, _, _ -> buttonOutlinedInactive { label: DOOM.text "Syncing" }
 

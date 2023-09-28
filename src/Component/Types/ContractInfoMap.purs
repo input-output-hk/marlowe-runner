@@ -191,8 +191,7 @@ insertContractUpdated contractUpdated contractInfoMap = do
       UninitializedContractInfoMap _ -> Nothing
       ContractInfoMap { contractsSources } -> theseRight contractsSources
 
-  if isContractUpdateStillRelevant contractUpdated possiblySynced
-  then do
+  if isContractUpdateStillRelevant contractUpdated possiblySynced then do
     let
       notSyncedYet = addContractUpdated contractUpdated $ case contractInfoMap of
         UninitializedContractInfoMap _ -> emptyNotSyncedYet

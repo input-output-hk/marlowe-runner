@@ -233,7 +233,7 @@ step state action = do
       FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
       FetchRequiredWalletContextSucceeded { requiredWalletContext, allInputsChoices, environment } -> case allInputsChoices of
         Left contract -> do
-          let inputChoices  = AdvanceContract contract
+          let inputChoices = AdvanceContract contract
           PickingInput
             { autoRun
             , errors: Nothing
@@ -250,10 +250,10 @@ step state action = do
               let
                 countInputType :: forall a. Maybe a -> Int
                 countInputType = maybe 0 (const 1)
-              countInputType deposits + countInputType choices + countInputType notify 
+              countInputType deposits + countInputType choices + countInputType notify
 
             possibleInputChoices :: Maybe InputChoices
-            possibleInputChoices  =
+            possibleInputChoices =
               (DepositInputs <$> deposits)
                 <|> (ChoiceInputs <$> choices)
                 <|> (SpecificNotifyInput <$> notify)
@@ -414,7 +414,6 @@ nextRequest env state = do
     SubmittingTx { errors: Nothing, createTxResponse, txWitnessSet } ->
       Just $ RuntimeRequest $ SubmitTxRequest { txWitnessSet, createTxResponse, serverURL }
     _ -> Nothing
-
 
 -- This is pretty arbitrary choice - we should keep track which inputs are relevant
 -- during the further steps.
