@@ -607,12 +607,13 @@ mkContractList = do
                                           [] -> Nothing
                                           unclaimedPayouts -> do
                                             for_ unclaimedPayouts \(Payout p) -> do
-                                              traceM "Uncalimed payout"
+                                              traceM "Unclaimed payout"
                                               traceM p.role
+                                            traceM roles
                                             Nothing
                                         balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
-                                        roleTokens = map Cardano.assetIdToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
-                                      case Array.uncons (Array.intersect roleTokens (map (\(Payout { role }) -> role) unclaimedPayouts)) of
+                                        roles = catMaybes <<< map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
+                                      case Array.uncons (Array.intersect roles (map (\(Payout { role }) -> role) unclaimedPayouts)) of
                                         Just { head, tail } -> buttonWithIcon
                                           { icon: unsafeIcon mempty
                                           , label: DOOM.text "Withdraw"
