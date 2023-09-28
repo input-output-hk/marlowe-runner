@@ -31,7 +31,7 @@ import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types (Ada(..)) as V1
 import Marlowe.Runtime.Web.Client (post', put')
-import Marlowe.Runtime.Web.Types (PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), PutWithdrawalRequest(..), Runtime(Runtime), ServerURL, TextEnvelope(..), TxOutRef, WithdrawalEndpoint, WithdrawalsEndpoint, toTextEnvelope)
+import Marlowe.Runtime.Web.Types (Payout(..), PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), PutWithdrawalRequest(..), Runtime(Runtime), ServerURL, TextEnvelope(..), TxOutRef, WithdrawalEndpoint, WithdrawalsEndpoint, toTextEnvelope)
 import Polyform.Validator (liftFn)
 import React.Basic (fragment)
 import React.Basic.DOM as DOOM
@@ -51,6 +51,7 @@ type Props =
   , withdrawalsEndpoint :: WithdrawalsEndpoint
   , roles :: NonEmptyArray String
   , contractId :: TxOutRef
+  , unclaimedPayouts :: Array Payout
   }
 
 mkComponent :: MkComponentM (Props -> JSX)
@@ -59,7 +60,7 @@ mkComponent = do
   modal <- liftEffect mkModal
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, roles, contractId, withdrawalsEndpoint } -> React.do
+  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, roles, contractId, withdrawalsEndpoint, unclaimedPayouts } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
 
     let
@@ -86,8 +87,7 @@ mkComponent = do
           let
             withdrawalContext = WithdrawalContext
               { wallet: { changeAddress, usedAddresses }
-              , contractId
-              , role
+              , payouts: unclaimedPayouts
               }
           do
             launchAff_ $ do
@@ -156,15 +156,13 @@ mkComponent = do
 
 newtype WithdrawalContext = WithdrawalContext
   { wallet :: { changeAddress :: Bech32, usedAddresses :: Array Bech32 }
-  , contractId :: TxOutRef
-  , role :: String
+  , payouts :: Array Payout
   }
 
 withdrawal (WithdrawalContext ctx) serverURL withdrawalsEndpoint = do
   let
     req = PostWithdrawalsRequest
-      { role: ctx.role
-      , contractId: ctx.contractId
+      { payouts: map (\(Payout { payoutId }) -> payoutId) ctx.payouts
       , changeAddress: ctx.wallet.changeAddress
       , addresses: ctx.wallet.usedAddresses
       , minUTxODeposit: V1.Lovelace (BigInt.fromInt 2_000_000)

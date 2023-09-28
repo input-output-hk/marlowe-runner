@@ -152,7 +152,7 @@ data ModalAction
       , transactionEndpoints :: Array Runtime.TransactionEndpoint
       }
   | ApplyInputs ContractInfo TransactionsEndpoint ApplyInputs.Machine.MarloweContext
-  | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef
+  | Withdrawal WithdrawalsEndpoint (NonEmptyArray.NonEmptyArray String) TxOutRef (Array Payout)
   | ContractTemplate ContractTemplate
 
 derive instance Eq ModalAction
@@ -341,7 +341,7 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Just (Withdrawal withdrawalsEndpoint roles contractId), Just cw -> do
+        Just (Withdrawal withdrawalsEndpoint roles contractId unclaimedPayouts), Just cw -> do
           let
             onSuccess = \_ -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
@@ -355,6 +355,7 @@ mkContractList = do
             , connectedWallet: cw
             , onSuccess
             , onDismiss: resetModalAction
+            , unclaimedPayouts
             }
         Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints }), _ -> do
           let
@@ -619,7 +620,7 @@ mkContractList = do
                                           , label: DOOM.text "Withdraw"
                                           , extraClassNames: "font-weight-bold me-2 btn-outline-warning"
                                           , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                          , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                          , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId unclaimedPayouts
                                           }
                                         _ -> mempty
                                     _, _ -> mempty
@@ -634,7 +635,7 @@ mkContractList = do
                                           , label: DOOM.text "Withdraw"
                                           , extraClassNames: "font-weight-bold me-2 btn-outline-warning"
                                           , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                          , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId
+                                          , onClick: setModalAction $ Withdrawal runtime.withdrawalsEndpoint (NonEmptyArray.cons' head tail) contractId unclaimedPayouts
                                           }
                                         _ -> mempty
                                     _, _ -> mempty
