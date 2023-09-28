@@ -8,23 +8,19 @@
     iogx.url = "github:input-output-hk/iogx";
     n2c.url = "github:nlewo/nix2container";
     std = {
-      url = "github:divnix/std";   
+      url = "github:divnix/std";
       inputs.n2c.follows = "n2c";
     };
     easyPSSrc = {
       flake = false;
-      url = "github:justinwoo/easy-purescript-nix";
-    };
-    easyPSSrcPaluh = {
-      flake = false;
-      url = "github:paluh/easy-purescript-nix/16c99dd8487604f5bc6b2aa86d33cacf8dacef8c";
+      url = "github:justinwoo/easy-purescript-nix/5dcea83eecb56241ed72e3631d47e87bb11e45b9";
     };
   };
 
   outputs = inputs: inputs.iogx.lib.mkFlake {
     inherit inputs;
     repoRoot = ./.;
-    systems = ["x86_64-linux"];
+    systems = [ "x86_64-linux" ];
     nixpkgsConfig = {
       permittedInsecurePackages = [
         "nodejs-16.20.1"

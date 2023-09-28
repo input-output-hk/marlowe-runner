@@ -5,7 +5,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import webpack from 'webpack';
-import RemarkHTML from 'remark-html';
 
 function getWebServerUrl() {
   if(!process.env.MARLOWE_WEB_SERVER_URL) {
@@ -32,7 +31,6 @@ export default function(_env, argv) {
     entry: {
        app: './src/frontend.js',
     },
-    devtool: 'inline-source-map',
     devServer: {
       static: './public',
       hot: true,
@@ -58,27 +56,12 @@ export default function(_env, argv) {
     module: {
       rules: [
         {
-          test: /\.md$/,
-          use: [
-            {
-              loader: "html-loader",
-            },
-            {
-              loader: "remark-loader",
-              options: {
-                remarkOptions: {
-                  plugins: [RemarkHTML],
-                },
-              },
-            },
-          ],
-        },
-        {
           test: /\.(scss|css)$/,
+          sideEffects: true,
           use: [
           {
             // inject CSS to page
-            loader: 'style-loader'
+            loader: 'style-loader',
           }, {
             // translates CSS into CommonJS modules
             loader: 'css-loader'

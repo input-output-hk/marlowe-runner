@@ -50,5 +50,5 @@ If you get a blank page when opening Marlowe Runner in your browser, it may be n
 Before contributing, please format the source code using the following command from within the `nix` development shell:
 
 ```bash
-purs-tidy --format-in-place src/**/*.purs
+purs-tidy --format-in-place 'src/**/*.purs'
 ```

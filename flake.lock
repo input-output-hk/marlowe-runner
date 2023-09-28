@@ -208,23 +208,7 @@
       "original": {
         "owner": "justinwoo",
         "repo": "easy-purescript-nix",
-        "type": "github"
-      }
-    },
-    "easyPSSrcPaluh": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1685968274,
-        "narHash": "sha256-SaeSMqbsBet7Yj7MKzax0DwThEp9cCGhbEcEgIOgECY=",
-        "owner": "paluh",
-        "repo": "easy-purescript-nix",
-        "rev": "16c99dd8487604f5bc6b2aa86d33cacf8dacef8c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "paluh",
-        "repo": "easy-purescript-nix",
-        "rev": "16c99dd8487604f5bc6b2aa86d33cacf8dacef8c",
+        "rev": "5dcea83eecb56241ed72e3631d47e87bb11e45b9",
         "type": "github"
       }
     },
@@ -1052,7 +1036,6 @@
     "root": {
       "inputs": {
         "easyPSSrc": "easyPSSrc",
-        "easyPSSrcPaluh": "easyPSSrcPaluh",
         "iogx": "iogx",
         "n2c": "n2c",
         "std": "std"
