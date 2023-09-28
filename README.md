@@ -2,7 +2,7 @@
 
 A simple web app which allows you to deploy and progress through Marlowe contracts on Cardano easily from the browser.
 
-## Installation
+## Development
 
 ### Prerequisites
 
@@ -25,7 +25,7 @@ Run the tests:
 spago test
 ```
 
-## Running
+## Running devel server
 
 To start the server you can use the `npm run start` command, for example:
 ```bash
@@ -36,6 +36,14 @@ In the previous example:
 - `MARLOWE_WEB_SERVER_URL`: Specifies URL for the Marlowe Runtime Web server.
 
 After this, the Marlowe Runner instance should be available by default at: `http://localhost:8080/`
+
+## Bundling
+
+If you would like to use optimzed bundle of the project you can run t:
+
+```bash
+MARLOWE_WEB_SERVER_URL="http://localhost:3780" npm run bundle
+```
 
 ### Troubleshooting
 
