@@ -17,6 +17,10 @@ $link-color: #511CF7;
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/utilities";
 
+.flex-grow-2 {
+  flex-grow: 2;
+}
+
 .top-10 {
   top: 10px;
 }
@@ -41,11 +45,6 @@ $link-color: #511CF7;
 
 .table thead th, td {
   border: none;
-}
-
-.card {
-  border-radius: 10px;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
 }
 
 .icon {

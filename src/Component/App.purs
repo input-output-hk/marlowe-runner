@@ -34,6 +34,7 @@ import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Newtype as Newtype
 import Data.Profunctor.Strong ((&&&))
+import Data.String.Extra as String
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (uncurry)
@@ -305,7 +306,7 @@ mkApp = do
         [ DOM.div { className: "container" }
             [ DOM.div { className: "row" }
                 [ DOM.div
-                    { className: "col-3 pt-2 pb-4 background-color-primary-light", id: "marlowe-logo-container" } $
+                    { className: "col-3 pt-3 pb-3 background-color-primary-light", id: "marlowe-logo-container" } $
                     DOM.a { href: "#" } [ svgImg { src: marloweLogoUrl } ]
                 , DOM.div { className: "col-9 pt-2 pb-4 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end" } $
                     [ DOM.li {} $ ReactContext.consumer msgHubProps.ctx \msgs ->
@@ -323,7 +324,7 @@ mkApp = do
                           case possibleWalletInfo, possibleWalletContext of
                             Just (WalletInfo wallet), Just (WalletContext ctx) -> link
                               { label: DOM.span { className: "h6 d-flex align-items-center" }
-                                  [ DOOM.img { src: wallet.icon, alt: wallet.name, className: "w-1_2rem me-1" }
+                                  [ DOOM.img { src: wallet.icon, alt: String.upperCaseFirst wallet.name, className: "w-1_2rem me-1" }
                                   , DOM.span { className: "cursor-pointer fw-normal text-decoration-none text-decoration-underline-hover truncate-text text-color-gray w-10rem d-inline-block fw-bold" }
                                       [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
                                   ]
@@ -378,7 +379,7 @@ mkApp = do
                       ConnectWallet.Connected walletInfo -> do
                         let
                           WalletInfo { name } = walletInfo
-                        msgHubProps.add $ Success $ DOOM.text $ "Connected to " <> name
+                        msgHubProps.add $ Success $ DOOM.text $ "Connected to " <> String.upperCaseFirst name
                         setWalletInfo (Just walletInfo)
                       ConnectWallet.ConnectionError _ -> pure unit
                       ConnectWallet.NoWallets -> pure unit

@@ -69,6 +69,7 @@
   , "safe-coerce"
   , "spec"
   , "strings"
+  , "strings-extra"
   , "tailrec"
   , "these"
   , "transformers"

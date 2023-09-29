@@ -51,18 +51,18 @@ mkLandingPage = do
   liftEffect $ component "LandingPage" \{ setWalletInfo } -> React.do
     possibleErrors /\ setErrors <- useState' Nothing
     pure $ BodyLayout.component
-      { title: DOM.div { className: "px-3 mx-3 fw-bold" }
+      { title: DOM.div { className: "pe-4 fw-bold" }
           [ DOOM.img { src: "/images/twotone_wallet.svg" }
           , DOM.h3 { className: "fw-bold" } $ DOOM.text "Choose a wallet to deploy a Marlowe smart contract"
           ]
       , description:
-          DOM.div { className: "px-3 mx-3" }
+          DOM.div { className: "pe-4" }
             [ DOM.p {} [ DOOM.text "Selecting a wallet is your first step in deploying a smart contract, your choice should be compatible with the blockchain network you want to deploy your contract on." ]
             ]
       , content: DOM.div {} $
           [ DOM.div { className: "container-fluid" }
               $ DOM.div { className: "row justify-content-center" }
-              $ DOM.div { className: "col-xl-8 col-lg-10 col-12" }
+              $ DOM.div { className: "col-xl-7 col-lg-10 col-12" }
                   [ case possibleErrors of
                       Just NoWallets -> DOOM.text "It seems that you have no cardano wallets..."
                       Just (ConnectionError err) -> DOOM.text $ unsafeStringify err
