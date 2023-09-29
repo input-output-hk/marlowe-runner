@@ -474,7 +474,7 @@ mkContractList = do
                   , tbody
                   ]
 
-              DOM.div { className: "container" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" } $ DOM.div { className: "p-3 shadow rounded my-3" } $ case possibleContracts'', contractMapInitialized of
+              DOM.div { className: "container" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" } $ DOM.div { className: "p-3 shadow-sm rounded my-3" } $ case possibleContracts'', contractMapInitialized of
                 -- Pre search no started
                 Nothing, _ -> fragment [ mkTable mempty, spinner ]
                 -- Searching but nothing was found, still searching

@@ -9,10 +9,9 @@ import Component.ApplyInputs.Machine as Machine
 import Component.BodyLayout (descriptionLink, wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, toIChoice, toIDeposit)
-import Component.MarloweYaml (marloweStateYaml, marloweYaml)
 import Component.Types (ContractInfo, MkComponentM, WalletInfo(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (SpinnerOverlayHeight(..), link, spinnerOverlay)
+import Component.Widgets (SpinnerOverlayHeight(..), link, marlowePreview, marloweStatePreview, spinnerOverlay)
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
@@ -50,7 +49,7 @@ import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics (computeTransaction) as V1
-import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), TimeInterval(..), Token(..), TransactionInput(..), TransactionOutput(..), Value(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), State(..), TimeInterval(..), Token(..), TransactionInput(..), TransactionOutput(..), Value(..)) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Input(..))
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse, PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
@@ -109,10 +108,11 @@ submit witnesses serverUrl contractEndpoint = do
     req = PutTransactionRequest textEnvelope
   put' serverUrl contractEndpoint req
 
+contractSection :: V1.Contract -> V1.State -> JSX
 contractSection contract state =
   tabs { fill: false, justify: false, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
     let
-      renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto hide-vertical-scroll" } children
+      renderTab props children = tab props $ DOM.div { className: "pt-4 h-vh50 d-flex align-items-stretch" } children
     [ renderTab
         { eventKey: eventKey "graph"
         , title: DOOM.span_
@@ -120,7 +120,7 @@ contractSection contract state =
             [ DOOM.text " Source graph"
             ]
         }
-        [ marloweGraph { contract: contract } ]
+        $ marloweGraph { contract: contract }
     , renderTab
         { eventKey: eventKey "source"
         , title: DOOM.span_
@@ -128,7 +128,7 @@ contractSection contract state =
             [ DOOM.text " Source code"
             ]
         }
-        [ marloweYaml contract ]
+        $ marlowePreview contract
     , renderTab
         { eventKey: eventKey "state"
         , title: DOOM.span_
@@ -136,7 +136,7 @@ contractSection contract state =
             [ DOOM.text " Contract state"
             ]
         }
-        [ marloweStateYaml state ]
+        $ marloweStatePreview state
     ]
 
 type DepositFormComponentProps =

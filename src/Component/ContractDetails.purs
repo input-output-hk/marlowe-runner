@@ -8,7 +8,7 @@ import Component.InputHelper as InputHelper
 import Component.MarloweYaml (marloweYaml, marloweStateYaml)
 import Component.Types (MkComponentM)
 import Component.Types.ContractInfo (fetchAppliedInputs)
-import Component.Widgets (link)
+import Component.Widgets (link, marlowePreview, marloweStatePreview)
 import Contrib.React.MarloweGraph (marloweGraph)
 import Control.Monad.Reader (asks)
 import Data.Array as Array
@@ -92,20 +92,18 @@ mkComponent = do
         React.fragment
           [ tabs { fill: false, justify: false, defaultActiveKey, variant: Tabs.variant.pills } do
               let
-                renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto hide-vertical-scroll" } children
+                renderTab props children = tab props $ DOM.div { className: "pt-4 h-vh50 d-flex align-items-stretch" } children
               [ case contract of
                   Nothing -> mempty
                   Just contract' ->
-                    tab
+                    renderTab
                       { eventKey: eventKey "source"
                       , title: DOOM.span_
                           -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
                           [ DOOM.text " Source code"
                           ]
                       }
-                      $ DOM.div
-                          { className: "w-100 h-vh50 overflow-auto hide-vertical-scroll border border-3 rounded mt-4" }
-                          [ marloweYaml contract' ]
+                      $ marlowePreview contract'
               , case possibleExecutionPath of
                   Nothing -> mempty
                   Just executionPath ->
@@ -116,17 +114,18 @@ mkComponent = do
                           [ DOOM.text " Source graph"
                           ]
                       }
-                      [ marloweGraph { contract: initialContract, executionPath } ]
+                      $ marloweGraph { contract: initialContract, executionPath }
               , case state of
                   Nothing -> mempty
-                  Just state -> renderTab
-                    { eventKey: eventKey "state"
-                    , title: DOOM.span_
-                        -- [ Icons.toJSX $ unsafeIcon "bank"
-                        [ DOOM.text " Contract state"
-                        ]
-                    }
-                    [ marloweStateYaml state ]
+                  Just st ->
+                    renderTab
+                      { eventKey: eventKey "state"
+                      , title: DOOM.span_
+                          -- [ Icons.toJSX $ unsafeIcon "bank"
+                          [ DOOM.text " Contract state"
+                          ]
+                      }
+                      $ marloweStatePreview st
               ]
           ]
       -- body = nav

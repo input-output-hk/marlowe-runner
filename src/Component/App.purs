@@ -161,7 +161,6 @@ mkApp = do
 
     (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
 
-    -- contractId -> [payoutId]
     submittedWithdrawalsInfo <- React.do
       submit /\ updateSubmit <- useState (Map.empty :: Map Runtime.ContractId (Array Runtime.TxOutRef))
       let

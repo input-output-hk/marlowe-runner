@@ -24,5 +24,5 @@ sortStateKeys a b = JsYaml.toJsOrdering $ a `compare` b
 
 marloweStateYaml :: V1.State -> JSX
 marloweStateYaml state =
-  DOM.div { className: "child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent border border-3 rounded" }
+  DOM.div { className: "child-pre-m-0 child-pre-px-2 child-pre-y-0 child-pre-bg-transparent" }
     [ yamlSyntaxHighlighter state { sortKeys: mkFn2 sortMarloweKeys } ]

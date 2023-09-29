@@ -2,12 +2,14 @@ module Component.Widgets where
 
 import Prelude
 
+import Component.MarloweYaml (marloweStateYaml, marloweYaml)
 import Contrib.React.Svg (loadingSpinnerLogo)
 import ConvertableOptions (defaults, class Defaults)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Undefined.NoProblem (Opt, fromOpt)
 import Data.Undefined.NoProblem.Closed as NoProblem
 import Effect (Effect)
+import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Prim.Row as Row
 import React.Basic (JSX)
 import React.Basic.DOM as DOOM
@@ -235,3 +237,13 @@ spinnerOverlay height = do
   DOM.div
     { className: "margin-top-minus-1 position-absolute top-0 w-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky " <> heightClassName }
     $ loadingSpinnerLogo {}
+
+marlowePreview :: V1.Contract -> JSX
+marlowePreview contract = DOM.div
+  { className: "overflow-auto hide-vertical-scroll border border-3 rounded w-100" }
+  [ marloweYaml contract ]
+
+marloweStatePreview :: V1.State -> JSX
+marloweStatePreview state = DOM.div
+  { className: "overflow-auto hide-vertical-scroll border border-3 rounded w-100" }
+  [ marloweStateYaml state ]
