@@ -17,13 +17,15 @@ type MooreMachineStep state action = state -> action -> state
 
 type MooreMachineDriver state action = state -> Maybe (Aff action)
 
+type OnStateTransition state = state -> state -> Effect Unit
+
 type MooreMachineSpec state action output =
   { initialState :: state
   -- | Driver can trigger automatic actions.
   , driver :: MooreMachineDriver state action
   -- , onStateTransition :: state -> state -> Effect Unit
   , output :: state -> output
-  , onStateTransition :: state -> state -> Effect Unit
+  , onStateTransition :: OnStateTransition state
   , step :: MooreMachineStep state action
   }
 

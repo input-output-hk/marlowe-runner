@@ -3,6 +3,7 @@ module Component.ApplyInputs where
 import Prelude
 
 import CardanoMultiplatformLib (Bech32, CborHex)
+import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..))
 import Component.ApplyInputs.Machine as Machine
@@ -16,7 +17,8 @@ import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
 import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
-import Contrib.React.Basic.Hooks.UseMooreMachine (useMooreMachine)
+import Contrib.React.Basic.Hooks.UseMooreMachine (MooreMachineSpec, useMooreMachine)
+import Contrib.React.Basic.Hooks.UseMooreMachine as Moore
 import Contrib.React.MarloweGraph (marloweGraph)
 import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), FieldLayout(..), LabelSpacing(..), booleanField, choiceField, intInput, radioFieldChoice, selectFieldChoice)
@@ -37,22 +39,20 @@ import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Monoid as Monoid
-import Data.Newtype (un)
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
-import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics (computeTransaction) as V1
-import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), State(..), TimeInterval(..), Token(..), TransactionInput(..), TransactionOutput(..), Value(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), State, TimeInterval(..), Token(..), TransactionInput(..), TransactionOutput(..), Value(..)) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Input(..))
+import Marlowe.Runtime.Web (Runtime)
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse, PutTransactionRequest(PutTransactionRequest), Runtime(Runtime), ServerURL, TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse, PutTransactionRequest(PutTransactionRequest), ServerURL, TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Batteries as Batteries
 import Polyform.Validator (liftFnMMaybe, liftFnMaybe)
@@ -61,7 +61,7 @@ import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
-import React.Basic.Hooks (JSX, component, useContext, useState', (/\))
+import React.Basic.Hooks (JSX, component, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import ReactBootstrap.Tab (tab)
@@ -69,7 +69,6 @@ import ReactBootstrap.Tabs (tabs)
 import ReactBootstrap.Tabs as Tabs
 import ReactBootstrap.Types (eventKey)
 import Wallet as Wallet
-import WalletContext (WalletContext(..))
 
 type Result = V1.Contract
 
@@ -244,18 +243,8 @@ type ChoiceFormComponentProps =
 
 mkChoiceFormComponent :: MkComponentM (ChoiceFormComponentProps -> JSX)
 mkChoiceFormComponent = do
-  Runtime runtime <- asks _.runtime
-  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-  walletInfoCtx <- asks _.walletInfoCtx
-
-  liftEffect $ component "ApplyInputs.DepositFormComponent" \props@{ choiceInputs, connectedWallet, marloweContext, onDismiss } -> React.do
-    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
-    -- type ChoiceFieldProps validatorM a =
-    --   { choices :: ChoiceFieldChoices
-    --   , validator :: Batteries.Validator validatorM String (Maybe String) a
-    --   | ChoiceFieldOptionalPropsRow ()
-    --   }
-    partialFormResult /\ setPartialFormResult <- useState' Nothing
+  liftEffect $ component "ApplyInputs.DepositFormComponent" \props@{ choiceInputs, marloweContext, onDismiss } -> React.do
+    _ /\ setPartialFormResult <- useState' Nothing
     let
       choices = SelectFieldChoices do
         let
@@ -319,17 +308,6 @@ mkChoiceFormComponent = do
             ]
         ]
     pure $ wrappedContentWithFooter body actions
-
--- pure $ BodyLayout.component do
-
---   { title: DOM.div { className: "" }
---       [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
---       , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
---       ]
-
---   , description: DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
---   , content: wrappedContentWithFooter body actions
---   }
 
 type NotifyFormComponentProps =
   { notifyInput :: NotifyInput
@@ -404,21 +382,17 @@ data CreateInputStep
 
 data Step = Creating CreateInputStep
 
--- | Created (Either String PostContractsResponseContent)
--- | Signing (Either String PostContractsResponseContent)
--- | Signed (Either ClientError PostContractsResponseContent)
-
-machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib onStateTransition runtime = do
+mkMachineSpec
+  :: Machine.MarloweContext
+  -> TransactionsEndpoint
+  -> WalletInfo Wallet.Api
+  -> CardanoMultiplatformLib.Lib
+  -> Moore.OnStateTransition Machine.State
+  -> Runtime
+  -> MooreMachineSpec Machine.State Machine.Action Machine.State
+mkMachineSpec marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib onStateTransition runtime = do
   let
     env = { connectedWallet, cardanoMultiplatformLib, runtime }
-  -- allInputsChoices = case nextTimeoutAdvance environment contract of
-  --   Just advanceContinuation -> Left advanceContinuation
-  --   Nothing -> do
-  --     let
-  --       deposits = NonEmpty.fromArray $ nextDeposit environment state contract
-  --       choices = NonEmpty.fromArray $ nextChoice environment state contract
-  --       notify = NonEmpty.head <$> NonEmpty.fromArray (nextNotify environment state contract)
-  --     Right { deposits, choices, notify }
 
   { initialState: Machine.initialState marloweContext transactionsEndpoint (AutoRun true)
   , step: Machine.step
@@ -451,7 +425,7 @@ mkContractDetailsComponent = do
       , initial: true
       , touched: true
       }
-  liftEffect $ component "ApplyInputs.ContractDetailsComponent" \{ marloweContext: { initialContract, contract, state }, onSuccess, onDismiss } -> React.do
+  liftEffect $ component "ApplyInputs.ContractDetailsComponent" \{ marloweContext: { contract, state }, onSuccess, onDismiss } -> React.do
     { formState, onSubmit: onSubmit' } <- useStatelessFormSpec
       { spec: autoRunFormSpec
       , onSubmit: _.result >>> case _ of
@@ -499,6 +473,12 @@ mkContractDetailsComponent = do
       }
 
 -- In here we want to summarize the initial interaction with the wallet
+fetchingRequiredWalletContextDetails
+  :: Machine.MarloweContext
+  -> Maybe (Effect Unit)
+  -> Effect Unit
+  -> (Maybe (Effect Unit))
+  -> JSX
 fetchingRequiredWalletContextDetails marloweContext possibleOnNext onDismiss possibleWalletResponse = do
   let
 
@@ -725,30 +705,6 @@ shouldShowPrevStep :: PreviewMode -> Boolean
 shouldShowPrevStep (DetailedFlow { showPrevStep }) = showPrevStep
 shouldShowPrevStep SimplifiedFlow = false
 
-showPossibleErrorAndDismiss title description body onDismiss errors = do
-  let
-    body' = case errors of
-      Just errors -> fragment
-        [ DOM.p {} $ DOOM.text "Error:"
-        , DOM.p {} $ DOOM.text $ unsafeStringify errors
-        ]
-      Nothing -> body
-    footer = case errors of
-      Just errors -> fragment
-        [ link
-            { label: DOOM.text "Cancel"
-            , onClick: onDismiss
-            , showBorders: true
-            , extraClassNames: "me-3"
-            }
-        ]
-      Nothing -> mempty
-  DOM.div { className: "row" } $ BodyLayout.component
-    { title: DOM.h3 {} $ DOOM.text title
-    , description: DOOM.text "We are submitting the final signed transaction."
-    , content: wrappedContentWithFooter body' footer
-    }
-
 type Props =
   { onDismiss :: Effect Unit
   , onSuccess :: ContractInfo.ContractUpdated -> Effect Unit
@@ -790,7 +746,12 @@ applyInputBodyLayout (UseSpinnerOverlay useSpinnerOverlay) content = do
       , DOM.div { className: "col-9 bg-white position-relative" } content'
       ]
 
-onStateTransition contractInfo onSuccess _ prevState (Machine.InputApplied ia) = do
+mkOnStateTransition
+  :: ContractInfo
+  -> (ContractInfo.ContractUpdated -> Effect Unit)
+  -> (String -> Effect Unit)
+  -> Moore.OnStateTransition Machine.State
+mkOnStateTransition contractInfo onSuccess _ _ (Machine.InputApplied ia) = do
   let
     { submittedAt
     , input: possibleInput
@@ -810,7 +771,7 @@ onStateTransition contractInfo onSuccess _ prevState (Machine.InputApplied ia) =
       , submittedAt
       }
   onSuccess contractUpdated
-onStateTransition _ _ onErrors prev next = do
+mkOnStateTransition _ _ onErrors _ next = do
   void $ for (Machine.stateErrors next) onErrors
 
 mkComponent :: MkComponentM (Props -> JSX)
@@ -832,28 +793,30 @@ mkComponent = do
       React.writeRef walletRef connectedWallet
       pure $ pure unit
 
+    -- We starting by fetching wallet context so in submit mode
+    submitting /\ setSubmitting <- useState' true
+
     machine <- do
       let
-        onStateTransition' = onStateTransition contractInfo onSuccess onError
-        props = machineProps marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib onStateTransition' runtime
-      useMooreMachine props
+        onStateTransition prev next = do
+          let
+            fn = mkOnStateTransition contractInfo onSuccess onError
+          case prev of
+            Machine.FetchingRequiredWalletContext _ -> setSubmitting false
+            _ -> pure unit
+          fn prev next
 
-    submitting /\ setSubmitting <- useState' false
+        props = mkMachineSpec marloweContext transactionsEndpoint connectedWallet cardanoMultiplatformLib onStateTransition runtime
+      useMooreMachine props
 
     let
       shouldUseSpinner = UseSpinnerOverlay submitting
 
     pure $ case machine.state of
-      Machine.FetchingRequiredWalletContext { errors } -> do
-        let
-          body = mempty
-        -- fragment $
-        --   [ contractSection marloweContext.contract marloweContext.state
-        --   , DOOM.hr {}
-        --   ]
-        showPossibleErrorAndDismiss "Fetching wallet context" "" body onDismiss errors
+      Machine.FetchingRequiredWalletContext {} -> do
+        applyInputBodyLayout shouldUseSpinner $ mempty
 
-      Machine.ChoosingInputType { allInputsChoices, requiredWalletContext } -> do
+      Machine.ChoosingInputType { allInputsChoices } -> do
         -- DetailedFlow { showPrevStep: true } -> do
         --   fetchingRequiredWalletContextDetails marloweContext (Just setNextFlow) onDismiss $ Just requiredWalletContext
         let
@@ -951,7 +914,6 @@ mkComponent = do
                       newMarloweContext = { initialContract, state: t.txOutState, contract: t.txOutContract }
                     machine.applyAction <<< Machine.PickInputSucceeded $ { input, newMarloweContext }
                   V1.Error err -> do
-                    traceM "Compute transaction error!"
                     machine.applyAction <<< Machine.PickInputFailed $ show err
             case inputChoices of
               ChoiceInputs choiceInputs -> applyInputBodyLayout shouldUseSpinner $ choiceFormComponent
@@ -988,40 +950,6 @@ mkComponent = do
                     setSubmitting true
                     applyPickInputSucceeded Nothing
                 }
-
--- Machine.PickingInput { errors: Just error } -> do
---   DOOM.text error
--- Machine.CreatingTx { errors } -> do
---   -- DetailedFlow _ -> do
---   --   creatingTxDetails Nothing onDismiss "createTx placeholder" $ case errors of
---   --     Just err -> Just $ err
---   --     Nothing -> Nothing
---   let
---     body = DOOM.text "Auto creating tx..."
---   showPossibleErrorAndDismiss "Creating Transaction" "" body onDismiss errors
--- -- SimplifiedFlow -> BodyLayout.component
--- --   { title: "Creating transaction"
--- --   , description: DOOM.text "We are creating the initial transaction."
--- --   , content: DOOM.text "Auto creating tx... (progress bar?)"
--- --   }
--- Machine.SigningTx { createTxResponse, errors } -> do
---   -- DetailedFlow { showPrevStep: true } -> do
---   --   creatingTxDetails (Just setNextFlow) onDismiss "createTx placeholder" $ Just createTxResponse
---   -- DetailedFlow _ ->
---   --   signingTransaction Nothing onDismiss Nothing
---   let
---     body = DOOM.text "Auto signing tx... (progress bar?)"
---   showPossibleErrorAndDismiss "Signing Transaction" "" body onDismiss errors
--- Machine.SubmittingTx { txWitnessSet, errors } ->
---   -- DetailedFlow { showPrevStep: true } -> do
---   --   signingTransaction (Just setNextFlow) onDismiss $ Just txWitnessSet
---   -- DetailedFlow _ ->
---   --   submittingTransaction onDismiss "Final request placeholder" $ errors
---   BodyLayout.component
---     { title: DOM.h3 {} $ DOOM.text "Submitting transaction"
---     , description: DOOM.text "We are submitting the initial transaction."
---     , content: DOOM.text "Auto submitting tx... (progress bar?)"
---     }
 
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
