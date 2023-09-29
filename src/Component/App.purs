@@ -161,6 +161,16 @@ mkApp = do
 
     (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
 
+    -- contractId -> [payoutId]
+    submittedWithdrawalsInfo <- React.do
+      submit /\ updateSubmit <- useState (Map.empty :: Map Runtime.ContractId (Array Runtime.TxOutRef))
+      let
+        addAndSync contractId payoutId = do
+          updateSubmit $ Map.insertWith append contractId [ payoutId ]
+      -- FIXME:
+      -- add a sync loop here
+      pure (submit /\ addAndSync)
+
     let
       notSyncedYetInserts = NotSyncedYetInserts do
         let
@@ -168,7 +178,7 @@ mkApp = do
           -- the user that we give up.
           resyncLoop contractId = case possibleSyncFn of
             Nothing -> pure unit
-            Just sync -> for_ (1 .. 30) \_ -> do
+            Just sync -> for_ (1 .. 60) \_ -> do
               delay (Milliseconds 5000.0)
               sync contractId `catchError` \err -> do
                 traceM $ "error during sync" <> unsafeStringify err
@@ -386,6 +396,7 @@ mkApp = do
               , contractMapInitialized
               , notSyncedYetInserts
               , connectedWallet: possibleWalletInfo
+              , submittedWithdrawalsInfo
               -- To start on create contract page:
               -- , possibleInitialModalAction: do
               --     -- let

@@ -45,6 +45,7 @@ import Data.Int as Int
 import Data.JSDate (fromDateTime) as JSDate
 import Data.List (intercalate)
 import Data.List as List
+import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Monoid as Monoid
@@ -122,6 +123,7 @@ type Props =
   , connectedWallet :: Maybe (WalletInfo Wallet.Api)
   , possibleInitialModalAction :: Maybe ModalAction
   , setPage :: Page -> Effect Unit
+  , submittedWithdrawalsInfo :: Map ContractId (Array TxOutRef) /\ (ContractId -> TxOutRef -> Effect Unit)
   }
 
 data OrderBy
@@ -603,14 +605,6 @@ mkContractList = do
                                 , case marloweInfo, possibleWalletContext of
                                     Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance } -> do
                                       let
-                                        x = case unclaimedPayouts of
-                                          [] -> Nothing
-                                          unclaimedPayouts -> do
-                                            for_ unclaimedPayouts \(Payout p) -> do
-                                              traceM "Unclaimed payout"
-                                              traceM p.role
-                                            traceM roles
-                                            Nothing
                                         balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
                                         roles = catMaybes <<< map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
                                       case Array.uncons (Array.intersect roles (map (\(Payout { role }) -> role) unclaimedPayouts)) of
