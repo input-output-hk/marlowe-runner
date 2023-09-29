@@ -38,7 +38,7 @@ import Data.Array.NonEmpty as NonEmptyArray
 import Data.DateTime.Instant (Instant, instant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either, hush)
-import Data.Foldable (findMap, fold, for_, or)
+import Data.Foldable (fold, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
 import Data.Int as Int
@@ -56,7 +56,6 @@ import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
@@ -74,7 +73,7 @@ import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.DOM.Simplified.ToJSX (class ToJSX)
 import React.Basic.Events (EventHandler, handler, handler_)
-import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useEffect, useState, useState', (/\))
+import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useState, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import ReactBootstrap (overlayTrigger, tooltip)
@@ -84,7 +83,6 @@ import ReactBootstrap.Table (striped) as Table
 import ReactBootstrap.Table (table)
 import ReactBootstrap.Types (placement)
 import ReactBootstrap.Types as OverlayTrigger
-import Unsafe.Coerce (unsafeCoerce)
 import Utils.React.Basic.Hooks (useMaybeValue, useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
@@ -234,40 +232,6 @@ mkContractList = do
     possibleModalActionRef <- useStateRef' possibleModalAction
     ordering /\ updateOrdering <- useState { orderBy: OrderByCreationDate, orderAsc: false }
     possibleQueryValue /\ setQueryValue <- useState' Nothing
-
-    useEffect possibleContracts do
-      let
-        possibleApplyInputs :: Maybe ModalAction
-        possibleApplyInputs = do
-          contracts <- possibleContracts
-          let
-            txIdStr = "e99a290e6f8a165ceab3fd767401d391d10dfec48d842e1676484beb2e5e31bd"
-            txIx = 1
-            contractId = Runtime.TxOutRef
-              { txId: Runtime.TxId txIdStr
-              , txIx
-              }
-          ci@(ContractInfo contractInfo) <- flip findMap contracts case _ of
-            SyncedConractInfo ci@(ContractInfo { contractId: contractId' }) ->
-              if contractId == contractId' then Just ci
-              else Nothing
-            _ -> Nothing
-          MarloweInfo marloweInfo <- contractInfo.marloweInfo
-          state <- marloweInfo.state
-          contract <- marloweInfo.currentContract
-          let
-            marloweContext = { initialContract: marloweInfo.initialContract, state, contract }
-            contractIdParam = txIdStr <> "%23" <> show txIx
-            transactionsEndpoint = unsafeCoerce $ "/contracts/" <> contractIdParam <> "/transactions"
-          pure $ ApplyInputs
-            ci
-            transactionsEndpoint
-            marloweContext
-      -- case possibleApplyInputs of
-      --   Just applyInputs -> do
-      --     setModalAction $ applyInputs
-      --   Nothing -> pure unit
-      pure $ pure unit
 
     let
       form = mkForm setQueryValue
@@ -604,13 +568,13 @@ mkContractList = do
                                       _, _, _ -> buttonOutlinedInactive { label: DOOM.text "Syncing" }
 
                                 , case marloweInfo, possibleWalletContext, submittedWithdrawalsInfo of
-                                    Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance }, submittedPayouts /\ updateSubmittedPayouts -> do
+                                    Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance }, submittedPayouts /\ _ -> do
                                       let
                                         balance' = Map.filterKeys (\assetId -> Cardano.assetIdToString assetId `eq` currencySymbol) balance
                                         roles = catMaybes <<< map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys $ balance'
                                         payouts = case lookup contractId submittedPayouts of
-                                            Just s -> filter ((\(Payout { payoutId }) -> not (elem payoutId s))) unclaimedPayouts
-                                            Nothing -> unclaimedPayouts
+                                          Just s -> filter ((\(Payout { payoutId }) -> not (elem payoutId s))) unclaimedPayouts
+                                          Nothing -> unclaimedPayouts
 
                                       case Array.uncons (Array.intersect roles (map (\(Payout { role }) -> role) payouts)) of
                                         Just { head, tail } -> buttonWithIcon

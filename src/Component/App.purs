@@ -12,7 +12,6 @@ import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
-import Component.Types as Types
 import Component.Types.ContractInfo (MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Types.ContractInfoMap as ContractInfoMap
@@ -32,19 +31,18 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid as Monoid
-import Data.Newtype (un, unwrap)
+import Data.Newtype (un)
 import Data.Newtype as Newtype
 import Data.Profunctor.Strong ((&&&))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (uncurry)
 import Data.Tuple.Nested ((/\))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import JS.Unsafe.Stringify (unsafeStringify)
+import Foreign.Internal.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsMap, ContractWithTransactionsStream(..), MaxPages(..), PollingInterval(..), RequestInterval(..))
 import Marlowe.Runtime.Web.Streaming as Streaming
@@ -54,7 +52,7 @@ import React.Basic (JSX)
 import React.Basic as ReactContext
 import React.Basic.DOM (img, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (component, provider, readRef, useEffectOnce, useState, useState')
+import React.Basic.Hooks (component, provider, readRef, useState, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import ReactBootstrap.Icons (unsafeIcon)
@@ -135,6 +133,7 @@ mkApp = do
   messageBox <- liftEffect $ mkMessageBox
   messagePreview <- liftEffect $ mkMessagePreview
   -- modal <- liftEffect $ mkModal
+  logger <- asks _.logger
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
   subcomponents <- do
     contractListComponent <- mkContractList
@@ -180,7 +179,7 @@ mkApp = do
             Just sync -> for_ (1 .. 60) \_ -> do
               delay (Milliseconds 5000.0)
               sync contractId `catchError` \err -> do
-                traceM $ "error during sync" <> unsafeStringify err
+                liftEffect $ logger $ unsafeStringify err
                 pure unit
 
           add :: ContractInfo.ContractCreated -> Effect Unit
@@ -250,7 +249,6 @@ mkApp = do
 
     configuringWallet /\ setConfiguringWallet <- useState' false
     checkingNotifications /\ setCheckingNotifications <- useState' false
-    displayOption /\ setDisplayOption <- useState' Default
 
     -- TODO: re-introduce notifications
     -- We are ignoring contract events for now and we update the whole contractInfo set.
@@ -396,38 +394,9 @@ mkApp = do
               , notSyncedYetInserts
               , connectedWallet: possibleWalletInfo
               , submittedWithdrawalsInfo
-              -- To start on create contract page:
-              -- , possibleInitialModalAction: do
-              --     -- let
-              --     --    _ = unsafePerformEffect $ props.setPage $ CreateContractPage Nothing
-              --     Just (NewContract Nothing)
               , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
               , setPage: props.setPage
               }
-        -- renderTab props children = tab props $ DOM.div { className: "row pt-4" } children
-
-        --          [ tabs { fill: true, justify: true, defaultActiveKey: "contracts" }
-        --              [ renderTab
-        --                  { eventKey: "contracts"
-        --                  , title: DOM.div
-        --                      { className: "text-body" }
-        --                      [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.files
-        --                      , DOOM.text "Contracts"
-        --                      ]
-        --                  }
-        --                  $ subcomponents.contractListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
-        --              -- , renderTab
-        --              --     { eventKey: "cash-flows"
-        --              --     , title: DOM.div
-        --              --         { className: "text-body" }
-        --              --         [ DOM.span { className: "me-2" } $ Icons.toJSX Icons.arrowDownShort
-        --              --         , DOOM.text "Apply Inputs"
-        --              --         ]
-        --
-        --              --     }
-        --              --     $ subcomponents.eventListComponent { contractList: contractArray, connectedWallet: possibleWalletInfo }
-        --              ]
-        --          ]
         , footer
         ]
 
@@ -478,4 +447,3 @@ mkAppContractInfoMap slotting walletContext possiblySynced possiblyNotSyncedYet 
 
   pure $ AppContractInfoMap { walletContext, map: ns `Map.union` s }
 
--- background: linear-gradient(    to right,    #F8F6FF 0%,    #F8F6FF 50%,    white 50%,    white 100%  )
