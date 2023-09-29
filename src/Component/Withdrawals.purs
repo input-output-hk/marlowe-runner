@@ -23,6 +23,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (un)
 import Data.Time.Duration (Seconds(..))
+import Data.Traversable (for_)
 import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
 import Data.Variant (Variant)
@@ -52,6 +53,7 @@ type Props =
   , withdrawalsEndpoint :: WithdrawalsEndpoint
   , roles :: NonEmptyArray String
   , unclaimedPayouts :: Array Payout
+  , updateSubmitted :: TxOutRef -> Effect Unit
   }
 
 mkComponent :: MkComponentM (Props -> JSX)
@@ -60,7 +62,7 @@ mkComponent = do
   modal <- liftEffect mkModal
   walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, roles, withdrawalsEndpoint, unclaimedPayouts } -> React.do
+  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, roles, withdrawalsEndpoint, unclaimedPayouts, updateSubmitted } -> React.do
     possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
 
     let
@@ -85,36 +87,37 @@ mkComponent = do
 
         Just (V (Right { role: selectedRole }) /\ _), Just { changeAddress, usedAddresses } -> do
           let
+            payouts = filter (\(Payout { role }) -> role == selectedRole) unclaimedPayouts
             withdrawalContext = WithdrawalContext
               { wallet: { changeAddress, usedAddresses }
-              , payouts: filter (\(Payout { role }) -> role == selectedRole) unclaimedPayouts
+              , payouts
               }
-          do
-            launchAff_ $ do
-              withdrawal withdrawalContext runtime.serverURL runtime.withdrawalsEndpoint >>= case _ of
-                Right { resource: PostWithdrawalsResponseContent res, links: { withdrawal: withdrawalEndpoint } } -> do
-                  let
-                    { tx } = res
-                    TextEnvelope { cborHex: txCborHex } = tx
-                  let
-                    WalletInfo { wallet: walletApi } = connectedWallet
-                  Wallet.signTx walletApi txCborHex true >>= case _ of
-                    Right witnessSet -> do
-                      submit witnessSet runtime.serverURL withdrawalEndpoint >>= case _ of
-                        Right _ -> do
-                          liftEffect $ onSuccess withdrawalEndpoint
-                        Left err -> do
-                          traceM "Error while submitting the transaction"
-                          traceM err
-                    Left err -> do
-                      traceM "Failed to sign transaction"
-                      traceM err
+          launchAff_ $ do
+            withdrawal withdrawalContext runtime.serverURL runtime.withdrawalsEndpoint >>= case _ of
+              Right { resource: PostWithdrawalsResponseContent res, links: { withdrawal: withdrawalEndpoint } } -> do
+                let
+                  { tx } = res
+                  TextEnvelope { cborHex: txCborHex } = tx
+                let
+                  WalletInfo { wallet: walletApi } = connectedWallet
+                Wallet.signTx walletApi txCborHex true >>= case _ of
+                  Right witnessSet -> do
+                    submit witnessSet runtime.serverURL withdrawalEndpoint >>= case _ of
+                      Right _ -> do
+                        liftEffect $ onSuccess withdrawalEndpoint
+                      Left err -> do
+                        traceM "Error while submitting the transaction"
+                        traceM err
+                  Left err -> do
+                    traceM "Failed to sign transaction"
+                    traceM err
 
-                Left err ->
-                  traceM $ "Error: " <> show err
-            traceM "withdrawal"
-            traceM unclaimedPayouts
-            pure unit
+              Left err ->
+                traceM $ "Error: " <> show err
+          traceM "withdrawal"
+          traceM unclaimedPayouts
+          for_ payouts $ \(Payout { payoutId }) -> updateSubmitted payoutId
+          pure unit
         _, _ -> do
           -- Rather improbable path because we disable submit button if the form is invalid
           traceM "withdrawal error"
