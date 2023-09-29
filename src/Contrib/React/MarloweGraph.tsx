@@ -360,7 +360,7 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 }
 
-export const _MarloweGraph = ({ contract, path }: { contract: Contract, path?: ContractPathHistory }): JSX.Element => {
+export const _MarloweGraphView = ({ contract, path, onInit }: { contract: Contract, path?: ContractPathHistory, onInit: any }): JSX.Element => {
   const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0, path || [])
-  return <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}><Background variant={BackgroundVariant.Dots} gap={12} size={1} /></ReactFlow>;
+  return <ReactFlow onInit={onInit} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}><Background variant={BackgroundVariant.Dots} gap={12} size={1} /></ReactFlow>;
 }

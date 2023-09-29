@@ -481,10 +481,10 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 }
 
-export const MarloweGraphView = ({ contract, path }: { contract: Contract, path?: ContractPathHistory }): JSX.Element => {
+export const MarloweGraphView = ({ contract, path, onInit }: { contract: Contract, path?: ContractPathHistory, onInit: any }): JSX.Element => {
   const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0, path || [])
   return <div style={{ width: "95vw", height: "95vh" }}>
-    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}>
+    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onInit={onInit}>
       <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
     </ReactFlow>
   </div>

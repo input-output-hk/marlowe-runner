@@ -472,76 +472,6 @@ mkContractDetailsComponent = do
       , content: wrappedContentWithFooter body footer
       }
 
--- In here we want to summarize the initial interaction with the wallet
-fetchingRequiredWalletContextDetails
-  :: Machine.MarloweContext
-  -> Maybe (Effect Unit)
-  -> Effect Unit
-  -> (Maybe (Effect Unit))
-  -> JSX
-fetchingRequiredWalletContextDetails marloweContext possibleOnNext onDismiss possibleWalletResponse = do
-  let
-
-    statusHtml = DOM.div { className: "row" }
-      [ DOM.div { className: "col-12" } $ case possibleWalletResponse of
-          Nothing ->
-            DOM.div
-              { className: "w-100 d-flex justify-content-center align-items-center"
-              }
-              $ loadingSpinnerLogo
-                  {}
-          Just walletResponse -> fragment
-            [ DOM.p { className: "h3" } $ DOOM.text "Wallet response:"
-            , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify walletResponse
-            ]
-      ]
-
-    body = fragment $
-      [ contractSection marloweContext.contract marloweContext.state
-      , DOOM.hr {}
-      ] <> [ statusHtml ]
-
-    footer = DOM.div { className: "row" }
-      [ DOM.div { className: "col-6 text-start" } $
-          [ link
-              { label: DOOM.text "Cancel"
-              , onClick: onDismiss
-              , showBorders: true
-              , extraClassNames: "me-3"
-              }
-          ]
-      , DOM.div { className: "col-6 text-end" } $
-          [ case possibleOnNext of
-              Nothing -> DOM.button
-                { className: "btn btn-primary"
-                , disabled: true
-                }
-                [ R.text "Next" ]
-              Just onNext -> DOM.button
-                { className: "btn btn-primary"
-                , onClick: handler_ onNext
-                , disabled: false
-                }
-                [ R.text "Next" ]
-          ]
-      ]
-
-  BodyLayout.component
-    { title: DOM.h3 {} $ DOOM.text "Fetching Wallet Context"
-    , description:
-        DOM.div {}
-          [ DOM.p {}
-              [ DOOM.text "We are currently fetching the required wallet context for interacting with the contract. This information is essential for confirming your participation in the contract and facilitating the necessary transactions." ]
-          , DOM.p {}
-              [ DOOM.text "The marlowe-runtime requires information about wallet addresses in order to select the appropriate UTxOs to pay for the initial transaction. To obtain the set of addresses from the wallet, we utilize the "
-              , DOM.code {} [ DOOM.text "getUsedAddresses" ]
-              , DOOM.text " method from "
-              , descriptionLink { label: "CIP-30", href: "https://github.com/cardano-foundation/CIPs/tree/master/CIP-0030", icon: "bi-github" }
-              ]
-          ]
-    , content: wrappedContentWithFooter body footer
-    }
-
 -- Now we want to to describe the interaction with the API where runtimeRequest is
 -- a { headers: Map String String, body: JSON }.
 -- We really want to provide the detailed informatin (headers and payoload)
@@ -817,8 +747,6 @@ mkComponent = do
         applyInputBodyLayout shouldUseSpinner $ mempty
 
       Machine.ChoosingInputType { allInputsChoices } -> do
-        -- DetailedFlow { showPrevStep: true } -> do
-        --   fetchingRequiredWalletContextDetails marloweContext (Just setNextFlow) onDismiss $ Just requiredWalletContext
         let
           body = fragment $
             [ contractSection marloweContext.contract marloweContext.state

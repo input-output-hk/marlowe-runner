@@ -12,6 +12,7 @@ import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (OutlineColoring(..), SpinnerOverlayHeight(..), buttonOutlinedClassNames, link, spinnerOverlay)
+import Component.Widgets as DOM
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
@@ -163,8 +164,9 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun _)) = FormSpecBuilder.ev
       , layout: fullWidthLayout
       , touched: isJust possibleInitialContract
       , validator: requiredV' $ Validator.liftFnEither \jsonString -> do
-          json <- lmap (\err -> [ "Invalid JSON:" <> show err ]) $ parseJson jsonString
-          lmap (Array.singleton <<< show) (decodeJson json)
+          json <- lmap (\_ -> [ "Invalid JSON value" ]) $ parseJson jsonString
+          -- lmap (Array.singleton <<< show) (decodeJson json)
+          lmap (\_ -> [ "Invalid Marlowe contract JSON" ]) (decodeJson json)
       , rows: 15
       , name: Just contractFieldId
       , inputExtraClassName: NoProblem.opt "font-monospace"
@@ -221,21 +223,7 @@ formatPossibleJSON str = fromMaybe str do
 mkLoadFileHiddenInputComponent :: MkComponentM ({ onFileload :: Maybe String -> Effect Unit, id :: String, accept :: String } -> JSX)
 mkLoadFileHiddenInputComponent =
   liftEffect $ component "LoadFileButton" \{ id, onFileload, accept } -> React.do
-    {- Working example in raw HTML:
-      <script>
-      const onfile = () => {
-        const fr = new FileReader()
-        fr.onload = e => {
-          console.log("hey ho")
-          console.log(e.target.result)
-        }
-        fr.readAsText(document.getElementById("yo").files[0])
-      }
-      </script>
-      <input id="yo" type="file" onchange="onfile()" />
-    -}
     ref :: Ref (Nullable Node) <- useRef Nullable.null
-
     let
       loadFile :: File -> Aff (Maybe String)
       loadFile = map Nullable.toMaybe <<< Promise.toAff <<< _loadFile
@@ -457,50 +445,67 @@ mkComponent = do
         -- , lookupSubform autoRunFieldId
         ]
       formActions = fragment
-        [ DOM.div { className: "row mt-5" } $
-            [ DOM.div { className: "col-12" } $
-                [ DOM.button
-                    do
-                      let
-                        disabled = case result of
-                          Just (V (Right _) /\ _) -> false
-                          _ -> true
-                      { className: "btn btn-primary w-100"
-                      , onClick: onSubmit'
-                      , disabled
-                      }
-                    [ R.text "Submit contract"
-                    , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
-                    ]
-                ]
+        [ DOM.div { className: "row mt-5" }
+            [ DOM.div { className: "col-12" } do
+                let
+                  disabled = case result of
+                    Just (V (Right _) /\ _) -> false
+                    _ -> true
+                DOM.submitButton
+                  { onClick: onSubmit'
+                  , disabled
+                  }
+                  $ fragment
+                      [ R.text "Submit contract"
+                      , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
+                      ]
             , backToContractListLink onDismiss
             ]
         ]
 
-      content useSpinner = do
+      contractFormContent useSpinner = do
         let
           title = stateToTitle submissionState
-          description = stateToDetailedDescription submissionState
+          description = DOM.div { className: "pe-3 mb-3" }
+            [ DOM.p {} $ DOOM.text
+                "Review your contract details before setting the terms to run it. Check the code and all details, this is your last chance to correct any errors before the contract is permanently live."
+            ]
           formContent =
             [ DOM.div { className: "ps-3" }
                 [ formBody
                 , formActions
                 ]
             ] <> Monoid.guard useSpinner [ spinnerOverlay Spinner100VH ]
-        -- Essentially this is a local copy of `BodyLayout.component` but
-        -- we use `relative` positioning for the form content instead.
-        -- Should we just use it there?
-        DOM.div { className: "container" } $ do
-          DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
-            [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center pb-3" } $
-                [ DOM.div { className: "fw-bold font-size-2rem my-3" } $ title
-                , DOM.div { className: "font-size-1rem" } $ description
-                ]
-            , DOM.div { className: "col-9 bg-white position-relative" } formContent
+          content = tabs { fill: false, justify: false, defaultActiveKey: "code", variant: Tabs.variant.pills } do
+            let
+              renderTab props children = tab props $ DOM.div { className: "w-100 pt-4 h-vh50" } children
+            [ renderTab
+                { eventKey: eventKey "graph"
+                , title: DOOM.text " Source graph"
+                , disabled: case result of
+                    Just (V (Right _) /\ _) -> false
+                    _ -> true
+                }
+                $ case result of
+                    Just (V (Right (contract /\ _ /\ _)) /\ _) -> do
+                      [ marloweGraph { contract: contract } ]
+                    _ ->
+                      [ DOM.div { className: "text-center" } $ DOOM.text "Please fill in the form and submit to see the source graph" ]
+            , renderTab
+                { eventKey: eventKey "code"
+                , disabled: false
+                , title: DOOM.text "Code"
+                }
+                $ formContent
             ]
+        BodyLayout.component
+          { title
+          , description
+          , content
+          }
 
     pure $ case submissionState of
-      Machine.DefiningContract -> content false
+      Machine.DefiningContract -> contractFormContent false
       Machine.DefiningRoleTokens { roleNames } -> do
         let
           onSuccess' :: RolesConfig -> Effect Unit
@@ -518,7 +523,6 @@ mkComponent = do
           , description: DOM.div { className: "px-3 mx-3" }
               [ DOM.p {} [ DOOM.text "This contract uses roles represented as NFTs. They are minted during the creation step and sent to participants. Please provide the addresses of the participants who should receive the role tokens." ]
               ]
-
           , content: roleTokenComponent
               { onDismiss
               , onSuccess: onSuccess'
@@ -526,7 +530,7 @@ mkComponent = do
               , roleNames
               }
           }
-      _ -> content true
+      _ -> contractFormContent true
 
 stateToTitle :: Machine.State -> JSX
 stateToTitle state = case state of
@@ -534,54 +538,6 @@ stateToTitle state = case state of
     [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
     , DOM.span { className: "mb-3" } $ DOOM.text "Create and submit your contract"
     ]
-
--- To display progress bar
-newtype StepIndex = StepIndex Int
-
-machineStepsCardinality :: Int
-machineStepsCardinality = 7
-
-machineStateToStepIndex :: Machine.State -> StepIndex
-machineStateToStepIndex state = StepIndex $ case state of
-  Machine.DefiningContract -> 1
-  Machine.DefiningRoleTokens {} -> 2
-  Machine.FetchingRequiredWalletContext {} -> 3
-  Machine.CreatingTx {} -> 4
-  Machine.SigningTx {} -> 5
-  Machine.SubmittigTx {} -> 6
-  Machine.ContractCreated {} -> 7
-
--- | We want to describe in details what kind of data we are gathering
--- | when we are performing a given transtition (state determines the next transition in our case)
--- | The output should be readable to the developer which should understand the whole flow.
--- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]
-stateToDetailedDescription :: Machine.State -> JSX
-stateToDetailedDescription state = case state of
-  _ -> DOM.div { className: "pe-3 mb-3" }
-    [ DOM.p {} $ DOOM.text "Review your contract details before setting the terms to run it. Check the code and all details, this is your last chance to correct any errors before the contract is permanently live."
-    ]
-
--- | Let's use error information and other details of the state to describe the sitution.
--- | Let's use standard react-basic JSX functions like: DOM.div { className: "foo" } [ DOOM.text "bar" ]
-stateToDescription :: Machine.State -> JSX
-stateToDescription state = case state of
-  Machine.DefiningContract -> DOOM.text "Please define your contract."
-  Machine.DefiningRoleTokens { errors } -> case errors of
-    Nothing -> DOOM.text "Defining role tokens."
-    Just err -> DOOM.text $ "Defining role tokens failed: " <> err
-  Machine.FetchingRequiredWalletContext { errors } -> case errors of
-    Nothing -> DOOM.text "Fetching required wallet context."
-    Just err -> DOOM.text $ "Fetching required wallet context failed: " <> err
-  Machine.CreatingTx { errors } -> case errors of
-    Nothing -> DOOM.text "Creating transaction."
-    Just err -> DOOM.text $ "Creating transaction failed: " <> err
-  Machine.SigningTx { errors } -> case errors of
-    Nothing -> DOOM.text "Signing transaction."
-    Just err -> DOOM.text $ "Signing transaction failed: " <> err
-  Machine.SubmittigTx { errors } -> case errors of
-    Nothing -> DOOM.text "Submitting transaction."
-    Just err -> DOOM.text $ "Submitting transaction failed: " <> err
-  Machine.ContractCreated {} -> DOOM.text "Contract created."
 
 three :: BigInt
 three = BigInt.fromInt 3

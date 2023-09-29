@@ -12,8 +12,10 @@ import Data.Nullable (Nullable, toNullable)
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
 import Data.Undefined.NoProblem (Opt, (!))
-import Data.Undefined.NoProblem.Closed as NoProblem
-import Debug (traceM)
+import Data.Undefined.NoProblem (toMaybe) as NoProblem
+import Data.Undefined.NoProblem.Closed (class Coerce, coerce) as NoProblem
+import Effect (Effect)
+import Effect.Uncurried (EffectFn1, mkEffectFn1)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import React.Basic (JSX, ReactComponent, element)
 
@@ -24,7 +26,14 @@ newtype ContractJson = MarloweJson Json
 toContractJson :: V1.Contract -> ContractJson
 toContractJson = MarloweJson <<< encodeJson
 
-foreign import _MarloweGraph :: ReactComponent { contract :: ContractJson, path :: Array (Nullable Int) }
+foreign import data ReactFlowInstance :: Type
+
+foreign import _MarloweGraph
+  :: ReactComponent
+       { contract :: ContractJson
+       , path :: Array (Nullable Int)
+       , onInit :: EffectFn1 ReactFlowInstance Unit
+       }
 
 type Index = Maybe Int
 
@@ -38,7 +47,11 @@ executionPathIndicies = foldMap \(_ /\ path) -> do
     arr = Array.NonEmpty.toArray path <#> fst
   map branchIndex arr
 
-type Props = { contract :: V1.Contract, executionPath :: Opt ExecutionPath }
+type Props =
+  { contract :: V1.Contract
+  , executionPath :: Opt ExecutionPath
+  , onInit :: Opt (ReactFlowInstance -> Effect Unit)
+  }
 
 -- { contract :: V1.Contract, path :: ExecutionPath }
 marloweGraph
@@ -56,5 +69,8 @@ marloweGraph props = do
     executionPath = props'.executionPath ! List.Nil
     executionPath' = map toNullable $ executionPathIndicies executionPath
 
-  element _MarloweGraph { contract: contractJson, path: executionPath' }
+    onInit = case NoProblem.toMaybe props'.onInit of
+      Just fn -> mkEffectFn1 fn
+      Nothing -> mkEffectFn1 \_ -> pure unit
 
+  element _MarloweGraph { contract: contractJson, path: executionPath', onInit }

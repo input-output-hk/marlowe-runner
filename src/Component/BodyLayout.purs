@@ -23,7 +23,7 @@ component { title, description, content } =
           [ DOM.div { className: "fw-bold font-size-2rem my-3" } $ title
           , DOM.div { className: "font-size-1rem" } $ description
           ]
-      , DOM.div { className: "ps-3 col-9 bg-white" } content
+      , DOM.div { className: "ps-3 col-9 bg-white position-relative" } content
       ]
 
 descriptionLink :: { icon :: String, href :: String, label :: String } -> JSX

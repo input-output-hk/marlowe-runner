@@ -5,36 +5,28 @@ import Prelude
 import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.InputHelper as InputHelper
-import Component.MarloweYaml (marloweYaml, marloweStateYaml)
 import Component.Types (MkComponentM)
 import Component.Types.ContractInfo (fetchAppliedInputs)
-import Component.Widgets (link, marlowePreview, marloweStatePreview)
+import Component.Widgets (SpinnerOverlayHeight(..), link, marlowePreview, marloweStatePreview, spinnerOverlay)
 import Contrib.React.MarloweGraph (marloweGraph)
 import Control.Monad.Reader (asks)
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.List as List
 import Data.Maybe (Maybe(..))
+import Data.Monoid as Monoid
 import Data.Tuple.Nested (type (/\))
 import Data.Validation.Semigroup (V(..))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Language.Marlowe.Core.V1.Semantics.Types (_marloweState)
+import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Types as Runtime
-import React.Basic as DOOM
-import React.Basic.DOM (css)
-import React.Basic.DOM (div, span_, text, img) as DOOM
+import React.Basic (fragment) as DOOM
+import React.Basic.DOM (img, span_, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (handler_)
-import React.Basic.Hooks (JSX, component, (/\))
-import React.Basic.Hooks as React
-import React.Basic.Hooks.Aff as React
-import ReactBootstrap.Icons (unsafeIcon)
-import ReactBootstrap.Icons as Icons
-import ReactBootstrap.Nav (nav)
-import ReactBootstrap.Nav as Nav
+import React.Basic.Hooks (JSX, component, useState', (/\))
+import React.Basic.Hooks (bind, discard, useState') as React
+import React.Basic.Hooks.Aff (useAff) as React
 import ReactBootstrap.Tab (tab)
 import ReactBootstrap.Tabs (tabs)
 import ReactBootstrap.Tabs as Tabs
@@ -55,23 +47,23 @@ data ContractView = SourceCode | Graph { compressed :: Boolean }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
+  logger <- asks _.logger
   Runtime.Runtime { serverURL } <- asks _.runtime
   liftEffect $ component "ContractDetails" \{ contract, state, initialState, initialContract, transactionEndpoints, onClose } -> React.do
     possibleExecutionPath /\ setPossibleExecutionPath <- React.useState' Nothing
 
     React.useAff (transactionEndpoints /\ contract /\ state) do
       fetchAppliedInputs serverURL (Array.reverse transactionEndpoints) >>= case _ of
-        V (Right inputs) -> case InputHelper.executionPath inputs initialContract initialState of
-          Right executionPath -> liftEffect $ setPossibleExecutionPath $ Just executionPath
+        V (Right inputs) -> liftEffect $ case InputHelper.executionPath inputs initialContract initialState of
+          Right executionPath -> setPossibleExecutionPath $ Just executionPath
           Left err -> do
-            traceM "ContractDetails: failed to compute execution path"
-            traceM err
-            pure unit
-        V (Left err) -> do
-          traceM "ContractDetails: failed to fetch applied inputs"
-          traceM err
-          pure unit
+            logger "ContractDetails: failed to compute execution path"
+            logger $ unsafeStringify err
+        V (Left err) -> liftEffect $ do
+          logger "ContractDetails: failed to fetch applied inputs"
+          logger $ unsafeStringify err
 
+    graphLoaded /\ setGraphLoaded <- useState' false
     let
       -- FIXME: We want to present here also:
       --  * `state`,
@@ -89,77 +81,64 @@ mkComponent = do
           defaultActiveKey = case contract of
             Nothing -> "graph"
             Just _ -> "source"
-        React.fragment
-          [ tabs { fill: false, justify: false, defaultActiveKey, variant: Tabs.variant.pills } do
-              let
-                renderTab props children = tab props $ DOM.div { className: "pt-4 h-vh50 d-flex align-items-stretch" } children
-              [ case contract of
-                  Nothing -> mempty
-                  Just contract' ->
-                    renderTab
-                      { eventKey: eventKey "source"
-                      , title: DOOM.span_
-                          -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
-                          [ DOOM.text " Source code"
-                          ]
-                      }
-                      $ marlowePreview contract'
-              , case possibleExecutionPath of
-                  Nothing -> mempty
-                  Just executionPath ->
-                    renderTab
-                      { eventKey: eventKey "graph"
-                      , title: DOOM.span_
-                          -- [ Icons.toJSX $ unsafeIcon "diagram-2"
-                          [ DOOM.text " Source graph"
-                          ]
-                      }
-                      $ marloweGraph { contract: initialContract, executionPath }
-              , case state of
-                  Nothing -> mempty
-                  Just st ->
-                    renderTab
-                      { eventKey: eventKey "state"
-                      , title: DOOM.span_
-                          -- [ Icons.toJSX $ unsafeIcon "bank"
-                          [ DOOM.text " Contract state"
-                          ]
-                      }
-                      $ marloweStatePreview st
-              ]
-          ]
-      -- body = nav
-      --   { variant: Nav.variant.pills }
-      --   [ Nav.link
-      --     { eventKey: eventKey "source"}
-      --     [ DOOM.span_
-      --         [ Icons.toJSX $ unsafeIcon "filetype-yml"
-      --         , DOOM.text " Source code"
-      --         ]
-      --     ]
-      --   , Nav.link
-      --     { eventKey: eventKey "graph"}
-      --     [ DOOM.span_
-      --         [ Icons.toJSX $ unsafeIcon "diagram-2"
-      --         , DOOM.text " Source graph"
-      --         ]
-      --     ]
-      --   ]
-      footer =
-        DOOM.fragment
-          [ DOM.div
-              { className: "col-12 text-center" } $
-              [ link
-                  { label: DOM.b {} [ DOOM.text "Back to contract list" ]
-                  , onClick: const onClose unit
-                  , showBorders: false
-                  , extraClassNames: "mt-3"
+        tabs { fill: false, justify: false, defaultActiveKey, variant: Tabs.variant.pills } do
+          let
+            renderTab props children = tab props $ DOM.div { className: "pt-4 h-vh50 d-flex align-items-stretch" } children
+          [ case contract of
+              Nothing -> mempty
+              Just contract' ->
+                renderTab
+                  { eventKey: eventKey "source"
+                  , title: DOOM.span_
+                      -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
+                      [ DOOM.text " Source code"
+                      ]
                   }
-
-              ]
+                  $ marlowePreview contract'
+          , case possibleExecutionPath of
+              Nothing -> mempty
+              Just executionPath ->
+                renderTab
+                  { eventKey: eventKey "graph"
+                  , title: DOOM.span_
+                      -- [ Icons.toJSX $ unsafeIcon "diagram-2"
+                      [ DOOM.text " Source graph"
+                      ]
+                  }
+                  $ marloweGraph
+                      { contract: initialContract
+                      , executionPath
+                      , onInit: (\_ -> setGraphLoaded true)
+                      }
+          , case state of
+              Nothing -> mempty
+              Just st ->
+                renderTab
+                  { eventKey: eventKey "state"
+                  , title: DOOM.span_
+                      -- [ Icons.toJSX $ unsafeIcon "bank"
+                      [ DOOM.text " Contract state"
+                      ]
+                  }
+                  $ marloweStatePreview st
           ]
+      footer = DOOM.fragment
+        [ DOM.div
+            { className: "col-12 text-center" } $
+            [ link
+                { label: DOM.b {} [ DOOM.text "Back to contract list" ]
+                , onClick: const onClose unit
+                , showBorders: false
+                , extraClassNames: "mt-3"
+                }
 
-      content = wrappedContentWithFooter body footer
+            ]
+        ]
+
+      content = DOOM.fragment
+        [ wrappedContentWithFooter body footer
+        , Monoid.guard (not graphLoaded) (spinnerOverlay Spinner100VH)
+        ]
 
     pure $ BodyLayout.component
       { title: DOM.div {}
@@ -171,25 +150,3 @@ mkComponent = do
           ]
       , content
       }
-
--- <ul class="nav nav-pills">
---   <li class="nav-item">
---     <a class="nav-link active" aria-current="page" href="#">Active</a>
---   </li>
---   <li class="nav-item dropdown">
---     <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Dropdown</a>
---     <ul class="dropdown-menu">
---       <li><a class="dropdown-item" href="#">Action</a></li>
---       <li><a class="dropdown-item" href="#">Another action</a></li>
---       <li><a class="dropdown-item" href="#">Something else here</a></li>
---       <li><hr class="dropdown-divider"></li>
---       <li><a class="dropdown-item" href="#">Separated link</a></li>
---     </ul>
---   </li>
---   <li class="nav-item">
---     <a class="nav-link" href="#">Link</a>
---   </li>
---   <li class="nav-item">
---     <a class="nav-link disabled">Disabled</a>
---   </li>
--- </ul>

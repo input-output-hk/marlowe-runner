@@ -227,8 +227,8 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
         max_y: y,
     };
 };
-export const _MarloweGraph = ({ contract, path }) => {
+export const _MarloweGraph = ({ contract, path, onInit }) => {
     const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0, path || []);
-    return React.createElement(ReactFlow, { nodes: nodes, edges: edges, nodeTypes: nodeTypes, edgeTypes: edgeTypes },
+    return React.createElement(ReactFlow, { onInit: onInit, nodes: nodes, edges: edges, nodeTypes: nodeTypes, edgeTypes: edgeTypes },
         React.createElement(Background, { variant: BackgroundVariant.Dots, gap: 12, size: 1 }));
 };

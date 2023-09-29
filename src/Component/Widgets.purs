@@ -9,13 +9,14 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Undefined.NoProblem (Opt, fromOpt)
 import Data.Undefined.NoProblem.Closed as NoProblem
 import Effect (Effect)
+import Effect.Uncurried (EffectFn1)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Prim.Row as Row
 import React.Basic (JSX)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM.Events (preventDefault)
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (handler)
+import React.Basic.Events (SyntheticEvent, handler, handler_)
 import ReactBootstrap (overlayTrigger, tooltip)
 import ReactBootstrap.Icons (Icon)
 import ReactBootstrap.Icons as Icons
@@ -247,3 +248,17 @@ marloweStatePreview :: V1.State -> JSX
 marloweStatePreview state = DOM.div
   { className: "overflow-auto hide-vertical-scroll border border-3 rounded w-100" }
   [ marloweStateYaml state ]
+
+submitButton
+  :: { disabled :: Boolean
+     , onClick :: EffectFn1 SyntheticEvent Unit
+     }
+  -> JSX
+  -> JSX
+submitButton { disabled, onClick } label = DOM.button
+  do
+    { className: "btn btn-primary w-100 py-2"
+    , onClick: onClick
+    , disabled
+    }
+  label
