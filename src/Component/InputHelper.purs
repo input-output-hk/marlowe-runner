@@ -295,12 +295,12 @@ allInputs environment state contract =
       Right { deposits, choices, notifies }
 
 canInput
-  :: Party
-  -> Environment
+  :: Environment
   -> State
   -> Contract
+  -> Party
   -> Boolean
-canInput party environment state contract =
+canInput environment state contract party =
   case allInputs environment state contract of
     Left _ -> true
     Right { choices, deposits, notifies } -> Array.any identity $

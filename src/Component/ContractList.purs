@@ -33,7 +33,7 @@ import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (Statel
 import Control.Alt ((<|>))
 import Control.Monad.Reader.Class (asks)
 import Data.Argonaut (decodeJson, encodeJson, stringify)
-import Data.Array (catMaybes, elem, filter, null)
+import Data.Array (catMaybes, elem, filter, null, union)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.DateTime.Instant (Instant, instant)
@@ -532,58 +532,42 @@ mkContractList = do
                                 tdContractId contractId marloweInfo transactionEndpoints
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
                             , tdCentered
-                                [ -- FIXME: Usage of inputs roles doesn't exclude addresses usage. Combine these two branches into one and probably
-                                  -- simplify the check if currency symbol is `Nothing`.
-                                  case endpoints.transactions, marloweInfo, possibleWalletContext, submittedWithdrawalsInfo of
+                                [ case endpoints.transactions, marloweInfo, possibleWalletContext, submittedWithdrawalsInfo of
                                     Just transactionsEndpoint,
-                                    Just (MarloweInfo { currencySymbol: Just currencySymbol, initialContract, state: Just state, currentContract: Just contract }),
-                                    Just { balance: Cardano.Value balance },
+                                    Just (MarloweInfo { currencySymbol, initialContract, state: Just state, currentContract: Just contract }),
+                                    Just { usedAddresses, balance: Cardano.Value balance },
                                     _ -> do
                                       let
-                                        roles = getRoles $ filterCurrencySymbol currencySymbol balance
+                                        rolesInContract = case currencySymbol of
+                                          Just currencySymbol' -> listRoles $ filterCurrencySymbol currencySymbol' balance
+                                          Nothing -> mempty
+                                        parties = map V1.Role rolesInContract `union` map (V1.Address <<< bech32ToString) usedAddresses
                                       Monoid.guard
-                                        (Array.any (\role -> canInput (V1.Role role) environment state contract) roles)
+                                        (Array.any (canInput environment state contract) parties)
                                         buttonOutlinedPrimary
                                         { label: DOOM.text "Advance"
                                         , extraClassNames: "me-2"
+                                        -- , extraClassNames: "font-weight-bold btn-outline-primary"
                                         , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint { initialContract, state, contract }
                                         }
-                                    Just transactionsEndpoint,
-                                    Just (MarloweInfo { initialContract, state: Just state, currentContract: Just contract }),
-                                    Just { usedAddresses },
-                                    _ ->
-                                      Monoid.guard
-                                        (Array.any (\addr -> canInput (V1.Address $ bech32ToString addr) environment state contract) usedAddresses)
-                                        buttonOutlinedPrimary
-                                        { label: DOOM.text "Advance"
-                                        , extraClassNames: "font-weight-bold btn-outline-primary"
-                                        , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint { initialContract, state, contract }
-                                        }
-                                    _, Just (MarloweInfo { state: Nothing, currentContract: Nothing, currencySymbol: Nothing }), _, unclaimedPayouts -> DOOM.text "Complete"
+                                    _, Just (MarloweInfo { state: Nothing, currentContract: Nothing, currencySymbol: Nothing }), _, _ -> DOOM.text "Complete"
                                     _,
                                     Just (MarloweInfo { state: Nothing, currentContract: Nothing, currencySymbol: Just currencySymbol, unclaimedPayouts }),
                                     Just { balance: Cardano.Value balance },
                                     submittedPayouts /\ _ -> do
                                       let
-                                        roles = getRoles $ filterCurrencySymbol currencySymbol balance
-                                        payouts = case lookup contractId submittedPayouts of
-                                          Just s -> filter ((\(Payout { payoutId }) -> not (elem payoutId s))) unclaimedPayouts
-                                          Nothing -> unclaimedPayouts
-                                        rolesConsidered = Array.intersect roles $ map (\(Payout { role }) -> role) payouts
+                                        payouts = remainingPayouts contractId submittedPayouts unclaimedPayouts
+                                        rolesConsidered = remainingRoles currencySymbol balance payouts
                                       Monoid.guard
                                         (null rolesConsidered)
                                         DOOM.text
                                         "Complete"
                                     _, _, _, _ -> buttonOutlinedInactive { label: DOOM.text "Syncing" }
-
                                 , case marloweInfo, possibleWalletContext, submittedWithdrawalsInfo of
                                     Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just { balance: Cardano.Value balance }, submittedPayouts /\ _ -> do
                                       let
-                                        roles = getRoles $ filterCurrencySymbol currencySymbol balance
-                                        payouts = case lookup contractId submittedPayouts of
-                                          Just s -> filter ((\(Payout { payoutId }) -> not (elem payoutId s))) unclaimedPayouts
-                                          Nothing -> unclaimedPayouts
-                                        rolesConsidered = Array.intersect roles $ map (\(Payout { role }) -> role) payouts
+                                        payouts = remainingPayouts contractId submittedPayouts unclaimedPayouts
+                                        rolesConsidered = remainingRoles currencySymbol balance payouts
                                       case Array.uncons rolesConsidered of
                                         Just { head, tail } -> buttonWithIcon
                                           { icon: unsafeIcon mempty
@@ -630,5 +614,17 @@ instantFromMillis ms = instant (Duration.Milliseconds ms)
 filterCurrencySymbol :: forall a. String -> Map AssetId a -> Map AssetId a
 filterCurrencySymbol currencySymbol = Map.filterKeys $ \assetId -> Cardano.assetIdToString assetId `eq` currencySymbol
 
-getRoles :: forall a. Map AssetId a -> Array String
-getRoles = catMaybes <<< map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys
+listRoles :: forall a. Map AssetId a -> Array String
+listRoles = catMaybes <<< map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys
+
+remainingRoles :: forall a. String -> Map AssetId a -> Array Payout -> Array String
+remainingRoles currencySymbol balance payouts = do
+  let
+    roles = listRoles $ filterCurrencySymbol currencySymbol balance
+  Array.intersect roles $ map (\(Payout { role }) -> role) payouts
+
+remainingPayouts :: ContractId -> Map ContractId (Array TxOutRef) -> Array Payout -> Array Payout
+remainingPayouts contractId submittedPayouts unclaimedPayouts = do
+  case lookup contractId submittedPayouts of
+    Just s -> filter ((\(Payout { payoutId }) -> not (elem payoutId s))) unclaimedPayouts
+    Nothing -> unclaimedPayouts
