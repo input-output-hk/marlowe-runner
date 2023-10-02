@@ -70,7 +70,7 @@ in  upstream
         , "unfoldable"
         ]
         "https://github.com/input-output-hk/purescript-marlowe.git"
-        "main"
+        "fb588282974a1aac67299b6ce37c818b156e28ab"
   with typelevel-eval =
       mkPackage
         [ "bifunctors"
@@ -130,7 +130,7 @@ in  upstream
         , "unsafe-coerce"
         ]
         "https://github.com/paluh/purescript-atleast.git"
-        "main"
+        "efcb32a1708578ad6ca0f6d05ff3d0ce290eb57f"
   with polyform =
       mkPackage
         [ "js-unsafe-stringify"
@@ -298,7 +298,7 @@ in  upstream
         , "web-encoding"
         ]
         "https://github.com/input-output-hk/purescript-cardano-multiplatform-lib.git"
-        "v0.0.1"
+        "198b6fa641cdbdd2a565ebc4763a02822f398fd9"
 
   with cardano-wallet-client =
       mkPackage
