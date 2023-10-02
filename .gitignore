@@ -12,3 +12,4 @@
 .vscode
 public/app.js
 .pre-commit-config.yaml
+.spago2nix

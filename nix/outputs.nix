@@ -12,6 +12,6 @@
 
     hydraJobs.required = lib.iogx.mkHydraRequiredJob { };
 
-
+    inherit repoRoot;
   }
 ]

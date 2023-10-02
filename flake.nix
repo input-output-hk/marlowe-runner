@@ -11,6 +11,11 @@
       inputs.n2c.follows = "n2c";
     };
 
+    spago2nix = {
+      url = "github:justinwoo/spago2nix";
+      inputs.easy-purescript-nix.follows = "easyPSSrc";
+    };
+
     easyPSSrc = {
       flake = false;
       url = "github:justinwoo/easy-purescript-nix/5dcea83eecb56241ed72e3631d47e87bb11e45b9";
