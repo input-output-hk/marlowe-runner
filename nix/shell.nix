@@ -39,7 +39,7 @@ lib.iogx.mkShell {
 
   scripts.run-spago2nix = {
     group = "marlowe-runner";
-    description = "Run spago2nix to generate ./pago-packages.nix";
+    description = "Run spago2nix to generate ./spago-packages.nix";
     exec = ''
       cd "$(git rev-parse --show-toplevel)"
       ${purescript.spago2nix}/bin/spago2nix generate

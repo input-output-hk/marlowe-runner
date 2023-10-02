@@ -46,11 +46,12 @@ pkgs.stdenv.mkDerivation {
   installPhase = ''
     export HOME=$TMP
 
-    echo aaaaaaa
     cd $src
     ls -lah
     # build-spago-style --help # "./src/**/*.purs"
-    # spago -x spago.dhall  build 
+    
+    spago -x spago.dhall  build 
+
     # --purs-args '--codegen corefn,js'  -V               
     # echo aaaaaaa
     #purs-backend-es bundle-app --minify --platform=node --main Test.Main --to index.mjs  

@@ -115,6 +115,7 @@ in  upstream
         ]
         "https://github.com/purescript-codegen/purescript-js-object.git"
         "73db55f89744b032f44c9ec49804f46e3ee63ed7"
+        
   with atleast =
       mkPackage
         [ "arrays"
@@ -131,6 +132,7 @@ in  upstream
         ]
         "https://github.com/paluh/purescript-atleast.git"
         "efcb32a1708578ad6ca0f6d05ff3d0ce290eb57f"
+
   with polyform =
       mkPackage
         [ "js-unsafe-stringify"
@@ -147,6 +149,7 @@ in  upstream
         ]
         "https://github.com/purescript-polyform/polyform.git"
         "v0.9.2"
+
   with polyform-batteries-core =
       mkPackage
         [ "debug"
@@ -160,6 +163,7 @@ in  upstream
         ]
         "https://github.com/purescript-polyform/batteries-core.git"
         "v0.3.0"
+
   with polyform-batteries-urlencoded =
       mkPackage
         [ "argonaut"
@@ -173,6 +177,7 @@ in  upstream
         ]
         "https://github.com/purescript-polyform/batteries-urlencoded.git"
         "v0.4.1"
+
   with
     -- react-bootstrap = ../purescript-react-bootstrap/spago.dhall as Location
     react-bootstrap = mkPackage
@@ -190,6 +195,7 @@ in  upstream
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
       "39c055d3a3d4fadca6afba31326fdf27d315aec8"
+
   with react-basic-hooks =
       mkPackage
         [ "aff"
@@ -221,6 +227,7 @@ in  upstream
         ]
         "https://github.com/purescript-react/purescript-react-basic-hooks.git"
         "v8.2.0"
+
   with
     react-bootstrap = mkPackage
       [ "aff", "arrays", "atleast", "bifunctors", "console", "control"
@@ -237,6 +244,7 @@ in  upstream
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
       "39c055d3a3d4fadca6afba31326fdf27d315aec8"
+      
   with datetime-iso =
       mkPackage
         [ "aff"
@@ -261,6 +269,7 @@ in  upstream
         ]
         "https://github.com/paluh/purescript-datetime-iso"
         "c7b75bb16e0543687fc4c9b21c34a49cdaa22f0c"
+
   with foreign-generic =
       mkPackage
       [ "effect", "foreign", "foreign-object", "ordered-collections"

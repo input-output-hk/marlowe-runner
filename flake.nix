@@ -22,7 +22,7 @@
     };
 
     easyPSSrc = {
-      url = "github:justinwoo/easy-purescript-nix";
+      url = "github:justinwoo/easy-purescript-nix/5dcea83eecb56241ed72e3631d47e87bb11e45b9";
       flake = false;
     };
   };
