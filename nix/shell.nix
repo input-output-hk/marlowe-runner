@@ -14,6 +14,7 @@ lib.iogx.mkShell {
     # Please update spago and purescript in `package.json` `scripts` section
     purescript.purs-0_15_10
     purescript.purescript-language-server
+    purescript.purs-backend-es
     purescript.pscid
     purescript.pulp
     purescript.spago
@@ -22,11 +23,11 @@ lib.iogx.mkShell {
     pkgs.podman
     pkgs.jq
     pkgs.docker
-    pkgs.nodePackages.bower
-    pkgs.nodePackages.jshint
-    pkgs.nodePackages.yarn
-    pkgs.dhall
     pkgs.nodejs-18_x
+    pkgs.nodejs-18_x.pkgs.bower
+    pkgs.nodejs-18_x.pkgs.jshint
+    pkgs.nodejs-18_x.pkgs.yarn
+    pkgs.dhall
     pkgs.pkg-config
     pkgs.python38
   ];

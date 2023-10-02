@@ -22,8 +22,8 @@
     };
 
     easyPSSrc = {
-      url = "github:justinwoo/easy-purescript-nix/5dcea83eecb56241ed72e3631d47e87bb11e45b9";
       flake = false;
+      url = "github:justinwoo/easy-purescript-nix/5dcea83eecb56241ed72e3631d47e87bb11e45b9";
     };
   };
 
@@ -32,10 +32,9 @@
     repoRoot = ./.;
     systems = [ "x86_64-linux" "x86_64-darwin" ];
     outputs = import ./nix/outputs.nix;
-    # nixpkgsArgs.config.permittedInsecurePackages = [
-    #   "nodejs-16.20.1"
-    #   "python-2.7.18.6"
-    # ];
+    nixpkgsArgs.config.permittedInsecurePackages = [
+      "nodejs-16.20.1"
+    ];
   };
 
   nixConfig = {
@@ -48,3 +47,4 @@
     allow-import-from-derivation = true;
   };
 }
+

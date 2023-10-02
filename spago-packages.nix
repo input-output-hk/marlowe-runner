@@ -187,11 +187,11 @@ let
 
     "cardano-multiplatform-lib" = pkgs.stdenv.mkDerivation {
       name = "cardano-multiplatform-lib";
-      version = "198b6fa641cdbdd2a565ebc4763a02822f398fd9";
+      version = "3929298b6a650f15d9d270b91b4415b9b5457601";
       src = pkgs.fetchgit {
         url = "https://github.com/input-output-hk/purescript-cardano-multiplatform-lib.git";
-        rev = "198b6fa641cdbdd2a565ebc4763a02822f398fd9";
-        sha256 = "0r3265z6w1z7k1i32g7a1di0vzs1swinyi1yfx9cc32m2kssmbfl";
+        rev = "3929298b6a650f15d9d270b91b4415b9b5457601";
+        sha256 = "1dm2gg1m3yallck3x6akzjkh7b2fyd1biwr9wgyb5ylb7nwqqxx4";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";

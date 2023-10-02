@@ -45,7 +45,6 @@
     "node": "18.x"
   },
   "scripts": {
-    "postinstall": "if ! command -v purs &> /dev/null; then npm install --no-save spago@0.21.0 purescript@0.15.10; fi",
     "bundle": "spago build --config prod.dhall && webpack-cli --mode=production -c webpack.js",
     "start": "spago build && webpack-cli serve --mode=development -c webpack.js",
     "test": "node --experimental-specifier-resolution=node -e \"import('./output/Test.Main/index.js').then(function(Main) { Main.main(); })\""

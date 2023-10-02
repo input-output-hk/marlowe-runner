@@ -1,108 +1,44 @@
 { repoRoot, inputs, pkgs, ... }:
 
 let
-  npmlock2nix = import inputs.npmlock2nix { inherit pkgs; };
+
+  hackedPkgs = pkgs // {
+    nodejs-16_x = pkgs.nodejs-18_x;
+  };
+
+  npmlock2nix = import inputs.npmlock2nix { pkgs = hackedPkgs; };
 
   spagoPkgs = import (inputs.self + "/spago-packages.nix") { inherit pkgs; };
 
-  # spago-packages = inputs.spago2nix.packages.spago2nix_nativeBuildInputs {
-  #   spago-dhall = "prod.dhall";
-  #   srcs-dhall = [ ./prod.dhall ./packages.dhall ];
-  # };
-
 in
 
-pkgs.stdenv.mkDerivation {
+npmlock2nix.v2.build {
 
-  name = "marlowe-runner";
+  src = inputs.self;
 
   buildInputs = [
-    # spagoPkgs.installSpagoStyle
-    # spagoPkgs.buildSpagoStyle
-    repoRoot.nix.purescript.spago
-    repoRoot.nix.purescript.purs
+    # pkgs.nodejs-18_x
     pkgs.which
+    spagoPkgs.installSpagoStyle
+    spagoPkgs.buildSpagoStyle
+    repoRoot.nix.purescript.purs
+    repoRoot.nix.purescript.spago2nix
   ];
 
-  phases = [ "installPhase" ];
+  buildCommands = [
+    ''
+      mkdir -p dist
+      cp -r $src/* dist 
+      cd dist 
 
-  src = ./..;
+      mv prod.dhall spago.dhall
+      install-spago-style
+      build-spago-style "./src/**/*.purs"
+      export MARLOWE_WEB_SERVER_URL=http://localhost:3780
+      ${pkgs.nodejs-18_x.pkgs.webpack-cli}/bin/webpack-cli --mode=production -c webpack.js
+      ls -lah
+    ''
+  ];
 
-  # SYSTEM_CERTIFICATE_PATH = "${pkgs.cacert}/etc/ssl/certs";
-  # SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-  # NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-  # GIT_SSL_CAINFO = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-
-  # unpackPhase = ''
-  #   # cd $src
-  #   # install-spago-style
-  # '';
-
-  # configurePhase = ''
-  #   export HOME=$TMP
-
-  # '';
-
-  installPhase = ''
-    export HOME=$TMP
-
-    cd $src
-    ls -lah
-    # build-spago-style --help # "./src/**/*.purs"
-    
-    spago -x spago.dhall  build 
-
-    # --purs-args '--codegen corefn,js'  -V               
-    # echo aaaaaaa
-    #purs-backend-es bundle-app --minify --platform=node --main Test.Main --to index.mjs  
-    #node index.mjs 
-    #spago build -V --global-cache skip
-    #spago build -- --config prod.dhall --global-cache skip
-    
-    ls -lah
-    mkdir -p $out
-    # mv outputs $out/
-  '';
+  installPhase = "cp -r dist $out";
 }
-
-# npmlock2nix.v1.build {
-
-#   src = inputs.self;
-
-#   installPhase = "cp -r dist $out";
-
-#   node_modules_attrs = {
-#     # githubSourceHashMap = {
-#     #   shmish111.nearley-webpack-loader."939360f9d1bafa9019b6ff8739495c6c9101c4a1" = "1brx669dgsryakf7my00m25xdv7a02snbwzhzgc9ylmys4p8c10x";
-#     #   ankitrohatgi.tarballjs."64ea5eb78f7fc018a223207e67f4f863fcc5d3c5" = "04r9yap0ka4y3yirg0g7xb63mq7jzc2qbgswbixxj8s60k6zdqsm";
-#     # };
-#     # buildInputs = [ pkgs.python ];
-#   };
-
-#   buildInputs = [
-#     pkgs.nodejs-18_x
-#     spagoPkgs.installSpagoStyle
-#     spagoPkgs.buildSpagoStyle
-#     repoRoot.nix.purescript.purs
-#     repoRoot.nix.purescript.spago2nix
-#   ];
-
-#   unpackPhase = ''
-#     mkdir -p marlowe-runner
-#     cp -r $src/* marlowe-runner
-#     cd marlowe-runner
-#     install-spago-style
-#     cd ..
-#   '';
-
-#   buildCommands = [
-#     ''
-#       cd marlowe-runner
-#       build-spago-style \
-#         "./src/**/*.purs" \
-#         "./generated/**/*.purs"
-#       rm -rf ./dist
-#       npm run build:webpack:prod
-#     ''
-#   ];
-# }
