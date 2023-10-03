@@ -22,7 +22,6 @@ import Data.Int as Int
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Variant (Variant)
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -445,7 +444,6 @@ requestToAffAction = case _ of
             { contract, state } = marloweContext
             allInputsChoices = case nextTimeoutAdvance environment state contract of
               Just advanceContinuation -> do
-                traceM "We computed 'advance' reduction"
                 Left advanceContinuation
               Nothing -> do
                 let
@@ -462,27 +460,30 @@ requestToAffAction = case _ of
     SignTxRequest { walletInfo, tx } -> do
       let
         WalletInfo { wallet } = walletInfo
-      sign wallet tx >>= case _ of
-        Left err -> pure $ SignTxFailed $ unsafeStringify err
-        Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
+        action = sign wallet tx >>= case _ of
+          Left err -> pure $ SignTxFailed $ unsafeStringify err
+          Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
+      action `catchError` (pure <<< SignTxFailed <<< show)
   RuntimeRequest runtimeRequest -> case runtimeRequest of
     CreateTxRequest { input, environment, requiredWalletContext, serverURL, transactionsEndpoint } -> do
       let
         inputs = foldMap Array.singleton input
-      create inputs environment requiredWalletContext serverURL transactionsEndpoint >>= case _ of
-        Right res -> pure $ CreateTxSucceeded res
-        Left err -> pure $ CreateTxFailed $ show err
+        action = create inputs environment requiredWalletContext serverURL transactionsEndpoint >>= case _ of
+          Right res -> pure $ CreateTxSucceeded res
+          Left err -> pure $ CreateTxFailed $ show err
+      action `catchError` (pure <<< CreateTxFailed <<< show)
     SubmitTxRequest { txWitnessSet, createTxResponse, serverURL } -> do
-      submit txWitnessSet serverURL createTxResponse.links.transaction >>= case _ of
-        Right _ -> do
-          n <- liftEffect $ now
-          pure $ SubmitTxSucceeded n
-        Left err -> pure $ SubmitTxFailed $ show err
+      let
+        action = submit txWitnessSet serverURL createTxResponse.links.transaction >>= case _ of
+          Right _ -> do
+            n <- liftEffect $ now
+            pure $ SubmitTxSucceeded n
+          Left err -> pure $ SubmitTxFailed $ show err
+      action `catchError` (pure <<< SubmitTxFailed <<< show)
 
 driver :: Env -> State -> Maybe (Aff Action)
 driver env state = do
   request <- nextRequest env state
-  traceM $ unsafeStringify request
   pure $ requestToAffAction request
 
 -- Lower level helpers

@@ -259,17 +259,20 @@ requestToAffAction = case _ of
           , rolesConfig
           , walletAddresses: reqWalletContext
           }
-      liftAff $ create contractData serverURL root >>= case _ of
-        Right res -> pure $ CreateTxSucceeded res
-        Left err -> pure $ CreateTxFailed $ show err
+        action = liftAff $ create contractData serverURL root >>= case _ of
+          Right res -> pure $ CreateTxSucceeded res
+          Left err -> pure $ CreateTxFailed $ show err
+      action `catchError` \err -> pure $ CreateTxFailed $ show err
     SubmitTxRequest { txWitnessSet, createTxResponse, runtime } -> do
       let
         Runtime { serverURL } = runtime
-      liftAff $ submit txWitnessSet serverURL createTxResponse.links.contract >>= case _ of
-        Right _ -> do
-          now <- liftEffect $ Instant.now
-          pure $ SubmitTxSucceeded now
-        Left err -> pure $ SubmitTxFailed $ show err
+        action = liftAff $ submit txWitnessSet serverURL createTxResponse.links.contract >>= case _ of
+          Right _ -> do
+            now <- liftEffect $ Instant.now
+            pure $ SubmitTxSucceeded now
+          Left err -> pure $ SubmitTxFailed $ show err
+      action `catchError` \err ->
+        pure $ SubmitTxFailed $ show err
 
 driver :: Env -> State -> Maybe (Aff Action)
 driver env state = do
