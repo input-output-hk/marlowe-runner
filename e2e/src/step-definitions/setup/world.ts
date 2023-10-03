@@ -52,7 +52,23 @@ export class ScenarioWorld extends World {
     const browser = await browserType.launch({
       devtools: process.env.DEVTOOLS !== 'false',
       headless: process.env.HEADLESS !== 'false',
-      args: ['--disable-web-security', '--disable-features=IsolateOrigins, site-per-process', '--window-size=1920,1080'],
+      args: [
+          '--no-sandbox',
+          '--disable-gpu',
+          '--disable-notifications',
+          '--enable-automation',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--disable-extensions-except=/tmp/lace/dist/',
+          '--load-extension=/tmp/lace/dist/',
+          '--disable-web-security',
+          '--allow-insecure-localhost',
+          '--window-size=1920,1080',
+          '--allow-file-access-from-files',
+          '--disable-dev-shm-usage',
+          '--remote-allow-origins=*',
+          '--disable-features=IsolateOrigins, site-per-process'
+        ]
     })
 
     return browser;
