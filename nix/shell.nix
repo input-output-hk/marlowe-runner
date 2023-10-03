@@ -6,9 +6,17 @@ let
   easyPS = pkgs.callPackage inputs.easyPSSrc { inherit pkgs; };
 in
 {
-  # name = "nix-shell";
-  # prompt = "$ ";
+  name = "marlowe-runner";
   welcomeMessage = "Marlowe Runner";
+
+  env = {
+    PLAYWRIGHT_BROWSERS_PATH =
+      lib.optionalString (system == "x86_64-linux")
+        "${repoRoot.nix.playwright}";
+
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "true";
+  };
+
   packages = [
     pkgs.podman
     # Please update spago and purescript in `package.json` `scripts` section
@@ -28,8 +36,7 @@ in
     pkgs.pkg-config
     pkgs.python38
   ];
-  # scripts = { };
-  # env = { };
+
   enterShell = ''
     npm install
     NODE_OPTIONS="--experimental-fetch --trace-warnings"

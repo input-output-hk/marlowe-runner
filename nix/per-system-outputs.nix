@@ -4,11 +4,13 @@
 { iogxRepoRoot, repoRoot, inputs, inputs', pkgs, system, lib, projects ? null, ... }:
 
 {
-# packages = { };
-# checks = { };
-# apps = { };
-# operables = { };
-# oci-images = { };
-# nomadTasks = { };
-# foobar = { };
+  playwright = lib.optionalAttrs (system == "x86_64-linux") repoRoot.nix.playwright;
+
+  # packages = { };
+  # checks = { };
+  # apps = { };
+  # operables = { };
+  # oci-images = { };
+  # nomadTasks = { };
+  # foobar = { };
 }
