@@ -5,10 +5,16 @@ let
   purescript = repoRoot.nix.purescript;
 
 in
-
 lib.iogx.mkShell {
 
   name = "marlowe-runner";
+  env = {
+    PLAYWRIGHT_BROWSERS_PATH =
+      lib.optionalString (system == "x86_64-linux")
+        "${repoRoot.nix.playwright}";
+
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "true";
+  };
 
   packages = [
     # Please update spago and purescript in `package.json` `scripts` section
