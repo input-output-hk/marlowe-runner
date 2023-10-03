@@ -1,0 +1,49 @@
+{{- range .Values.networks }}
+---
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: marlowe-runner-{{ . }}
+  namespace: marlowe-production
+spec:
+  components:
+    - name: marlowe-runner-{{ . }}
+      properties:
+        env:
+          - name: MARLOWE_WEB_SERVER_URL
+            value: https://marlowe-runtime-{{ . }}-web.scdev.aws.iohkdev.io
+        image: ghcr.io/input-output-hk/marlowe-runner:b2ddafc
+        imagePullPolicy: IfNotPresent
+        ports:
+          - expose: true
+            port: 8080
+            protocol: TCP
+      traits:
+        - properties:
+            replicas: 1
+          type: scaler
+        - properties:
+            domains:
+              - runner-{{ . }}.scdev.aws.iohkdev.io
+            rules:
+              - port: 8080
+                serviceName: marlowe-runner-{{ . }}
+          type: https-route
+      type: webservice
+  policies:
+    - name: marlowe-runner
+      properties:
+        clusters:
+          - local
+        namespace: marlowe-production
+      type: topology
+  workflow:
+    steps:
+      - type: deploy
+        meta:
+          alias: Deploy marlowe-runner
+        name: marlowe-runner
+        properties:
+          policies:
+            - marlowe-runner
+{{- end }}

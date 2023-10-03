@@ -1,0 +1,7 @@
+apiVersion: v2
+name: marlowe-runner
+version: v1.0.0
+description: A simple web app which allows you to deploy and progress through Marlowe contracts on Cardano easily from the browser.
+home: https://runner.marlowe.iohk.io
+sources:
+  - https://github.com/input-output-hk/marlowe-runner
