@@ -49,7 +49,7 @@ npmlock2nix.v2.build {
     # spago.dhall by default and there doesn't seem to be a way to override it.
     "mv prod.dhall spago.dhall"
     "install-spago-style"
-    "build-spago-style ./src/**/*.purs"
+    "build-spago-style \"./src/**/*.purs\""
 
     # This will create the public/*bundle.js* and public/*.module.wasm files.   
     "webpack-cli --mode=production -c webpack.js"

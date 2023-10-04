@@ -13,6 +13,7 @@
 
     spago2nix = {
       url = "github:justinwoo/spago2nix";
+      inputs.easy-purescript-nix.follows = "easyPSSrc";
     };
 
     npmlock2nix = {
