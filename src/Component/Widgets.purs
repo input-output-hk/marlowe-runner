@@ -16,7 +16,7 @@ import React.Basic (JSX)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM.Events (preventDefault)
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (SyntheticEvent, handler, handler_)
+import React.Basic.Events (SyntheticEvent, handler)
 import ReactBootstrap (overlayTrigger, tooltip)
 import ReactBootstrap.Icons (Icon)
 import ReactBootstrap.Icons as Icons
@@ -148,26 +148,19 @@ buttonWithIcon provided = do
     , label
     ]
 
---   newContractButton = buttonWithIcon
---     { icon: unsafeIcon "h5 me-1"
---     , label: DOOM.text "Create a contract"
---     , extraClassNames: "font-weight-bold me-2 btn-outline-primary background-color-primary-light background-color-primary-hover"
---     , disabled
---     , onClick: do
---         readRef possibleModalActionRef >>= case _ of
---           Nothing -> setModalAction (NewContract Nothing)
---           _ -> pure unit
---     }
-
+-- This is a strange naming convention - mixture of theming and particular use case.
+-- I'm not able to do any better right now.
 data OutlineColoring
-  = OutlinePrimaryColoring
-  | OutlineInactiveColoring -- We use this for syncing etc.
+  = OutlinePrimaryColoring -- We use this for `Advance`
+  | OutlineInactiveColoring -- We use this for `Syncing`
+  | OutlineWithdrawColoring -- We use this for `Withdraw`
 
 outlineColoringToClassName :: OutlineColoring -> String
 outlineColoringToClassName = case _ of
-  OutlinePrimaryColoring -> "btn-outline-primary background-color-primary-light background-color-primary-hover"
+  OutlinePrimaryColoring -> "btn-outline-primary background-color-primary-light background-color-primary-hover font-color-white-hover"
   -- { className: "border border-dark rounded bg-white text-dark d-inline-block py-1 px-3 fw-bold" }
   OutlineInactiveColoring -> "border-dark text-darg bg-secondary"
+  OutlineWithdrawColoring -> "btn-outline-danger color-withdrawal color-withdrawal-hover background-color-withdrawal-light background-color-withdrawal-hover"
 
 type ButtonOutlinedProps =
   { coloring :: OutlineColoring
@@ -222,6 +215,19 @@ buttonOutlinedInactive props = do
   let
     props' :: { coloring :: OutlineColoring | props }
     props' = Record.insert (Proxy :: Proxy "coloring") OutlineInactiveColoring props
+  buttonOutlined props'
+
+buttonOutlinedWithdraw
+  :: forall props
+   . NoProblem.Coerce { coloring :: OutlineColoring | props } ButtonOutlinedProps
+  => Row.Lacks "coloring" props
+  => Row.Cons "coloring" OutlineColoring props (coloring :: OutlineColoring | props)
+  => { | props }
+  -> JSX
+buttonOutlinedWithdraw props = do
+  let
+    props' :: { coloring :: OutlineColoring | props }
+    props' = Record.insert (Proxy :: Proxy "coloring") OutlineWithdrawColoring props
   buttonOutlined props'
 
 data SpinnerOverlayHeight = Spinner100VH | SpinnerHeight100Percent

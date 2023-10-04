@@ -19,7 +19,7 @@ import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(..)
 import Component.Types.ContractInfo (MarloweInfo(..), SomeContractInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (buttonOutlinedInactive, buttonOutlinedPrimary, buttonWithIcon)
+import Component.Widgets (buttonOutlinedWithdraw, buttonOutlinedInactive, buttonOutlinedPrimary, buttonWithIcon)
 import Component.Withdrawals as Withdrawals
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
@@ -545,7 +545,7 @@ mkContractList = do
                                         (Array.any (canInput environment state contract) parties)
                                         buttonOutlinedPrimary
                                         { label: DOOM.text "Advance"
-                                        , extraClassNames: "me-2"
+                                        -- , extraClassNames: "me-2"
                                         -- , extraClassNames: "font-weight-bold btn-outline-primary"
                                         , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint { initialContract, state, contract }
                                         }
@@ -570,11 +570,9 @@ mkContractList = do
                                         rolesConsidered = remainingRoles currencySymbol balance payouts
 
                                       case Array.uncons rolesConsidered of
-                                        Just { head, tail } -> buttonWithIcon
-                                          { icon: unsafeIcon mempty
-                                          , label: DOOM.text "Withdraw"
-                                          , extraClassNames: "font-weight-bold me-2 btn-outline-warning"
-                                          , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                        Just { head, tail } -> buttonOutlinedWithdraw
+                                          { label: DOOM.text "Withdraw"
+                                          -- , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
                                           , onClick: case tail of
                                               [] -> pure unit
                                               _ -> setModalAction $ Withdrawal walletContext (NonEmptyArray.cons' head tail) contractId payouts

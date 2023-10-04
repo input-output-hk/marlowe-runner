@@ -209,6 +209,22 @@ $link-color: #511CF7;
   background-color: $primary;
 }
 
+.color-withdrawal {
+  color: #E8740A !important;
+}
+
+.color-withdrawal-hover:hover {
+  color: white !important;
+}
+
+.background-color-withdrawal-light {
+  background-color: #FFFCF9 !important;
+}
+
+.background-color-withdrawal-hover:hover {
+  background-color: #E8740A !important;
+}
+
 .background-color-primary-hover:hover {
   background-color: $primary !important;
 }
