@@ -207,7 +207,9 @@ mkApp = do
     useAff changeAddress $ case usedAddresses, tokens of
       [], [] -> do
         liftEffect $ React.writeRef updateStreamingQueryParamsRef (const $ pure unit)
-        liftEffect $ updateContractInfoMap (const (ContractInfoMap.uninitialized slotting /\ true))
+        let
+          initialized = isJust possibleWalletContext
+        liftEffect $ updateContractInfoMap (const (ContractInfoMap.uninitialized slotting /\ initialized))
       _, _ -> do
         let
           reqInterval = RequestInterval (Milliseconds 50.0)

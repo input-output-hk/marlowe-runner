@@ -561,7 +561,7 @@ mkContractList = do
                                         (null rolesConsidered)
                                         DOOM.text
                                         "Complete"
-                                    _, _, _, _ -> buttonOutlinedInactive { label: DOOM.text "Syncing (CI)" }
+                                    _, _, _, _ -> buttonOutlinedInactive { label: DOOM.text "Syncing" }
                                 , case marloweInfo, possibleWalletContext, submittedWithdrawalsInfo of
                                     Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just walletContext, submittedPayouts /\ _ -> do
                                       let
@@ -588,7 +588,7 @@ mkContractList = do
                             , tdInstant $ updatedAt <|> createdAt
                             , tdContractId contractId Nothing []
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing (CC)" } ]
+                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
                             ]
                           NotSyncedUpdatedContract { contractInfo } -> do
                             [ tdInstant createdAt
@@ -599,7 +599,7 @@ mkContractList = do
                                   transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
                                 tdContractId contractId Nothing transactionEndpoints
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing (UC)" } ]
+                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
                             ]
           ]
         _, _, _ -> mempty
