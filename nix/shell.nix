@@ -33,12 +33,7 @@ lib.iogx.mkShell {
     pkgs.python38
   ];
 
-  shellHook = ''
-    # NODE_OPTIONS="--experimental-fetch --trace-warnings"
-    # export PATH="$PATH:./node_modules/.bin/:./bin"
-  '';
-
-  scripts.run-spago2nix = {
+  scripts.gen-spago-packages-nix = {
     group = "marlowe-runner";
     description = "Run spago2nix to generate ./spago-packages.nix";
     exec = ''

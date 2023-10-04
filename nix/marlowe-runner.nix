@@ -30,7 +30,6 @@ npmlock2nix.v2.build {
   ];
 
   buildInputs = [
-    pkgs.which
     spagoPkgs.installSpagoStyle
     spagoPkgs.buildSpagoStyle
     repoRoot.nix.purescript.purs-0_15_10
@@ -38,19 +37,24 @@ npmlock2nix.v2.build {
   ];
 
   buildCommands = [
-    ''
-      mkdir -p dist
-      cp -r $src/* dist 
-      chmod -R u+w dist       
-      cd dist 
+    "mkdir -p dist"
+    "cp -r $src/* dist"
 
-      mv prod.dhall spago.dhall
-      install-spago-style
-      build-spago-style "./src/**/*.purs"
-      webpack-cli --mode=production -c webpack.js
-      cd ..
-    ''
+    # webpack-cli will want to write file to dist/public, so we need perissions.     
+    "chmod -R u+w dist"
+
+    "cd dist"
+
+    # We want to use prod.dhall, but `install-spago-style` below uses 
+    # spago.dhall by default and there doesn't seem to be a way to override it.
+    "mv prod.dhall spago.dhall"
+    "install-spago-style"
+    "build-spago-style ./src/**/*.purs"
+
+    # This will create the public/*bundle.js* and public/*.module.wasm files.   
+    "webpack-cli --mode=production -c webpack.js"
   ];
 
-  installPhase = "cp -r dist/public $out";
+  # The output of the nix build is the contents of the ./public folder 
+  installPhase = "cp -r public $out";
 }

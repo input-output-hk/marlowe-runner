@@ -58,6 +58,17 @@ If you would like to use optimzed bundle of the project you can run t:
 MARLOWE_WEB_SERVER_URL="http://localhost:3780" npm run bundle
 ```
 
+## Building with Nix 
+
+You can build the static site with Nix using:
+```nix 
+nix build .#marlowe-runner
+```
+
+Whenever you make changes to your `spago` packages, you must run the 
+`gen-spago-packages-nix` script (available inside the `nix develop` shell) to 
+recreate `spago-packages.nix`.
+
 ### Troubleshooting
 
 Ensure that:
