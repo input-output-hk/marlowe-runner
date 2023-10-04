@@ -112,8 +112,9 @@ $link-color: #511CF7;
     display: flex !important;
   }
   button.active {
-    font-weight: bold;
-    border: 2px solid #000 !important;
+    text-shadow: 0 0 1px black !important;
+    box-shadow: 0 0 2px black !important;
+    border: 1px solid #000 !important;
     opacity: 1 !important;
   }
   button.disabled {
