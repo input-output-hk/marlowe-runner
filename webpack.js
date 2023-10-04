@@ -19,6 +19,7 @@ function getWebServerUrl() {
   }
 };
 
+
 export default function(_env, argv) {
   const develMode = argv.mode == "development";
   const webServerUrl = getWebServerUrl();

@@ -27,14 +27,15 @@ lib.iogx.mkShell {
     pkgs.nodejs-18_x.pkgs.bower
     pkgs.nodejs-18_x.pkgs.jshint
     pkgs.nodejs-18_x.pkgs.yarn
+    pkgs.nodejs-18_x.pkgs.webpack-cli
     pkgs.dhall
     pkgs.pkg-config
     pkgs.python38
   ];
 
   shellHook = ''
-    NODE_OPTIONS="--experimental-fetch --trace-warnings"
-    export PATH="$PATH:./node_modules/.bin/:./bin"
+    # NODE_OPTIONS="--experimental-fetch --trace-warnings"
+    # export PATH="$PATH:./node_modules/.bin/:./bin"
   '';
 
   scripts.run-spago2nix = {

@@ -211,9 +211,9 @@ services:
     - 3780:3780
 
   marlowe-runner:
-    image: docker.io/bwbush/marlowe-runner:latest
+    image: ghcr.io/input-output-hk/marlowe-runner:latest
     environment:
-    - MARLOWE_RT_WEBSERVER_URL=${MARLOWE_RT_WEBSERVER_URL:?err}
+    - MARLOWE_WEBSERVER_URL=${MARLOWE_WEBSERVER_URL:?err}
     depends_on:
       - web-server
     ports:

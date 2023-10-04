@@ -30,6 +30,7 @@ npmlock2nix.v2.build {
   ];
 
   buildInputs = [
+    pkgs.which
     spagoPkgs.installSpagoStyle
     spagoPkgs.buildSpagoStyle
     repoRoot.nix.purescript.purs-0_15_10
@@ -46,6 +47,7 @@ npmlock2nix.v2.build {
       mv prod.dhall spago.dhall
       install-spago-style
       build-spago-style "./src/**/*.purs"
+      echo '{ "marloweWebServerUrl": "https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io", "develMode": false }' > public/config.json
       webpack-cli --mode=production -c webpack.js
       cd ..
     ''
