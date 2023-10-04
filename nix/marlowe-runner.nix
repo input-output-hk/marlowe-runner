@@ -47,7 +47,6 @@ npmlock2nix.v2.build {
       mv prod.dhall spago.dhall
       install-spago-style
       build-spago-style "./src/**/*.purs"
-      echo '{ "marloweWebServerUrl": "https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io", "develMode": false }' > public/config.json
       webpack-cli --mode=production -c webpack.js
       cd ..
     ''
