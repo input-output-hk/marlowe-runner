@@ -1,12 +1,8 @@
-{ repoRoot, inputs, pkgs, ... }:
+{ repoRoot, inputs, pkgs, lib, system }:
 
 let
 
-  hackedPkgs = pkgs // {
-    nodejs-16_x = pkgs.nodejs-18_x;
-  };
-
-  npmlock2nix = import inputs.npmlock2nix { pkgs = hackedPkgs; };
+  npmlock2nix = import inputs.npmlock2nix { inherit pkgs; };
 
   spagoPkgs = import (inputs.self + "/spago-packages.nix") { inherit pkgs; };
 
@@ -14,10 +10,26 @@ in
 
 npmlock2nix.v2.build {
 
-  src = inputs.self;
+  nodejs = pkgs.nodejs-18_x;
+
+  src = lib.sourceByRegex ../. [
+    "^prototype.*"
+    "^public.*"
+    "^src.*"
+    "^test.*"
+    "^.tidyrc.json$"
+    "^jsconfig.json$"
+    "^package-lock.json$"
+    "^package.json$"
+    "^packages.dhall$"
+    "^prod.dhall$"
+    "^spago-packages.nix$"
+    "^spago.dhall$"
+    "^tsconfig.json$"
+    "^webpack.js$"
+  ];
 
   buildInputs = [
-    # pkgs.nodejs-18_x
     pkgs.which
     spagoPkgs.installSpagoStyle
     spagoPkgs.buildSpagoStyle
@@ -35,8 +47,7 @@ npmlock2nix.v2.build {
       install-spago-style
       build-spago-style "./src/**/*.purs"
       export MARLOWE_WEB_SERVER_URL=http://localhost:3780
-      ${pkgs.nodejs-18_x.pkgs.webpack-cli}/bin/webpack-cli --mode=production -c webpack.js
-      ls -lah
+      webpack-cli --mode=production -c webpack.js
     ''
   ];
 
