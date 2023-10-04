@@ -883,11 +883,11 @@ let
 
     "marlowe-runtime-client" = pkgs.stdenv.mkDerivation {
       name = "marlowe-runtime-client";
-      version = "v0.0.6";
+      version = "v0.0.7";
       src = pkgs.fetchgit {
         url = "https://github.com/input-output-hk/purescript-marlowe-runtime-client.git";
-        rev = "601d5ce7e6b30c1701e3fad388bdaad41391180d";
-        sha256 = "0p550r9wiql491w6j2yn0kp4lfbfynsf1hh16l48hp1kry19qrvs";
+        rev = "342455d9a8450187358d6bd89e85df85a5984663";
+        sha256 = "1wwp114ffj0jbhqjkqgg56l7bi9cy0rhvpsc731ja218frds2xk6";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";

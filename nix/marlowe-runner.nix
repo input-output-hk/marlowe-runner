@@ -30,10 +30,9 @@ npmlock2nix.v2.build {
   ];
 
   buildInputs = [
-    pkgs.which
     spagoPkgs.installSpagoStyle
     spagoPkgs.buildSpagoStyle
-    repoRoot.nix.purescript.purs
+    repoRoot.nix.purescript.purs-0_15_10
     repoRoot.nix.purescript.spago2nix
   ];
 
@@ -41,15 +40,16 @@ npmlock2nix.v2.build {
     ''
       mkdir -p dist
       cp -r $src/* dist 
+      chmod -R u+w dist       
       cd dist 
 
       mv prod.dhall spago.dhall
       install-spago-style
       build-spago-style "./src/**/*.purs"
-      # export MARLOWE_WEB_SERVER_URL=http://localhost:3780
       webpack-cli --mode=production -c webpack.js
+      cd ..
     ''
   ];
 
-  installPhase = "cp -r dist $out";
+  installPhase = "cp -r dist/public $out";
 }
