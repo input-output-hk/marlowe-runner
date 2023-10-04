@@ -102,7 +102,6 @@ $link-color: #511CF7;
     background: #FFF !important;
     border: 1px solid #000 !important;
     color: #000 !important;
-    opacity: 0.5 !important;
 
     /* box shadow */
     box-shadow: 0px 2px 2px 0px rgba(205, 205, 205, 0.25) !important;
@@ -113,7 +112,11 @@ $link-color: #511CF7;
     display: flex !important;
   }
   button.active {
+    font-weight: bold;
     opacity: 1 !important;
+  }
+  button.disabled {
+    opacity: 0.5 !important;
   }
 }
 
