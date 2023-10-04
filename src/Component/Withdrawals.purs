@@ -21,10 +21,8 @@ import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int (fromString)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (un)
 import Data.Time.Duration (Seconds(..))
 import Data.Traversable (for_)
-import Data.Tuple (snd)
 import Data.Validation.Semigroup (V(..))
 import Data.Variant (Variant)
 import Debug (traceM)
@@ -39,31 +37,28 @@ import React.Basic (fragment)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (JSX, component, useContext, (/\))
+import React.Basic.Hooks (JSX, component, (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
 
 type Props =
-  { inModal :: Boolean
-  , onDismiss :: Effect Unit
+  { onDismiss :: Effect Unit
   , onSuccess :: WithdrawalEndpoint -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
-  , withdrawalsEndpoint :: WithdrawalsEndpoint
   , roles :: NonEmptyArray String
   , unclaimedPayouts :: Array Payout
   , updateSubmitted :: TxOutRef -> Effect Unit
+  , walletContext :: WalletContext
   }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   Runtime runtime <- asks _.runtime
   modal <- liftEffect mkModal
-  walletInfoCtx <- asks _.walletInfoCtx
 
-  liftEffect $ component "Withdrawal" \{ connectedWallet, onSuccess, onDismiss, inModal, roles, withdrawalsEndpoint, unclaimedPayouts, updateSubmitted } -> React.do
-    possibleWalletContext <- useContext walletInfoCtx <#> map (un WalletContext <<< snd)
+  liftEffect $ component "Withdrawal" \props@{ connectedWallet, onSuccess, onDismiss, roles, unclaimedPayouts, updateSubmitted } -> React.do
 
     let
       choices = RadioButtonFieldChoices do
@@ -71,6 +66,7 @@ mkComponent = do
         { switch: true
         , choices: ArrayAL.fromNonEmptyArray (mapWithIndex toRole roles)
         }
+      WalletContext { changeAddress, usedAddresses } = props.walletContext
 
       rolesMap = Map.fromFoldableWithIndex roles
       formSpec = evalBuilder Nothing $ ado
@@ -83,9 +79,9 @@ mkComponent = do
         in { role }
 
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
-      onSubmit = _.result >>> case _, possibleWalletContext of
+      onSubmit = _.result >>> case _ of
 
-        Just (V (Right { role: selectedRole }) /\ _), Just { changeAddress, usedAddresses } -> do
+        Just (V (Right { role: selectedRole }) /\ _) -> do
           let
             payouts = filter (\(Payout { role }) -> role == selectedRole) unclaimedPayouts
             withdrawalContext = WithdrawalContext
@@ -93,7 +89,7 @@ mkComponent = do
               , payouts
               }
           launchAff_ $ do
-            withdrawal withdrawalContext runtime.serverURL runtime.withdrawalsEndpoint >>= case _ of
+            withdraw withdrawalContext runtime.serverURL runtime.withdrawalsEndpoint >>= case _ of
               Right { resource: PostWithdrawalsResponseContent res, links: { withdrawal: withdrawalEndpoint } } -> do
                 let
                   { tx } = res
@@ -118,7 +114,7 @@ mkComponent = do
           traceM unclaimedPayouts
           for_ payouts $ \(Payout { payoutId }) -> updateSubmitted payoutId
           pure unit
-        _, _ -> do
+        _ -> do
           -- Rather improbable path because we disable submit button if the form is invalid
           traceM "withdrawal error"
           pure unit
@@ -161,7 +157,7 @@ newtype WithdrawalContext = WithdrawalContext
   , payouts :: Array Payout
   }
 
-withdrawal (WithdrawalContext ctx) serverURL withdrawalsEndpoint = do
+withdraw (WithdrawalContext ctx) serverURL withdrawalsEndpoint = do
   let
     req = PostWithdrawalsRequest
       { payouts: map (\(Payout { payoutId }) -> payoutId) ctx.payouts

@@ -1,5 +1,5 @@
 module Component.Types.ContractInfoMap
-  ( ContractInfoMap
+  ( ContractInfoMap(..)
   , insertContractCreated
   , insertContractUpdated
   , updateSynced
@@ -147,9 +147,7 @@ updateSynced possiblySynced contractInfoMap = do
       ContractInfoMap { contractsSources } -> theseLeft contractsSources
     slotting = contractInfoMapSlotting contractInfoMap
 
-    syncedKeys = fromMaybe mempty do
-      synced <- possiblySynced
-      pure $ Map.keys synced
+    syncedKeys = fromMaybe mempty $ Map.keys <$> possiblySynced
 
     possiblyNotSyncedYet' = do
       NotSyncedYet { created, updated } <- possiblyNotSyncedYet

@@ -2,7 +2,7 @@ module Component.App where
 
 import Prelude
 
-import Cardano (AssetId(..), NonAdaAssets(..), nonAdaAssets)
+import Cardano as C
 import CardanoMultiplatformLib (bech32ToString)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
@@ -12,18 +12,16 @@ import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
-import Component.Types.ContractInfo (MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
-import Component.Types.ContractInfo as ContractInfo
+import Component.Types.ContractInfo (SomeContractInfo)
+import Component.Types.ContractInfo (ContractCreated(..), ContractUpdated(..)) as ContractInfo
 import Component.Types.ContractInfoMap as ContractInfoMap
 import Component.Widgets (link, linkWithIcon)
-import Contrib.Cardano (Slotting, slotToTimestamp)
 import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Loops (untilJust)
 import Control.Monad.Reader.Class (asks)
 import Data.Array ((..))
 import Data.Array as Array
-import Data.DateTime.Instant (Instant)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.List as List
@@ -33,27 +31,24 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Newtype as Newtype
-import Data.Profunctor.Strong ((&&&))
 import Data.String.Extra as String
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
-import Data.Tuple (uncurry)
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Foreign.Internal.Stringify (unsafeStringify)
-import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
-import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsMap, ContractWithTransactionsStream(..), MaxPages(..), PollingInterval(..), RequestInterval(..))
+import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsStream(..), PollingInterval(..), RequestInterval(..))
 import Marlowe.Runtime.Web.Streaming as Streaming
-import Marlowe.Runtime.Web.Types (BlockHeader(..), BlockNumber(..), ContractHeader(..), PolicyId(..), Runtime(..))
+import Marlowe.Runtime.Web.Types (Runtime(..))
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX)
 import React.Basic as ReactContext
 import React.Basic.DOM (img, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (component, provider, readRef, useState, useState')
+import React.Basic.Hooks (component, provider, readRef, useEffect, useState, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import ReactBootstrap.Icons (unsafeIcon)
@@ -115,14 +110,6 @@ derive instance Eq DisplayOption
 
 type ContractInfoMap = Map Runtime.ContractId SomeContractInfo
 
--- On the app level we keep the previous wallet context
--- so we can reuse pieces of contract info from the previous
--- state in a safe manner.
-newtype AppContractInfoMap = AppContractInfoMap
-  { walletContext :: Maybe WalletContext
-  , map :: ContractInfoMap
-  }
-
 type Props =
   { possibleInitialContract :: Maybe ContractJsonString
   , setPage :: Page -> Effect Unit
@@ -159,8 +146,6 @@ mkApp = do
 
     (possibleSyncFn /\ setSyncFn) <- useState' Nothing
 
-    (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
-
     submittedWithdrawalsInfo <- React.do
       submit /\ updateSubmit <- useState (Map.empty :: Map Runtime.ContractId (Array Runtime.TxOutRef))
       let
@@ -170,23 +155,25 @@ mkApp = do
       -- add a sync loop here
       pure (submit /\ addAndSync)
 
+    (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
+
     let
       notSyncedYetInserts = NotSyncedYetInserts do
         let
           -- FIXME: Make this loop a bit smarter and after some time stop trying and notify
           -- the user that we give up.
-          resyncLoop contractId = case possibleSyncFn of
-            Nothing -> pure unit
-            Just sync -> for_ (1 .. 60) \_ -> do
-              delay (Milliseconds 5000.0)
-              sync contractId `catchError` \err -> do
-                liftEffect $ logger $ unsafeStringify err
-                pure unit
+          resyncLoop contractId =
+            for_ possibleSyncFn \sync ->
+              for_ (1 .. 30) \_ -> do
+                delay (Milliseconds 5000.0)
+                sync contractId `catchError` \err -> do
+                  liftEffect $ logger $ unsafeStringify err
+                  pure unit
 
           add :: ContractInfo.ContractCreated -> Effect Unit
           add cc@(ContractInfo.ContractCreated { contractId }) = do
             launchAff_ $ resyncLoop contractId
-            updateContractInfoMap $ \(contractMap /\ initialized) -> do
+            updateContractInfoMap $ \(contractMap /\ initialized) ->
               ContractInfoMap.insertContractCreated cc contractMap /\ initialized
 
           update :: ContractInfo.ContractUpdated -> Effect Unit
@@ -197,40 +184,61 @@ mkApp = do
 
         { add, update }
 
-    let
       walletCtx = un WalletContext <$> possibleWalletContext
+      changeAddress = _.changeAddress <$> walletCtx
 
-    useAff ((_.usedAddresses &&& _.changeAddress) <$> walletCtx) $
-      case walletCtx of
-        Just ctx -> do
-          let
-            tokens = map (uncurry AssetId) <<< Array.fromFoldable <<< Map.keys <<< un NonAdaAssets <<< nonAdaAssets $ ctx.balance
-            reqInterval = RequestInterval (Milliseconds 50.0)
-            pollInterval = PollingInterval (Milliseconds 60_000.0)
-            filterContracts getContractResponse = case un ContractHeader getContractResponse.resource of
-              { block: Nothing } -> true
-              { block: Just (BlockHeader { blockNo: BlockNumber blockNo }) } -> blockNo > 909000 -- 904279
-            maxPages = Just (MaxPages 1)
-            params = { partyAddresses: ctx.usedAddresses, partyRoles: tokens, tags: [] }
+      usedAddresses = fromMaybe [] $ _.usedAddresses <$> walletCtx
+      tokens = fromMaybe [] do
+        { balance } <- walletCtx
+        let
+          C.Value valueMap = balance
+        pure $ Array.filter (not <<< eq C.AdaAssetId) $ Array.fromFoldable $ Map.keys valueMap
 
-          ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions pollInterval reqInterval params filterContracts maxPages runtime.serverURL
+    -- Whenever we get a new token in the wallet or new address we update the query params
+    -- which are used to filter the contracts in the streaming thread.
+    updateStreamingQueryParamsRef <- React.useRef (const $ pure unit)
+    useEffect (usedAddresses /\ tokens) do
+      let
+        params = { partyAddresses: usedAddresses, partyRoles: tokens, tags: [] }
+      updateQueryParams <- React.readRef updateStreamingQueryParamsRef
+      updateQueryParams params
+      pure $ pure unit
 
-          supervise do
-            void $ forkAff do
-              _ <- contractStream.getState
-              liftEffect $ updateContractInfoMap \(contractMap /\ _) -> (contractMap /\ true)
+    useAff changeAddress $ case usedAddresses, tokens of
+      [], [] -> do
+        liftEffect $ React.writeRef updateStreamingQueryParamsRef (const $ pure unit)
+        liftEffect $ updateContractInfoMap (const (ContractInfoMap.uninitialized slotting /\ true))
+      _, _ -> do
+        let
+          reqInterval = RequestInterval (Milliseconds 50.0)
+          pollInterval = PollingInterval (Milliseconds 60_000.0)
+          params = { partyAddresses: usedAddresses, partyRoles: tokens, tags: [] }
 
-            void $ forkAff do
-              untilJust do
-                newSynced <- liftEffect $ contractStream.getLiveState
-                liftEffect $ updateContractInfoMap \(contractMap /\ initialized) ->
-                  (ContractInfoMap.updateSynced (Just newSynced) contractMap) /\ initialized
-                delay (Milliseconds 1_000.0)
-                pure Nothing
+        ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions
+          pollInterval
+          reqInterval
+          params
+          (const true)
+          Nothing
+          runtime.serverURL
 
-            liftEffect $ setSyncFn (Just contractStream.sync)
-            contractStream.start
-        Nothing -> pure unit
+        liftEffect $ React.writeRef updateStreamingQueryParamsRef $ contractStream.updateQueryParams
+
+        supervise do
+          void $ forkAff do
+            _ <- contractStream.getState
+            liftEffect $ updateContractInfoMap \(contractMap /\ _) -> (contractMap /\ true)
+
+          void $ forkAff do
+            untilJust do
+              newSynced <- liftEffect $ contractStream.getLiveState
+              liftEffect $ updateContractInfoMap \(contractMap /\ initialized) ->
+                ContractInfoMap.updateSynced (Just newSynced) contractMap /\ initialized
+              delay (Milliseconds 1_000.0)
+              pure Nothing
+
+          liftEffect $ setSyncFn (Just contractStream.sync)
+          contractStream.start
 
     useLoopAff walletInfoName (Milliseconds 20_000.0) do
       pwi <- liftEffect $ readRef possibleWalletInfoRef
@@ -252,6 +260,13 @@ mkApp = do
     checkingNotifications /\ setCheckingNotifications <- useState' false
 
     -- TODO: re-introduce notifications
+    -- On the app level we keep the previous wallet context
+    -- so we can reuse pieces of contract info from the previous
+    -- state in a safe manner.
+    -- newtype AppContractInfoMap = AppContractInfoMap
+    --   { walletContext :: Maybe WalletContext
+    --   , map :: ContractInfoMap
+    --   }
     -- We are ignoring contract events for now and we update the whole contractInfo set.
     --    upstreamVersion <- useEmitter' initialVersion (Subscription.bindEffect (const now) emitter)
     --    upstreamVersionRef <- useStateRef' upstreamVersion
@@ -400,51 +415,4 @@ mkApp = do
               }
         , footer
         ]
-
-mkAppContractInfoMap :: Slotting -> Maybe WalletContext -> Maybe ContractWithTransactionsMap -> Maybe NotSyncedYet -> Maybe AppContractInfoMap
-mkAppContractInfoMap _ _ Nothing Nothing = Nothing
-mkAppContractInfoMap slotting walletContext possiblySynced possiblyNotSyncedYet = do
-  let
-    ns = fromMaybe Map.empty do
-      NotSyncedYet { created, updated } <- possiblyNotSyncedYet
-      pure $ map someContractInfoFromContractCreated created
-        `Map.union` map someContractInfoFromContractUpdated updated
-    s = fromMaybe Map.empty do
-      synced <- possiblySynced
-      pure $ Map.catMaybes $ synced <#> \{ contract: { resource: contractHeader@(Runtime.ContractHeader { roleTokenMintingPolicyId, tags }), links: endpoints }, contractState, transactions } -> do
-        let
-          marloweInfo = do
-            Runtime.ContractState contractState' <- contractState
-            pure $ MarloweInfo
-              { initialContract: contractState'.initialContract
-              , currencySymbol: case roleTokenMintingPolicyId of
-                  PolicyId "" -> Nothing
-                  PolicyId policyId -> Just $ policyId
-              , state: contractState'.state
-              , currentContract: contractState'.currentContract
-              , initialState: V1.emptyState -- FIXME: No initial state on the API LEVEL?
-              , unclaimedPayouts: contractState'.unclaimedPayouts
-              }
-          Runtime.ContractHeader { contractId, block } = contractHeader
-          blockSlotTimestamp (Runtime.BlockHeader { slotNo }) = slotToTimestamp slotting slotNo
-
-          createdAt :: Maybe Instant
-          createdAt = blockSlotTimestamp <$> block
-
-          updatedAt :: Maybe Instant
-          updatedAt = do
-            Runtime.TxHeader tx /\ _ <- Array.head transactions
-            blockSlotTimestamp <$> tx.block
-
-        pure $ SyncedConractInfo $ ContractInfo $
-          { contractId
-          , createdAt
-          , updatedAt
-          , endpoints
-          , marloweInfo
-          , tags
-          , _runtime: { contractHeader, transactions }
-          }
-
-  pure $ AppContractInfoMap { walletContext, map: ns `Map.union` s }
 
