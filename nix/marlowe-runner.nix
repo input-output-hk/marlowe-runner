@@ -46,7 +46,7 @@ npmlock2nix.v2.build {
       mv prod.dhall spago.dhall
       install-spago-style
       build-spago-style "./src/**/*.purs"
-      export MARLOWE_WEB_SERVER_URL=http://localhost:3780
+      # export MARLOWE_WEB_SERVER_URL=http://localhost:3780
       webpack-cli --mode=production -c webpack.js
     ''
   ];
