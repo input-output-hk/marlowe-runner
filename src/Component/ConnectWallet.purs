@@ -194,22 +194,35 @@ mkConnectWallet = do
         DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
           [ DOM.div { className: "col-12" }
               [ DOM.div { className: "shadow-sm rounded p-4" }
-                  [ DOM.div { className: "container" }
-                      [ DOM.div { className: "row" }
-                          [ DOM.div { className: "col-12" }
-                              [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
-                              , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please select a wallet to deploy a contract." ]
+                  case possibleWallets of
+                    Just wallets ->
+                      [ DOM.div { className: "container" }
+                          [ DOM.div { className: "row" }
+                              [ DOM.div { className: "col-12" }
+                                  [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
+                                  , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please select a wallet to deploy a contract." ]
+                                  ]
+                              ]
+                          , case possibleWallets of
+                              Just wallets -> fragment $ (ArrayAL.toArray wallets) <#> \wallet -> do
+                                renderWallets (submit $ Just wallet) wallet
+                              Nothing -> mempty
+                          , DOM.div { className: "row mt-4 d-none" }
+                              [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#" } [ DOOM.text "Learn more" ] ]
+                              , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none" } [ DOOM.text "I don't have a wallet" ] ]
                               ]
                           ]
-                      , case possibleWallets of
-                          Just wallets -> fragment $ (ArrayAL.toArray wallets) <#> \wallet -> do
-                            renderWallets (submit $ Just wallet) wallet
-                          Nothing -> mempty
-                      , DOM.div { className: "row mt-4 d-none" }
-                          [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#" } [ DOOM.text "Learn more" ] ]
-                          , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none" } [ DOOM.text "I don't have a wallet" ] ]
+                      ]
+                    Nothing ->
+                      [ DOM.div { className: "container" }
+                          [ DOM.div { className: "row" }
+                              [ DOM.div { className: "col-12" }
+                                  [ DOM.h5 { className: "card-title font-weight-bold text-left mb-3" } [ DOOM.text "Looks like you don't have a wallet extension installed." ]
+                                  , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please install a cardano wallet extension, such as Lace, Nami or Eternl in order to proceed and start running Marlowe contracts." ]
+                                  ]
+                              ]
                           ]
                       ]
-                  ]
+
               ]
           ]
