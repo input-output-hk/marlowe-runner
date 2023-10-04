@@ -2,6 +2,19 @@
 
 A simple web app which allows you to deploy and progress through Marlowe contracts on Cardano easily from the browser.
 
+## Installation
+
+The application itself is a fully static JS app which requires Marlowe Runtime for running. A release package is providing a directory which could be served by your favorite HTTP server but in order to use it you should setup a minimal configuration.
+
+### Configuration
+
+In order to configure the application your HTTP server should serve `/config.json`. An `example.config.json` could be found as a part of the release which you can link and use:
+
+```
+{ "marloweWebServerUrl": 'https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io', "develMode": false }
+```
+
+
 ## Development
 
 ### Prerequisites

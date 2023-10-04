@@ -9,9 +9,10 @@ import Component.Types (ContractJsonString(..), Page(..))
 import Contrib.Cardano (Slotting(..))
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
+import Contrib.Fetch (fetchEither)
 import Contrib.JsonBigInt as JsonBigInt
 import Control.Monad.Reader (runReaderT)
-import Data.Argonaut (Json, decodeJson, (.:))
+import Data.Argonaut (Json, decodeJson, (.:), (.:?))
 import Data.Array as Array
 import Data.BigInt.Argonaut as BigInt
 import Data.Either (Either(..), hush)
@@ -24,6 +25,7 @@ import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Effect.Exception (throw)
+import Foreign (Foreign)
 import Foreign.NullOrUndefined (null) as Foreign
 import JS.Unsafe.Stringify (unsafeStringify)
 import Marlowe.Runtime.Web as Marlowe.Runtime.Web
@@ -36,6 +38,7 @@ import React.Basic.DOM.Client (createRoot, renderRoot)
 import URI (RelativeRef(..), URI(..)) as URI
 import URI.Extra.QueryPairs (QueryPairs(..)) as URI
 import URI.URIRef as URIRef
+import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM (Element)
 import Web.DOM.Element (getAttribute, setAttribute)
 import Web.DOM.NonElementParentNode (getElementById)
@@ -45,8 +48,23 @@ import Web.HTML.HTMLDocument as HTMLDocument
 import Web.HTML.History (DocumentTitle(..))
 import Web.HTML.History as History
 import Web.HTML.Location as Location
-import Web.HTML.Window (document)
+import Web.HTML.Window (alert, document)
 import Web.HTML.Window as Window
+
+type BuildConfig =
+  { marloweWebServerUrl :: Maybe ServerURL
+  , develMode :: Boolean
+  }
+
+decodeBuildConfig :: JsonParser BuildConfig
+decodeBuildConfig json = do
+  obj <- decodeJson json
+  marloweWebServerUrl <- obj .:? "marloweWebServerUrl"
+  develMode <- obj .: "develMode"
+  pure
+    { marloweWebServerUrl: ServerURL <$> marloweWebServerUrl
+    , develMode
+    }
 
 type Config =
   { marloweWebServerUrl :: ServerURL
@@ -97,34 +115,15 @@ processInitialURL = do
 
   pure possibleContract
 
-main :: Json -> Effect Unit
-main configJson = do
-  config <- Effect.liftEither $ decodeConfig configJson
+configURL :: String
+configURL = "/config.json"
 
-  JsonBigInt.patchers.patchStringify
-  JsonBigInt.patchers.patchParse
-
-  let
-    logger :: String -> Effect Unit
-    logger =
-      if config.develMode then Console.log
-      else const (pure unit)
-    runtime@(Marlowe.Runtime.Web.Runtime { serverURL }) = Marlowe.Runtime.Web.runtime config.marloweWebServerUrl
-
-  -- We do this URL processing here because the future URL routing will initialized here as well.
-  possibleInitialContract <- processInitialURL
-
-  doc :: HTMLDocument <- document =<< window
-  appContainer :: Element <- maybe (throw "Could not find element with id 'app-root'") pure =<<
-    (getElementById "app-root" $ toNonElementParentNode doc)
-
-  -- FIXME:
-  -- Currently `setPage` is triggered bottom up
-  -- but it should be triggered top down from the brower and routing events
-  -- Introduce: https://github.com/robertdp/purescript-web-router
-
-  origClasses <- fromMaybe "" <$> getAttribute "class" appContainer
-
+-- FIXME:
+-- Currently `setPage` is triggered bottom up
+-- but it should be triggered top down from the brower and routing events
+-- Introduce: https://github.com/robertdp/purescript-web-router
+mkSetPage :: String -> Element -> { setPage :: Page -> Effect Unit, setPageClass :: Page -> Effect Unit }
+mkSetPage origClasses appContainer = do
   let
     setPageClass :: Page -> Effect Unit
     setPageClass ContractListPage =
@@ -139,38 +138,88 @@ main configJson = do
     setPage :: Page -> Effect Unit
     setPage page = do
       setPageClass page
+  { setPage, setPageClass }
 
-  reactRoot <- createRoot appContainer
-  launchAff_ do
-    HealthCheck { networkId } <- Marlowe.Runtime.Web.getHealthCheck serverURL >>= case _ of
-      Left err -> liftEffect $ throw $ unsafeStringify err
-      Right healthCheck -> pure healthCheck
+main :: Json -> Effect Unit
+main configJson = launchAff_ do
+  buildConfig <- liftEffect do
+    JsonBigInt.patchers.patchStringify
+    JsonBigInt.patchers.patchParse
+    liftEffect $ Effect.liftEither $ decodeBuildConfig configJson
 
-    let
-      -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
-      slotting = case networkId of
-        Mainnet -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
-        Testnet (NetworkMagic 1) -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1655683200000" }
-        _ -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
+  let
+    throw' msg = liftEffect $ do
+      window >>= alert msg
+      throw msg
 
-    CardanoMultiplatformLib.importLib >>= case _ of
-      Nothing -> liftEffect $ logger "Cardano serialization lib loading failed"
-      Just cardanoMultiplatformLib -> do
-        walletInfoCtx <- liftEffect $ createContext Nothing
-        msgHubComponent /\ msgHub <- liftEffect $ mkMessageHub
-        let
-          mkAppCtx =
-            { cardanoMultiplatformLib
-            , walletInfoCtx
-            , logger
-            , msgHub
-            , runtime
-            , slotting
-            }
+  config <- do
+    fetchEither configURL {} [ 200, 404 ] identity >>= case _ of
+      Right res -> case res.status, buildConfig of
+        404, { marloweWebServerUrl: Just marloweWebServerUrl } ->
+          pure { marloweWebServerUrl, develMode: buildConfig.develMode }
+        404, _ -> do
+          throw' "Incomplete configuration - please create a config.json file in the root of the project - more info in the README"
+        200, _ -> do
+          possibleConfig <- do
+            json <- res.json <#> (unsafeCoerce :: Foreign -> Json)
+            pure $ decodeConfig json
+          case possibleConfig of
+            Left err -> do
+              throw' $ "Error parsing '/config.json': " <> show err
+            Right config -> pure config
+        _, _ -> do
+          throw' $ "Unexpected status code fetching '/config.json': " <> show res.status
+      Left err -> do
+        throw' $ "Error fetching '/config.json': " <> unsafeStringify err
+  let
+    logger :: String -> Effect Unit
+    logger =
+      if config.develMode then Console.log
+      else const (pure unit)
+    runtime@(Marlowe.Runtime.Web.Runtime { serverURL }) = Marlowe.Runtime.Web.runtime config.marloweWebServerUrl
 
-        liftEffect $ setPageClass $ case possibleInitialContract of
-          Nothing -> LoginPage
-          Just contractJson -> CreateContractPage (Just contractJson)
+  -- We do this URL processing here because the future URL routing will initialized here as well.
+  possibleInitialContract <- liftEffect processInitialURL
 
-        app <- liftEffect $ runReaderT mkApp mkAppCtx
-        liftEffect $ renderRoot reactRoot $ msgHubComponent [ app { possibleInitialContract, setPage } ]
+  doc :: HTMLDocument <- liftEffect $ document =<< window
+  appContainer :: Element <- liftEffect $ maybe (throw "Could not find element with id 'app-root'") pure =<<
+    (getElementById "app-root" $ toNonElementParentNode doc)
+
+  reactRoot <- liftEffect $ createRoot appContainer
+
+  HealthCheck { networkId } <- Marlowe.Runtime.Web.getHealthCheck serverURL >>= case _ of
+    Left err -> liftEffect $ throw $ unsafeStringify err
+    Right healthCheck -> pure healthCheck
+
+  let
+    -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
+    slotting = case networkId of
+      Mainnet -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1591566291000" }
+      Testnet (NetworkMagic 1) -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1655683200000" }
+      _ -> Slotting { slotLength: BigInt.fromInt 1000, slotZeroTime: unsafePartial $ fromJust $ BigInt.fromString "1666656000000" }
+
+  CardanoMultiplatformLib.importLib >>= case _ of
+    Nothing -> liftEffect $ logger "Cardano serialization lib loading failed"
+    Just cardanoMultiplatformLib -> do
+      walletInfoCtx <- liftEffect $ createContext Nothing
+      msgHubComponent /\ msgHub <- liftEffect $ mkMessageHub
+      let
+        mkAppCtx =
+          { cardanoMultiplatformLib
+          , walletInfoCtx
+          , logger
+          , msgHub
+          , runtime
+          , slotting
+          }
+
+      origClasses <- liftEffect $ fromMaybe "" <$> getAttribute "class" appContainer
+      let
+        { setPage, setPageClass } = mkSetPage origClasses appContainer
+
+      liftEffect $ setPageClass $ case possibleInitialContract of
+        Nothing -> LoginPage
+        Just contractJson -> CreateContractPage (Just contractJson)
+
+      app <- liftEffect $ runReaderT mkApp mkAppCtx
+      liftEffect $ renderRoot reactRoot $ msgHubComponent [ app { possibleInitialContract, setPage } ]
