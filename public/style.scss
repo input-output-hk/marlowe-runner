@@ -113,6 +113,7 @@ $link-color: #511CF7;
   }
   button.active {
     font-weight: bold;
+    border: 2px solid #000 !important;
     opacity: 1 !important;
   }
   button.disabled {
