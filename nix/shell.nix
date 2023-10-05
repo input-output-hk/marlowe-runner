@@ -42,6 +42,10 @@ lib.iogx.mkShell {
     '';
   };
 
+  shellHook = ''
+    NODE_OPTIONS="--experimental-fetch --trace-warnings"
+  '';
+
   tools = {
     purs-tidy = purescript.purs-tidy;
   };
@@ -49,6 +53,6 @@ lib.iogx.mkShell {
   preCommit = {
     shellcheck.enable = true;
     nixpkgs-fmt.enable = true;
-    purs-tidy.enable = false;
+    purs-tidy.enable = true;
   };
 }
