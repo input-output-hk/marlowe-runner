@@ -108,7 +108,7 @@ type Contract
   | {
     nodeEvents?: ContractNodeEvents,
     timeout_continuationEdgeEvents?: ContractEdgeEvents,
-    when: Case[], timout: Timeout, timeout_continuation: Contract,
+    when: Case[], timeout: Timeout, timeout_continuation: Contract,
   }
   | {
     nodeEvents?: ContractNodeEvents,
@@ -143,7 +143,7 @@ type ContractNodeType
   = "close"
   | { nodeEvents?: ContractNodeEvents, pay: Value, token: Token, to: Payee, from_account: AccountId }
   | { nodeEvents?: ContractNodeEvents, if: Observation }
-  | { nodeEvents?: ContractNodeEvents, when: ({ case: Action } | { case: Action, merkleized_then: string })[], timout: Timeout }
+  | { nodeEvents?: ContractNodeEvents, when: ({ case: Action } | { case: Action, merkleized_then: string })[], timeout: Timeout }
   | { nodeEvents?: ContractNodeEvents, let: ValueId, be: Value }
   | { nodeEvents?: ContractNodeEvents, assert: Observation }
 

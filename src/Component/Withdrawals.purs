@@ -117,6 +117,9 @@ mkComponent = do
             { wallet: { changeAddress, usedAddresses }
             , payouts
             }
+
+          onError' :: forall err. err -> Aff Unit
+          onError' err = liftEffect $ onError $ unsafeStringify err
         launchAff_ $ do
           withdraw withdrawalContext runtime.serverURL runtime.withdrawalsEndpoint >>= case _ of
             Right { resource: PostWithdrawalsResponseContent res, links: { withdrawal: withdrawalEndpoint } } -> do
@@ -130,12 +133,9 @@ mkComponent = do
                   submit witnessSet runtime.serverURL withdrawalEndpoint >>= case _ of
                     Right _ -> do
                       liftEffect $ onSuccess withdrawalEndpoint
-                    Left err -> do
-                      onError $ unsafeStringify err
-                Left err -> do
-                  onError $ unsafeStringify err
-            Left err ->
-              onError $ unsafeStringify err
+                    Left err -> onError' err
+                Left err -> onError' err
+            Left err -> onError' err
         for_ payouts $ \(Payout { payoutId }) -> updateSubmitted payoutId
         pure unit
 

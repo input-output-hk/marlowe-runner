@@ -79,7 +79,7 @@ type Contract
   = "close"
   | { pay: Value, token: Token, to: Payee, from_account: AccountId, then: Contract }
   | { if: Observation, then: Contract, else: Contract }
-  | { when: Case[], timout: Timeout, timeout_continuation: Contract }
+  | { when: Case[], timeout: Timeout, timeout_continuation: Contract }
   | { let: ValueId, be: Value, then: Contract }
   | { assert: Observation, then: Contract }
 
@@ -105,7 +105,7 @@ type ContractNodeType
   = "close"
   | { pay: Value, token: Token, to: Payee, from_account: AccountId }
   | { if: Observation }
-  | { when: ({ case: Action } | { case: Action, merkleized_then: string })[], timout: Timeout }
+  | { when: ({ case: Action } | { case: Action, merkleized_then: string })[], timeout: Timeout }
   | { let: ValueId, be: Value }
   | { assert: Observation }
 
