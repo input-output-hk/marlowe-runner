@@ -8,17 +8,17 @@ import webpack from 'webpack';
 
 function getWebServerUrl() {
   if(!process.env.MARLOWE_WEB_SERVER_URL) {
-    console.log("You should setup MARLOWE_WEBSERVER_URL before starting the devel server - for example: $ export MARLOWE_WEB_SERVER_URL='http://127.0.0.1:479001'");
+    console.log("MARLOWE_WEB_SERVER_URL is missing so the bundle will be purely config.json dependent.")
+    return null;
   } else {
     console.log("Checking MARLOWE_WEB_SERVER_URL: " + process.env.MARLOWE_WEB_SERVER_URL);
-    fetch(process.env.MARLOWE_WEB_SERVER_URL + "/contracts").catch(function (_err) {
-      throw ("You should start the marlowe-web-server or change the MARLOWE_WEB_SERVER_URL environment variable value.");
-    }).then(function (_response) {
-      console.log("marlowe-web-server is running");
-      return process.env.MARLOWE_WEB_SERVER_URL;
+    fetch(process.env.MARLOWE_WEB_SERVER_URL + "/healthcheck").catch(function (_err) {
+      console.log("WARNING! The Marlowe Runtime is not responsive!!!");
     });
+    return process.env.MARLOWE_WEB_SERVER_URL;
   }
 };
+
 
 export default function(_env, argv) {
   const develMode = argv.mode == "development";

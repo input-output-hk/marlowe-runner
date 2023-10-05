@@ -12,3 +12,10 @@
 .vscode
 public/app.js
 .pre-commit-config.yaml
+.spago2nix
+result
+.DS_Store 
+output-es
+public/*bundle.js*
+public/*module.wasm 
+public/config.json
