@@ -20,7 +20,7 @@ Before(async function(this: ScenarioWorld, scenario) {
 
 After(async function(this: ScenarioWorld, scenario) {
   const {
-    screen: { page, browser }
+    screen: { page, context }
   } = this;
 
   const scenarioStatus = scenario.result?.status;
@@ -32,6 +32,6 @@ After(async function(this: ScenarioWorld, scenario) {
     await this.attach(screenshot, 'image/png');
   }
 
-  await browser.close();
-  return browser;
+  await context.close();
+  return context;
 });

@@ -12,7 +12,6 @@ import { GlobalConfig } from '../../env/global';
 import GlobalStateManager from "../../support/globalStateManager";
 
 export type Screen = {
-  browser: Browser;
   context: BrowserContext;
   page: Page;
 }
@@ -32,24 +31,23 @@ export class ScenarioWorld extends World {
   async init(contextOptions?: BrowserContextOptions): Promise<Screen> {
     await this.screen?.page?.close();
     await this.screen?.context?.close();
-    await this.screen?.browser?.close();
 
-    const browser = await this.newBrowser();
-    const context = await browser.newContext(contextOptions);
+    const context = await this.newContext();
     const page = await context.newPage();
 
-    this.screen = { browser, context, page };
+    this.screen = { context, page };
 
     return this.screen
   }
 
-  private newBrowser = async (): Promise<Browser> => {
+  private newContext = async (): Promise<BrowserContext> => {
     const automationBrowsers = ['chromium', 'firefox', 'webkit']
     type AutomationBrowser = typeof automationBrowsers[number]
     const automationBrowser = env('UI_AUTOMATION_BROWSER') as AutomationBrowser
+    const pathToExtension = env('LACE_WALLET_EXTENSION_PATH') as AutomationBrowser
 
     const browserType: BrowserType = playwright[automationBrowser];
-    const browser = await browserType.launch({
+    const context = await browserType.launchPersistentContext('', {
       devtools: process.env.DEVTOOLS !== 'false',
       headless: process.env.HEADLESS !== 'false',
       args: [
@@ -59,8 +57,8 @@ export class ScenarioWorld extends World {
           '--enable-automation',
           '--no-first-run',
           '--no-default-browser-check',
-          // '--disable-extensions-except=path/to/lace/dist',
-          // '--load-extension=path/to/lace/dist',
+          `--disable-extensions-except=${pathToExtension}`,
+          `--load-extension=${pathToExtension}`,
           '--disable-web-security',
           '--allow-insecure-localhost',
           '--window-size=1920,1080',
@@ -71,7 +69,7 @@ export class ScenarioWorld extends World {
         ]
     })
 
-    return browser;
+    return context;
   }
 }
 
