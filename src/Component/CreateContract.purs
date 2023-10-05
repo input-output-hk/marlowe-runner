@@ -11,7 +11,7 @@ import Component.CreateContract.Machine as Machine
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (OutlineColoring(..), SpinnerOverlayHeight(..), buttonOutlinedClassNames, link, spinnerOverlay)
+import Component.Widgets (OutlineColoring(..), SpinnerOverlayHeight(..), backToContractListLink, buttonOutlinedClassNames, link, spinnerOverlay)
 import Component.Widgets as DOM
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
@@ -317,17 +317,6 @@ mkRoleTokensComponent = do
 
 runLiteTag :: String
 runLiteTag = "run-lite"
-
-backToContractListLink :: Effect Unit -> JSX
-backToContractListLink onDismiss = do
-  DOM.div { className: "col-12 text-center" } $
-    [ link
-        { label: DOM.b {} [ DOOM.text "Back to contract list" ]
-        , onClick: onDismiss
-        , showBorders: false
-        , extraClassNames: "mt-3"
-        }
-    ]
 
 -- We want to construct `ContractInfo.ContractCreated` and call `onSuccess` only
 mkOnStateTransition

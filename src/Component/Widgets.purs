@@ -268,3 +268,15 @@ submitButton { disabled, onClick } label = DOM.button
     , disabled
     }
   label
+
+backToContractListLink :: Effect Unit -> JSX
+backToContractListLink onDismiss = do
+  DOM.div { className: "col-12 text-center" } $
+    [ link
+        { label: DOM.b {} [ DOOM.text "Back to contract list" ]
+        , onClick: onDismiss
+        , showBorders: false
+        , extraClassNames: "mt-3"
+        }
+    ]
+

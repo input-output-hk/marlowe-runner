@@ -12,7 +12,7 @@ import Component.BodyLayout as BodyLayout
 import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, toIChoice, toIDeposit)
 import Component.Types (ContractInfo, MkComponentM, WalletInfo(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (SpinnerOverlayHeight(..), link, marlowePreview, marloweStatePreview, spinnerOverlay)
+import Component.Widgets (SpinnerOverlayHeight(..), backToContractListLink, link, marlowePreview, marloweStatePreview, spinnerOverlay)
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
@@ -145,17 +145,6 @@ type DepositFormComponentProps =
   , onDismiss :: Effect Unit
   , onSubmit :: V1.Input -> Effect Unit
   }
-
-backToContractListLink :: Effect Unit -> JSX
-backToContractListLink onDismiss = do
-  DOM.div { className: "col-12 text-center" } $
-    [ link
-        { label: DOM.b {} [ DOOM.text "Back to contract list" ]
-        , onClick: onDismiss
-        , showBorders: false
-        , extraClassNames: "mt-3"
-        }
-    ]
 
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
 mkDepositFormComponent = do
@@ -647,12 +636,6 @@ type Props =
 
 newtype UseSpinnerOverlay = UseSpinnerOverlay Boolean
 
-useSpinner :: UseSpinnerOverlay
-useSpinner = UseSpinnerOverlay true
-
-dontUseSpinner :: UseSpinnerOverlay
-dontUseSpinner = UseSpinnerOverlay false
-
 applyInputBodyLayout :: UseSpinnerOverlay -> JSX -> JSX
 applyInputBodyLayout (UseSpinnerOverlay useSpinnerOverlay) content = do
   let
@@ -664,17 +647,7 @@ applyInputBodyLayout (UseSpinnerOverlay useSpinnerOverlay) content = do
     content' = fragment $
       [ content ]
         <> Monoid.guard useSpinnerOverlay [ spinnerOverlay Spinner100VH ]
-  -- Essentially this is a local copy of `BodyLayout.component` but
-  -- we use `relative` positioning for the form content instead.
-  -- Should we just use it there?
-  DOM.div { className: "container" } $ do
-    DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
-      [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center pb-3" } $
-          [ DOM.div { className: "fw-bold font-size-2rem my-3" } $ title
-          , DOM.div { className: "font-size-1rem" } $ description
-          ]
-      , DOM.div { className: "col-9 bg-white position-relative" } content'
-      ]
+  BodyLayout.component { title, description, content: content' }
 
 mkOnStateTransition
   :: ContractInfo

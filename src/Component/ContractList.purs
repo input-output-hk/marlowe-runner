@@ -19,7 +19,7 @@ import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(..)
 import Component.Types.ContractInfo (MarloweInfo(..), SomeContractInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
-import Component.Widgets (buttonOutlinedWithdraw, buttonOutlinedInactive, buttonOutlinedPrimary, buttonWithIcon)
+import Component.Widgets (buttonOutlinedInactive, buttonOutlinedPrimary, buttonOutlinedWithdraw)
 import Component.Withdrawals as Withdrawals
 import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
@@ -322,6 +322,7 @@ mkContractList = do
             { roles
             , connectedWallet: cw
             , onSuccess
+            , onError
             , onDismiss: resetModalAction
             , unclaimedPayouts
             , updateSubmitted: updateSubmitted contractId
@@ -573,9 +574,7 @@ mkContractList = do
                                         Just { head, tail } -> buttonOutlinedWithdraw
                                           { label: DOOM.text "Withdraw"
                                           -- , tooltipText: Just "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
-                                          , onClick: case tail of
-                                              [] -> pure unit
-                                              _ -> setModalAction $ Withdrawal walletContext (NonEmptyArray.cons' head tail) contractId payouts
+                                          , onClick: setModalAction $ Withdrawal walletContext (NonEmptyArray.cons' head tail) contractId payouts
                                           }
                                         _ -> mempty
                                     _, _, _ -> mempty
