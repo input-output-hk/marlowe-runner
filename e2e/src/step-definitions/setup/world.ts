@@ -10,6 +10,7 @@ import { env } from '../../env/parseEnv'
 import { World, IWorldOptions, setWorldConstructor } from "@cucumber/cucumber";
 import { GlobalConfig } from '../../env/global';
 import GlobalStateManager from "../../support/globalStateManager";
+import { testWallet } from "../../support/walletConfiguration";
 
 export type Screen = {
   context: BrowserContext;
@@ -35,10 +36,37 @@ export class ScenarioWorld extends World {
     const context = await this.newContext();
     const page = await context.newPage();
 
+    const EXTENSION_URL = 'chrome-extension://gafhhkghbfjjkeiendhlofajokpaflmk';
+
+    await page.goto(`${EXTENSION_URL}/app.html`);
+    await page.addInitScript((testWallet) => {
+      window.localStorage.setItem('lock', testWallet.lock);
+      window.localStorage.setItem('analyticsAccepted', testWallet.analyticsAccepted);
+      window.localStorage.setItem('showDappBetaModal', testWallet.showDappBetaModal);
+      window.localStorage.setItem('wallet', testWallet.wallet);
+      const keyAgentData = JSON.parse(testWallet?.backgroundStorage?.keyAgentsByChain);
+      const mnemonicData = JSON.parse(testWallet?.backgroundStorage?.mnemonic);
+      const backgroundStorage = {
+        mnemonic: mnemonicData,
+        keyAgentsByChain: keyAgentData,
+        MIGRATION_STATE: { state: 'up-to-date' }
+      };
+      window.localStorage.setItem('BACKGROUND_STORAGE', JSON.stringify(backgroundStorage));
+      window.localStorage.setItem('appSettings', testWallet.appSettings);
+      window.localStorage.setItem('keyAgentData', testWallet.keyAgentData);
+      //window.localStorage.setItem('authorizedDapps', testWallet.authorizedDapps);
+      //window.localStorage.setItem('lace-activate', testWallet.laceActivate);
+      //window.localStorage.setItem('laceOrigins', testWallet.laceOrigins);
+    }, testWallet);
+    await page.goto(`${EXTENSION_URL}/app.html`);
+    await page.waitForTimeout(5000);
+    await page.reload();
+
     this.screen = { context, page };
 
     return this.screen
   }
+
 
   private newContext = async (): Promise<BrowserContext> => {
     const automationBrowsers = ['chromium', 'firefox', 'webkit']
