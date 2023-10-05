@@ -21,6 +21,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, catchError, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error)
+import Foreign.Object as Object
 import React.Basic (JSX, fragment)
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (button, img, span_, text) as DOOM
@@ -64,8 +65,15 @@ formatName name = String.upperCaseFirst name
 
 renderWallets :: Effect Unit -> WalletInfo Wallet -> JSX
 renderWallets onSubmit (WalletInfo { icon, name }) =
-  DOM.div { className: "row mt-2" }
-    [ DOM.div { className: "col-12 d-flex rounded p-2 align-items-center border border-2 border-secondary justify-content-between cursor-pointer", onClick: handler_ onSubmit }
+  DOM.div { className: "row mt-2" } do
+    let
+      _aria = Object.fromHomogeneous { labelledBy: "button", label: name }
+    [ DOM.div
+        { className: "col-12 d-flex rounded p-2 align-items-center border border-2 border-secondary justify-content-between cursor-pointer"
+        , onClick: handler_ onSubmit
+        , role: "button"
+        , _aria
+        }
         [ DOOM.img { src: icon, alt: "Icon Before", className: "icon" }
         , DOM.div { className: "fw-bold text-start flex-grow-2 ps-2" } $ DOOM.text $ formatName name
         , DOM.div { className: "cardano-badge flex-8" }
