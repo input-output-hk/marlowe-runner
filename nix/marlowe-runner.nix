@@ -50,7 +50,7 @@ npmlock2nix.v2.build {
     "mv prod.dhall spago.dhall"
     "echo AM I FAILING"
     "install-spago-style"
-    "echo OR ME"
+    "echo OR sME"
     "build-spago-style \"./src/**/*.purs\""
     "echo OR NPM"
 
