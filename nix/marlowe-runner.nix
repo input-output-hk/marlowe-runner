@@ -12,6 +12,9 @@ npmlock2nix.v2.build {
 
   nodejs = pkgs.nodejs-18_x;
 
+  packageJson = ../package.json;
+  packageLockJson = ../package-lock.json;
+
   src = lib.sourceByRegex ../. [
     "^prototype.*"
     "^public.*"
