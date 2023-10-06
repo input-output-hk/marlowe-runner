@@ -17,7 +17,8 @@
     };
 
     npmlock2nix = {
-      url = "github:nix-community/npmlock2nix";
+      url = "github:zeme-wana/npmlock2nix";
+      # url = "github:nix-community/npmlock2nix";
       flake = false;
     };
 
