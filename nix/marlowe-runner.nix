@@ -30,8 +30,8 @@ npmlock2nix.v2.build {
   ];
 
   buildInputs = [
-    spagoPkgs.installSpagoStyle
-    spagoPkgs.buildSpagoStyle
+    # spagoPkgs.installSpagoStyle
+    # spagoPkgs.buildSpagoStyle
     repoRoot.nix.purescript.purs-0_15_10
     repoRoot.nix.purescript.spago2nix
   ];
