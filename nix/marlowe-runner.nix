@@ -48,8 +48,11 @@ npmlock2nix.v2.build {
     # We want to use prod.dhall, but `install-spago-style` below uses 
     # spago.dhall by default and there doesn't seem to be a way to override it.
     "mv prod.dhall spago.dhall"
+    "echo AM I FAILING"
     "install-spago-style"
+    "echo OR ME"
     "build-spago-style \"./src/**/*.purs\""
+    "echo OR NPM"
 
     # These appear to the fix the following error when building on Hydra:
     #   npm ERR! request to https://registry.npmjs.org/express failed, reason: getaddrinfo 
