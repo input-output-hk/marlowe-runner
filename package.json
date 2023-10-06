@@ -1,12 +1,14 @@
 {
   "name": "marlowe-runner",
   "dependencies": {
+    "2": "^3.0.0",
     "@dcspark/cardano-multiplatform-lib-browser": "^3.1.2",
     "big-integer": "^1.6.51",
     "bip39": "^3.0.4",
     "bootstrap": "^5.2.3",
     "bootstrap-icons": "^1.10.2",
     "browser-or-node": "^2.1.1",
+    "cors": "^2.8.5",
     "decimal.js": "^10.4.2",
     "domready": "^1.0.8",
     "hex-string": "^1.0.3",
