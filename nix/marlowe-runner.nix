@@ -51,8 +51,13 @@ npmlock2nix.v2.build {
     "install-spago-style"
     "build-spago-style \"./src/**/*.purs\""
 
+    # These appear to the fix the following error when building on Hydra:
+    #   npm ERR! request to https://registry.npmjs.org/express failed, reason: getaddrinfo 
+    "npm config rm proxy"
+    "npm config rm https-proxy --tried removing npm proxy"
+
     # This will create the public/*bundle.js* and public/*.module.wasm files.   
-    "webpack-cli --mode=production -c webpack.js"
+    "webpack-cli --mode=production -c webpack.js --progress=profile"
   ];
 
   # The output of the nix build is the contents of the ./public folder 
