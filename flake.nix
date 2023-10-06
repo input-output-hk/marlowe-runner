@@ -33,9 +33,6 @@
     repoRoot = ./.;
     systems = [ "x86_64-linux" "x86_64-darwin" ];
     outputs = import ./nix/outputs.nix;
-    nixpkgsArgs.config.permittedInsecurePackages = [
-      "nodejs-16.20.1"
-    ];
   };
 
   nixConfig = {

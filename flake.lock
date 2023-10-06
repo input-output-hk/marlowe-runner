@@ -952,11 +952,11 @@
     "npmlock2nix": {
       "flake": false,
       "locked": {
-        "lastModified": 1696595981,
-        "narHash": "sha256-JutaruLlBKZApJMuNXrFD7GeoQg3ItHbxUzjkDBK7Gw=",
+        "lastModified": 1696597458,
+        "narHash": "sha256-4XHxnrJ3sB4pGd07jUbK7LqYYfHPSYl8L0H/gLSNcRw=",
         "owner": "zeme-wana",
         "repo": "npmlock2nix",
-        "rev": "d61d4e911a903222a32553267d4409b4c7626b36",
+        "rev": "a5e8ae1e75c768b451318cddfb735bd9e4055ae3",
         "type": "github"
       },
       "original": {
