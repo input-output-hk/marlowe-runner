@@ -54,13 +54,29 @@ export class ScenarioWorld extends World {
       window.localStorage.setItem('BACKGROUND_STORAGE', JSON.stringify(backgroundStorage));
       window.localStorage.setItem('appSettings', testWallet.appSettings);
       window.localStorage.setItem('keyAgentData', testWallet.keyAgentData);
-      //window.localStorage.setItem('authorizedDapps', testWallet.authorizedDapps);
-      //window.localStorage.setItem('lace-activate', testWallet.laceActivate);
-      //window.localStorage.setItem('laceOrigins', testWallet.laceOrigins);
     }, testWallet);
     await page.goto(`${EXTENSION_URL}/app.html`);
     await page.waitForTimeout(5000);
     await page.reload();
+
+    // authorize Dapp
+    // await page.getByRole('button').filter({ hasText: 'Lace' }).click();
+
+    // const popupPromise = context.waitForEvent('page');
+    // await Promise.race([
+    //   new Promise((resolve) => setTimeout(resolve, 5000)),
+    //   page.evaluate(async () => await window['cardano']['lace'].enable())
+    // ]);
+    // const popup = await popupPromise;
+    // await popup.waitForLoadState();
+    // await popup.waitForTimeout(5000);
+
+    // await page.getByRole('button').filter({ hasText: 'Authorize' }).click();
+    // await page.getByRole('button').filter({ hasText: 'Always' }).click();
+
+    // await page.goto(`${EXTENSION_URL}/app.html`);
+    // await page.waitForTimeout(5000);
+    // await page.reload();
 
     this.screen = { context, page };
 
