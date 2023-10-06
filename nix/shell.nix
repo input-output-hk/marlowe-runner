@@ -29,11 +29,11 @@ lib.iogx.mkShell {
     pkgs.podman
     pkgs.jq
     pkgs.docker
-    pkgs.nodejs-16_x
-    pkgs.nodejs-16_x.pkgs.bower
-    pkgs.nodejs-16_x.pkgs.jshint
-    pkgs.nodejs-16_x.pkgs.yarn
-    pkgs.nodejs-16_x.pkgs.webpack-cli
+    pkgs.nodejs-18_x
+    pkgs.nodejs-18_x.pkgs.bower
+    pkgs.nodejs-18_x.pkgs.jshint
+    pkgs.nodejs-18_x.pkgs.yarn
+    pkgs.nodejs-18_x.pkgs.webpack-cli
     pkgs.dhall
     pkgs.pkg-config
     pkgs.python38

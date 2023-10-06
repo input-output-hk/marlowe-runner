@@ -8,9 +8,9 @@ let
 
 in
 
-npmlock2nix.v1.node_modules {
+npmlock2nix.v2.node_modules {
 
-  nodejs = pkgs.nodejs-16_x;
+  nodejs = pkgs.nodejs-18_x;
 
   src = lib.sourceByRegex ../. [
     "^prototype.*"
