@@ -10,7 +10,7 @@ in
 
 npmlock2nix.v1.node_modules {
 
-  nodejs = pkgs.nodejs-18_x;
+  nodejs = pkgs.nodejs-16_x;
 
   src = lib.sourceByRegex ../. [
     "^prototype.*"
