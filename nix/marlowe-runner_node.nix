@@ -8,11 +8,7 @@ let
 
 in
 
-npmlock2nix.v2.node_modules {
-
-  # HACK: break the nix sandbox so we can fetch the dependencies. This
-  # requires Nix to have `sandbox = relaxed` in its config.
-  __noChroot = true;
+npmlock2nix.v1.node_modules {
 
   nodejs = pkgs.nodejs-18_x;
 
