@@ -8,7 +8,7 @@ function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) { try
 function _asyncToGenerator(fn) { return function () { var self = this, args = arguments; return new Promise(function (resolve, reject) { var gen = fn.apply(self, args); function _next(value) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value); } function _throw(err) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err); } _next(undefined); }); }; }
 (0, _cucumber.When)(/^I click the "([^"]*)" with "([^"]*)" text$/, /*#__PURE__*/function () {
   var _ref = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2(role, name) {
-    var page, globalStateManager, newPagePromise;
+    var page, globalStateManager;
     return _regeneratorRuntime().wrap(function _callee2$(_context2) {
       while (1) switch (_context2.prev = _context2.next) {
         case 0:
@@ -54,24 +54,24 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
     return _ref.apply(this, arguments);
   };
 }());
-(0, _cucumber.When)(/^I click the new tab "link" with "([^"]*)" text$/, /*#__PURE__*/function () {
-  var _ref3 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4(name) {
+(0, _cucumber.When)(/^I authorize my "([^"]*)" wallet$/, /*#__PURE__*/function () {
+  var _ref3 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7(name) {
     var page, globalStateManager, newPagePromise, newPage;
-    return _regeneratorRuntime().wrap(function _callee4$(_context4) {
-      while (1) switch (_context4.prev = _context4.next) {
+    return _regeneratorRuntime().wrap(function _callee7$(_context7) {
+      while (1) switch (_context7.prev = _context7.next) {
         case 0:
           page = this.screen.page, globalStateManager = this.globalStateManager;
           newPagePromise = new Promise(function (resolve) {
             return page.context().once('page', resolve);
           });
-          _context4.next = 4;
+          _context7.next = 4;
           return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
             var locator, result;
             return _regeneratorRuntime().wrap(function _callee3$(_context3) {
               while (1) switch (_context3.prev = _context3.next) {
                 case 0:
                   _context3.next = 2;
-                  return page.getByRole("link", {
+                  return page.getByRole("button", {
                     name: name,
                     exact: true
                   });
@@ -96,66 +96,307 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
             }, _callee3);
           })));
         case 4:
-          _context4.next = 6;
+          _context7.next = 6;
           return newPagePromise;
         case 6:
-          newPage = _context4.sent;
-          globalStateManager.appendValue(name, newPage);
-        case 8:
-        case "end":
-          return _context4.stop();
-      }
-    }, _callee4, this);
-  }));
-  return function (_x4, _x5) {
-    return _ref3.apply(this, arguments);
-  };
-}());
-(0, _cucumber.When)(/^I click the "([^"]*)" (?:button|link)$/, /*#__PURE__*/function () {
-  var _ref5 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6(name, role) {
-    var page;
-    return _regeneratorRuntime().wrap(function _callee6$(_context6) {
-      while (1) switch (_context6.prev = _context6.next) {
-        case 0:
-          page = this.screen.page;
-          _context6.next = 3;
+          newPage = _context7.sent;
+          _context7.next = 9;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
+            return _regeneratorRuntime().wrap(function _callee4$(_context4) {
+              while (1) switch (_context4.prev = _context4.next) {
+                case 0:
+                  _context4.next = 2;
+                  return newPage.reload();
+                case 2:
+                  return _context4.abrupt("return", true);
+                case 3:
+                case "end":
+                  return _context4.stop();
+              }
+            }, _callee4);
+          })));
+        case 9:
+          _context7.next = 11;
           return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
-            var locator, result;
+            var buttonName, locator, result;
             return _regeneratorRuntime().wrap(function _callee5$(_context5) {
               while (1) switch (_context5.prev = _context5.next) {
                 case 0:
-                  _context5.next = 2;
-                  return page.getByRole(role, {
-                    name: name,
+                  buttonName = "Authorize";
+                  _context5.next = 3;
+                  return newPage.getByRole("button", {
+                    name: buttonName,
                     exact: true
                   });
-                case 2:
+                case 3:
                   locator = _context5.sent;
-                  _context5.next = 5;
+                  _context5.next = 6;
                   return locator.isVisible();
-                case 5:
+                case 6:
                   result = _context5.sent;
                   if (!result) {
-                    _context5.next = 10;
+                    _context5.next = 11;
                     break;
                   }
-                  _context5.next = 9;
+                  _context5.next = 10;
                   return locator.click();
-                case 9:
-                  return _context5.abrupt("return", result);
                 case 10:
+                  return _context5.abrupt("return", result);
+                case 11:
                 case "end":
                   return _context5.stop();
               }
             }, _callee5);
           })));
-        case 3:
+        case 11:
+          _context7.next = 13;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6() {
+            var buttonName, locator, result;
+            return _regeneratorRuntime().wrap(function _callee6$(_context6) {
+              while (1) switch (_context6.prev = _context6.next) {
+                case 0:
+                  buttonName = "Always";
+                  _context6.next = 3;
+                  return newPage.getByRole("button", {
+                    name: buttonName,
+                    exact: true
+                  });
+                case 3:
+                  locator = _context6.sent;
+                  _context6.next = 6;
+                  return locator.isVisible();
+                case 6:
+                  result = _context6.sent;
+                  if (!result) {
+                    _context6.next = 11;
+                    break;
+                  }
+                  _context6.next = 10;
+                  return locator.click();
+                case 10:
+                  return _context6.abrupt("return", result);
+                case 11:
+                case "end":
+                  return _context6.stop();
+              }
+            }, _callee6);
+          })));
+        case 13:
         case "end":
-          return _context6.stop();
+          return _context7.stop();
       }
-    }, _callee6, this);
+    }, _callee7, this);
+  }));
+  return function (_x4, _x5) {
+    return _ref3.apply(this, arguments);
+  };
+}());
+(0, _cucumber.When)(/^I click the "([^"]*)" with "([^"]*)" text And sign the transaction$/, /*#__PURE__*/function () {
+  var _ref8 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee11(role, name) {
+    var page, globalStateManager, newPagePromise, newPage;
+    return _regeneratorRuntime().wrap(function _callee11$(_context11) {
+      while (1) switch (_context11.prev = _context11.next) {
+        case 0:
+          page = this.screen.page, globalStateManager = this.globalStateManager;
+          newPagePromise = new Promise(function (resolve) {
+            return page.context().once('page', resolve);
+          });
+          _context11.next = 4;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee8() {
+            var locator, result;
+            return _regeneratorRuntime().wrap(function _callee8$(_context8) {
+              while (1) switch (_context8.prev = _context8.next) {
+                case 0:
+                  _context8.next = 2;
+                  return page.getByRole(role, {
+                    name: name,
+                    exact: true
+                  });
+                case 2:
+                  locator = _context8.sent;
+                  _context8.next = 5;
+                  return locator.isVisible();
+                case 5:
+                  result = _context8.sent;
+                  if (!result) {
+                    _context8.next = 10;
+                    break;
+                  }
+                  _context8.next = 9;
+                  return locator.click();
+                case 9:
+                  return _context8.abrupt("return", result);
+                case 10:
+                case "end":
+                  return _context8.stop();
+              }
+            }, _callee8);
+          })));
+        case 4:
+          _context11.next = 6;
+          return newPagePromise;
+        case 6:
+          newPage = _context11.sent;
+          _context11.next = 9;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee9() {
+            return _regeneratorRuntime().wrap(function _callee9$(_context9) {
+              while (1) switch (_context9.prev = _context9.next) {
+                case 0:
+                  _context9.next = 2;
+                  return newPage.reload();
+                case 2:
+                  return _context9.abrupt("return", true);
+                case 3:
+                case "end":
+                  return _context9.stop();
+              }
+            }, _callee9);
+          })));
+        case 9:
+          _context11.next = 11;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee10() {
+            var buttonName, locator, result;
+            return _regeneratorRuntime().wrap(function _callee10$(_context10) {
+              while (1) switch (_context10.prev = _context10.next) {
+                case 0:
+                  buttonName = "Confirm";
+                  _context10.next = 3;
+                  return newPage.getByRole("button", {
+                    name: buttonName,
+                    exact: true
+                  });
+                case 3:
+                  locator = _context10.sent;
+                  _context10.next = 6;
+                  return locator.isVisible();
+                case 6:
+                  result = _context10.sent;
+                  if (!result) {
+                    _context10.next = 11;
+                    break;
+                  }
+                  _context10.next = 10;
+                  return locator.click();
+                case 10:
+                  return _context10.abrupt("return", result);
+                case 11:
+                case "end":
+                  return _context10.stop();
+              }
+            }, _callee10);
+          })));
+        case 11:
+        case "end":
+          return _context11.stop();
+      }
+    }, _callee11, this);
   }));
   return function (_x6, _x7, _x8) {
-    return _ref5.apply(this, arguments);
+    return _ref8.apply(this, arguments);
+  };
+}());
+(0, _cucumber.When)(/^I click the new tab "link" with "([^"]*)" text$/, /*#__PURE__*/function () {
+  var _ref12 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee13(name) {
+    var page, globalStateManager, newPagePromise, newPage;
+    return _regeneratorRuntime().wrap(function _callee13$(_context13) {
+      while (1) switch (_context13.prev = _context13.next) {
+        case 0:
+          page = this.screen.page, globalStateManager = this.globalStateManager;
+          newPagePromise = new Promise(function (resolve) {
+            return page.context().once('page', resolve);
+          });
+          _context13.next = 4;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee12() {
+            var locator, result;
+            return _regeneratorRuntime().wrap(function _callee12$(_context12) {
+              while (1) switch (_context12.prev = _context12.next) {
+                case 0:
+                  _context12.next = 2;
+                  return page.getByRole("link", {
+                    name: name,
+                    exact: true
+                  });
+                case 2:
+                  locator = _context12.sent;
+                  _context12.next = 5;
+                  return locator.isVisible();
+                case 5:
+                  result = _context12.sent;
+                  if (!result) {
+                    _context12.next = 10;
+                    break;
+                  }
+                  _context12.next = 9;
+                  return locator.click();
+                case 9:
+                  return _context12.abrupt("return", result);
+                case 10:
+                case "end":
+                  return _context12.stop();
+              }
+            }, _callee12);
+          })));
+        case 4:
+          _context13.next = 6;
+          return newPagePromise;
+        case 6:
+          newPage = _context13.sent;
+          globalStateManager.appendValue(name, newPage);
+        case 8:
+        case "end":
+          return _context13.stop();
+      }
+    }, _callee13, this);
+  }));
+  return function (_x9, _x10) {
+    return _ref12.apply(this, arguments);
+  };
+}());
+(0, _cucumber.When)(/^I click the "([^"]*)" (?:button|link)$/, /*#__PURE__*/function () {
+  var _ref14 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee15(name, role) {
+    var page;
+    return _regeneratorRuntime().wrap(function _callee15$(_context15) {
+      while (1) switch (_context15.prev = _context15.next) {
+        case 0:
+          page = this.screen.page;
+          _context15.next = 3;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee14() {
+            var locator, result;
+            return _regeneratorRuntime().wrap(function _callee14$(_context14) {
+              while (1) switch (_context14.prev = _context14.next) {
+                case 0:
+                  _context14.next = 2;
+                  return page.getByRole(role, {
+                    name: name,
+                    exact: true
+                  });
+                case 2:
+                  locator = _context14.sent;
+                  _context14.next = 5;
+                  return locator.isVisible();
+                case 5:
+                  result = _context14.sent;
+                  if (!result) {
+                    _context14.next = 10;
+                    break;
+                  }
+                  _context14.next = 9;
+                  return locator.click();
+                case 9:
+                  return _context14.abrupt("return", result);
+                case 10:
+                case "end":
+                  return _context14.stop();
+              }
+            }, _callee14);
+          })));
+        case 3:
+        case "end":
+          return _context15.stop();
+      }
+    }, _callee15, this);
+  }));
+  return function (_x11, _x12, _x13) {
+    return _ref14.apply(this, arguments);
   };
 }());

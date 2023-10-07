@@ -1,4 +1,3 @@
-@dev
 @smoke
 @regression
 

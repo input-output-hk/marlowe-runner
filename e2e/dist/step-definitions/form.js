@@ -125,8 +125,8 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
     return _ref5.apply(this, arguments);
   };
 }());
-(0, _cucumber.When)('I find the line in the {string} editor containing {string}', /*#__PURE__*/function () {
-  var _ref6 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7(editorName, codeExample) {
+(0, _cucumber.When)(/^I reload the page$/, /*#__PURE__*/function () {
+  var _ref6 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7() {
     var page;
     return _regeneratorRuntime().wrap(function _callee7$(_context7) {
       while (1) switch (_context7.prev = _context7.next) {
@@ -138,9 +138,7 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
               while (1) switch (_context6.prev = _context6.next) {
                 case 0:
                   _context6.next = 2;
-                  return page.getByRole('code').locator('div').filter({
-                    hasText: codeExample
-                  }).nth(4).click();
+                  return page.reload();
                 case 2:
                   return _context6.abrupt("return", true);
                 case 3:
@@ -155,12 +153,12 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
       }
     }, _callee7, this);
   }));
-  return function (_x7, _x8, _x9) {
+  return function (_x7) {
     return _ref6.apply(this, arguments);
   };
 }());
-(0, _cucumber.When)('I press {string} on the keyboard {string} times', /*#__PURE__*/function () {
-  var _ref8 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee9(keyName, numberOfTimes) {
+(0, _cucumber.When)('I find the line in the {string} editor containing {string}', /*#__PURE__*/function () {
+  var _ref8 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee9(editorName, codeExample) {
     var page;
     return _regeneratorRuntime().wrap(function _callee9$(_context9) {
       while (1) switch (_context9.prev = _context9.next) {
@@ -168,26 +166,16 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
           page = this.screen.page;
           _context9.next = 3;
           return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee8() {
-            var times, i;
             return _regeneratorRuntime().wrap(function _callee8$(_context8) {
               while (1) switch (_context8.prev = _context8.next) {
                 case 0:
-                  times = parseInt(numberOfTimes, 10);
-                  i = 0;
-                case 2:
-                  if (!(i < times)) {
-                    _context8.next = 8;
-                    break;
-                  }
-                  _context8.next = 5;
-                  return page.keyboard.press(keyName);
-                case 5:
-                  i++;
                   _context8.next = 2;
-                  break;
-                case 8:
+                  return page.getByRole('code').locator('div').filter({
+                    hasText: codeExample
+                  }).nth(4).click();
+                case 2:
                   return _context8.abrupt("return", true);
-                case 9:
+                case 3:
                 case "end":
                   return _context8.stop();
               }
@@ -199,7 +187,51 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
       }
     }, _callee9, this);
   }));
-  return function (_x10, _x11, _x12) {
+  return function (_x8, _x9, _x10) {
     return _ref8.apply(this, arguments);
+  };
+}());
+(0, _cucumber.When)('I press {string} on the keyboard {string} times', /*#__PURE__*/function () {
+  var _ref10 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee11(keyName, numberOfTimes) {
+    var page;
+    return _regeneratorRuntime().wrap(function _callee11$(_context11) {
+      while (1) switch (_context11.prev = _context11.next) {
+        case 0:
+          page = this.screen.page;
+          _context11.next = 3;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee10() {
+            var times, i;
+            return _regeneratorRuntime().wrap(function _callee10$(_context10) {
+              while (1) switch (_context10.prev = _context10.next) {
+                case 0:
+                  times = parseInt(numberOfTimes, 10);
+                  i = 0;
+                case 2:
+                  if (!(i < times)) {
+                    _context10.next = 8;
+                    break;
+                  }
+                  _context10.next = 5;
+                  return page.keyboard.press(keyName);
+                case 5:
+                  i++;
+                  _context10.next = 2;
+                  break;
+                case 8:
+                  return _context10.abrupt("return", true);
+                case 9:
+                case "end":
+                  return _context10.stop();
+              }
+            }, _callee10);
+          })));
+        case 3:
+        case "end":
+          return _context11.stop();
+      }
+    }, _callee11, this);
+  }));
+  return function (_x11, _x12, _x13) {
+    return _ref10.apply(this, arguments);
   };
 }());
