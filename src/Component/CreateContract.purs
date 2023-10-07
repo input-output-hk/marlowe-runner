@@ -411,7 +411,7 @@ mkComponent = do
             $ DOM.div { className: "col-12 text-end" }
             $ do
                 let inputId = "contract-file-upload"
-                [ DOM.label { htmlFor: inputId, className: buttonOutlinedClassNames OutlinePrimaryColoring "" }
+                [ DOM.label { htmlFor: inputId, className: buttonOutlinedClassNames OutlinePrimaryColoring "", role: "button" }
                     [ R.text "Upload JSON" ]
                 , loadFileHiddenInputComponent
                     { onFileload: case _ of

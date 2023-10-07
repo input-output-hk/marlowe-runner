@@ -12,8 +12,6 @@ When(
       globalStateManager
     } = this;
 
-    let newPagePromise;
-
     await waitFor(async() => {
       const locator = await page.getByRole(role, { name, exact: true });
       const result = await locator.isVisible();
@@ -24,6 +22,98 @@ When(
     });
   }
 );
+
+When(
+  /^I authorize my "([^"]*)" wallet$/,
+  async function(this: ScenarioWorld, name: string) {
+    const {
+      screen: { page },
+      globalStateManager
+    } = this;
+
+    let newPagePromise;
+
+    newPagePromise = new Promise(resolve => page.context().once('page', resolve));
+
+    await waitFor(async() => {
+      const locator = await page.getByRole("button", { name, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    const newPage = await newPagePromise as playwright.Page;
+
+    await waitFor(async() => {
+      await newPage.reload();
+      return true;
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Authorize"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Always"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+  }
+);
+
+When(
+  /^I click the "([^"]*)" with "([^"]*)" text And sign the transaction$/,
+  async function(this: ScenarioWorld, role: ValidAccessibilityRoles,  name: string) {
+    const {
+      screen: { page },
+      globalStateManager
+    } = this;
+
+    let newPagePromise;
+
+    newPagePromise = new Promise(resolve => page.context().once('page', resolve));
+
+    await waitFor(async() => {
+      const locator = await page.getByRole(role, { name, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    // Await for new page to popup
+    const newPage = await newPagePromise as playwright.Page;
+
+    await waitFor(async() => {
+      await newPage.reload();
+      return true;
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Confirm"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+  }
+);
+
 
 When(
   /^I click the new tab "link" with "([^"]*)" text$/,
