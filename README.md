@@ -65,9 +65,9 @@ You can build the static site with Nix using:
 nix build .#marlowe-runner
 ```
 
-Whenever you make changes to your `spago` packages, you must run the 
-`gen-spago-packages-nix` script (available inside the `nix develop` shell) to 
-recreate `spago-packages.nix`.
+Whenever you make changes to `package-json.lock` or `packages.dhall` packages, you must run the 
+`gen-nix-lockfiles` script (available inside the `nix develop` shell) to 
+recreate `spago-packages.nix` and `npm-deps-hash.nix`.
 
 ### Troubleshooting
 
