@@ -99,3 +99,42 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
     return _ref3.apply(this, arguments);
   };
 }());
+(0, _cucumber.Then)(/^I should see "([^"]*)" text$/, /*#__PURE__*/function () {
+  var _ref5 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6(text) {
+    var page;
+    return _regeneratorRuntime().wrap(function _callee6$(_context6) {
+      while (1) switch (_context6.prev = _context6.next) {
+        case 0:
+          page = this.screen.page; // NOTE: This locator uses html accessibility roles and names to find elements.
+          // If your test is not finding an element, please verify that the role and name are correct.
+          _context6.next = 3;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
+            var locator, isElementVisible;
+            return _regeneratorRuntime().wrap(function _callee5$(_context5) {
+              while (1) switch (_context5.prev = _context5.next) {
+                case 0:
+                  _context5.next = 2;
+                  return page.getByText(text);
+                case 2:
+                  locator = _context5.sent;
+                  _context5.next = 5;
+                  return locator.isVisible();
+                case 5:
+                  isElementVisible = _context5.sent;
+                  return _context5.abrupt("return", isElementVisible);
+                case 7:
+                case "end":
+                  return _context5.stop();
+              }
+            }, _callee5);
+          })));
+        case 3:
+        case "end":
+          return _context6.stop();
+      }
+    }, _callee6, this);
+  }));
+  return function (_x10, _x11) {
+    return _ref5.apply(this, arguments);
+  };
+}());

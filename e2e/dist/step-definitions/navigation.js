@@ -72,3 +72,54 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
     return _ref2.apply(this, arguments);
   };
 }());
+(0, _cucumber.When)(/^I pause the page$/, /*#__PURE__*/function () {
+  var _ref4 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
+    var page;
+    return _regeneratorRuntime().wrap(function _callee4$(_context4) {
+      while (1) switch (_context4.prev = _context4.next) {
+        case 0:
+          page = this.screen.page;
+          _context4.next = 3;
+          return page.pause();
+        case 3:
+        case "end":
+          return _context4.stop();
+      }
+    }, _callee4, this);
+  }));
+  return function (_x6) {
+    return _ref4.apply(this, arguments);
+  };
+}());
+(0, _cucumber.When)(/^I reload the page$/, /*#__PURE__*/function () {
+  var _ref5 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6() {
+    var page;
+    return _regeneratorRuntime().wrap(function _callee6$(_context6) {
+      while (1) switch (_context6.prev = _context6.next) {
+        case 0:
+          page = this.screen.page;
+          _context6.next = 3;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
+            return _regeneratorRuntime().wrap(function _callee5$(_context5) {
+              while (1) switch (_context5.prev = _context5.next) {
+                case 0:
+                  _context5.next = 2;
+                  return page.reload();
+                case 2:
+                  return _context5.abrupt("return", true);
+                case 3:
+                case "end":
+                  return _context5.stop();
+              }
+            }, _callee5);
+          })));
+        case 3:
+        case "end":
+          return _context6.stop();
+      }
+    }, _callee6, this);
+  }));
+  return function (_x7) {
+    return _ref5.apply(this, arguments);
+  };
+}());
