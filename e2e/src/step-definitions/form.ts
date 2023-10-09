@@ -54,30 +54,6 @@ When(
   }
 )
 
-When(
-  /^I pause the page$/,
-  async function(this: ScenarioWorld) {
-    const {
-      screen: { page },
-    } = this;
-    await page.pause();
-  }
-)
-
-When(
-  /^I reload the page$/,
-  async function(this: ScenarioWorld) {
-    const {
-      screen: { page },
-    } = this;
-    await waitFor(async() => {
-      await page.reload();
-      return true;
-    });
-  }
-)
-
-
 When('I find the line in the {string} editor containing {string}',
   async function (this: ScenarioWorld, editorName: string, codeExample: string) {
     const {

@@ -1,5 +1,5 @@
 import playwright from 'playwright';
-import { Given, Then } from '@cucumber/cucumber';
+import { Given, When, Then } from '@cucumber/cucumber';
 import { PageId } from '../env/global';
 import {
   navigateToPage,
@@ -42,3 +42,26 @@ Then('a new browser tab should open for {string} at {string} url', async functio
     return actualUrl.includes(expectedUrl);
   });
 });
+
+When(
+  /^I pause the page$/,
+  async function(this: ScenarioWorld) {
+    const {
+      screen: { page },
+    } = this;
+    await page.pause();
+  }
+)
+
+When(
+  /^I reload the page$/,
+  async function(this: ScenarioWorld) {
+    const {
+      screen: { page },
+    } = this;
+    await waitFor(async() => {
+      await page.reload();
+      return true;
+    });
+  }
+)

@@ -3,6 +3,9 @@ import { When } from '@cucumber/cucumber';
 import { ScenarioWorld } from './setup/world';
 import { ValidAccessibilityRoles } from '../env/global';
 import { waitFor } from "../support/wait-for-behavior";
+import {
+  inputValue,
+} from '../support/html-behavior';
 
 When(
   /^I click the "([^"]*)" with "([^"]*)" text$/,
@@ -111,6 +114,41 @@ When(
         return result;
       }
     });
+
+    await waitFor(async() => {
+      // const locator = await page.getByRole(role as ValidAccessibilityRoles, { name })
+      // const locator = await newPage.getByRole("textbox", { name: "Password" })  
+      const locator = await newPage.getByTestId("password-input")
+      const result = await locator.isVisible();
+
+      if (result) {
+        const password = process.env.LACE_WALLET_PASSWORD as string
+        await inputValue(locator, password);
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Confirm"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Close"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+
   }
 );
 
