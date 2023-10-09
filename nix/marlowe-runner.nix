@@ -6,21 +6,10 @@ let
 
   spago-pkgs = import ./gen/spago-packages.nix { inherit pkgs; };
 
-  node-deps =
-    let
-      node-default = import ./gen/node-default.nix {
-        inherit pkgs system;
-        nodejs = pkgs.nodejs-18_x;
-      };
-    in
-    node-default.nodeDependencies;
-
 in
 
-pkgs.stdenv.mkDerivation {
-
-  name = "marlowe-runner";
-
+pkgs.buildNpmPackage {
+  pname = "marlowe-runner";
   version = "0.1.0";
 
   src = lib.sourceByRegex ../. [
@@ -40,45 +29,101 @@ pkgs.stdenv.mkDerivation {
     "^webpack.js$"
   ];
 
-  buildInputs = [
+  npmDepsHash = import ./gen/npm-deps-hash.nix;
+
+  nativeBuildInputs = [
     spago-pkgs.installSpagoStyle
     spago-pkgs.buildSpagoStyle
     repoRoot.nix.purescript.purs-0_15_10
     repoRoot.nix.purescript.spago2nix
+    pkgs.nodejs_18.pkgs.webpack-cli
   ];
 
   buildPhase = ''
-    # Symlink the generated node deps to the current directory for building
-    ln -sf ${node-deps}/lib/node_modules ./node_modules
-    export PATH="${node-deps}/bin:$PATH"
+    mkdir -p $out
 
     # We want to use prod.dhall, but `install-spago-style` below uses 
     # spago.dhall by default and there doesn't seem to be a way to override it.
-    mv prod.dhall spago.dhall"
+    mv prod.dhall spago.dhall
       
     install-spago-style
     build-spago-style "./src/**/*.purs"
 
     # This will create the public/*bundle.js* and public/*.module.wasm files.   
     webpack-cli --mode=production -c webpack.js --progress=profile
-  '';
 
-  installPhase = ''
     cp -r public $out
-
-    # runHook preInstall
-    # mkdir -p $out/bin
-    # cp package.json $out/package.json
-    # cp -r dist $out/dist
-    # ln -sf ${node-deps}/lib/node_modules $out/node_modules
-    # # copy entry point, in this case our index.ts has the node shebang
-    # # nix will patch the shebang to be the node version specified in buildInputs
-    # # you could also copy in a script that is basically `npm run start`
-    # cp dist/index.js $out/bin/example-ts-nix
-    # chmod a+x $out/bin/example-ts-nix
-    # runHook postInstall
   '';
+
+  # The prepack script runs the build script, which we'd rather do in the build phase.
+  #npmPackFlags = [ "--ignore-scripts" ];
+
+  #NODE_OPTIONS = "--openssl-legacy-provider";
+
 }
+
+# pkgs.stdenv.mkDerivation {
+
+#   name = "marlowe-runner";
+
+#   version = "0.1.0";
+
+#   src = lib.sourceByRegex ../. [
+#     "^prototype.*"
+#     "^public.*"
+#     "^src.*"
+#     "^test.*"
+#     "^.tidyrc.json$"
+#     "^jsconfig.json$"
+#     "^package-lock.json$"
+#     "^package.json$"
+#     "^packages.dhall$"
+#     "^prod.dhall$"
+#     "^spago-packages.nix$"
+#     "^spago.dhall$"
+#     "^tsconfig.json$"
+#     "^webpack.js$"
+#   ];
+
+#   buildInputs = [
+#     spago-pkgs.installSpagoStyle
+#     spago-pkgs.buildSpagoStyle
+#     repoRoot.nix.purescript.purs-0_15_10
+#     repoRoot.nix.purescript.spago2nix
+#   ];
+
+#   buildPhase = ''
+#     # Symlink the generated node deps to the current directory for building
+#     ln -sf ${node-deps}/lib/node_modules ./node_modules
+#     export PATH="${node-deps}/bin:$PATH"
+
+#     # We want to use prod.dhall, but `install-spago-style` below uses 
+#     # spago.dhall by default and there doesn't seem to be a way to override it.
+#     mv prod.dhall spago.dhall
+
+#     install-spago-style
+#     build-spago-style "./src/**/*.purs"
+
+#     # This will create the public/*bundle.js* and public/*.module.wasm files.   
+#     webpack-cli --mode=production -c webpack.js --progress=profile
+#   '';
+
+#   installPhase = ''
+#     cp -r public $out
+
+#     # runHook preInstall
+#     # mkdir -p $out/bin
+#     # cp package.json $out/package.json
+#     # cp -r dist $out/dist
+#     # ln -sf ${node-deps}/lib/node_modules $out/node_modules
+#     # # copy entry point, in this case our index.ts has the node shebang
+#     # # nix will patch the shebang to be the node version specified in buildInputs
+#     # # you could also copy in a script that is basically `npm run start`
+#     # cp dist/index.js $out/bin/example-ts-nix
+#     # chmod a+x $out/bin/example-ts-nix
+#     # runHook postInstall
+#   '';
+# }
 
 # npmlock2nix.v1.build {
 

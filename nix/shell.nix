@@ -30,7 +30,9 @@ lib.iogx.mkShell {
     pkgs.jq
     pkgs.node2nix
     pkgs.docker
+    pkgs.prefetch-npm-deps
     pkgs.nodejs-18_x
+    pkgs.nodejs-18_x.pkgs.yarn
     pkgs.nodejs-18_x.pkgs.bower
     pkgs.nodejs-18_x.pkgs.jshint
     pkgs.nodejs-18_x.pkgs.yarn
@@ -49,12 +51,7 @@ lib.iogx.mkShell {
       spago2nix generate 
       mv spago-packages.nix nix/gen/spago-packages.nix
 
-      node2nix -18 --development \
-        --input package.json \
-        --lock package-lock.json \
-        --node-env ./nix/gen/node-env.nix \
-        --composition ./nix/gen/node-default.nix \
-        --output ./nix/gen/node-package.nix
+      prefetch-npm-deps package-lock.json > nix/gen/nom-deps-hash.nix
     '';
   };
 
