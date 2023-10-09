@@ -172,13 +172,16 @@ isInline :: FieldLayout -> Boolean
 isInline = eq Inline
 
 type TextInputOptionalPropsRow r =
-  ( label :: Maybe JSX
+  ( "aria-label" :: Opt String
+  , "aria-labelledby" :: Opt String
+  , label :: Maybe JSX
   , name :: Maybe FieldId
   , initial :: String
   , layout :: FieldLayout
   , helpText :: Maybe JSX
   , missingError :: String
   , placeholder :: String
+  , "role" :: Opt String
   , "type" :: String
   , touched :: Boolean
 
@@ -196,7 +199,10 @@ type TextInputOptionalProps = { | TextInputOptionalPropsRow () }
 
 defaultTextInputProps :: TextInputOptionalProps
 defaultTextInputProps =
-  { label: Nothing
+  { "aria-label": NoProblem.undefined
+  , "aria-labelledby": NoProblem.undefined
+  , role: NoProblem.undefined
+  , label: Nothing
   , layout: MultiColumn col3spacings
   , missingError: "This field is required"
   , name: Nothing
@@ -598,7 +604,10 @@ type TextAreaOptionalProps = { | TextAreaOptionalPropsRow () }
 
 defaultTextAreaProps :: TextAreaOptionalProps
 defaultTextAreaProps =
-  { label: Nothing
+  { "aria-label": NoProblem.undefined
+  , "aria-labelledby": NoProblem.undefined
+  , "role": NoProblem.undefined
+  , label: Nothing
   , missingError: "This field is required"
   , name: Nothing
   , initial: ""

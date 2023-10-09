@@ -194,7 +194,7 @@ in  upstream
       , "validation", "web-html"
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
-      "39c055d3a3d4fadca6afba31326fdf27d315aec8"
+      "v0.0.1"
 
   with react-basic-hooks =
       mkPackage
