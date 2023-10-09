@@ -170,6 +170,8 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun _)) = FormSpecBuilder.ev
       , rows: 15
       , name: Just contractFieldId
       , inputExtraClassName: NoProblem.opt "font-monospace"
+      , role: NoProblem.opt "textarea"
+      , "aria-label": NoProblem.opt "contract-input"
       }
 
     tags <- labelSubform tagFieldId $ StatelessFormSpecBuilders.textInput
