@@ -22,4 +22,4 @@ Feature: As a user I should be able to choose a wallet
       And I should see a "button" with "Back to contract list" text
 
       When I click the "button" with "Submit contract" text And sign the transaction
-      Then I pause the page
+      Then I should see "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain." text

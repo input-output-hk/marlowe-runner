@@ -44,3 +44,22 @@ Then(
     });
   }
 );
+
+Then(
+  /^I should see "([^"]*)" text$/,
+  async function(this: ScenarioWorld, text:string) {
+
+    const {
+      screen: { page },
+    } = this;
+
+
+    // NOTE: This locator uses html accessibility roles and names to find elements.
+    // If your test is not finding an element, please verify that the role and name are correct.
+    await waitFor(async () => {
+      const locator = await page.getByText(text);
+      const isElementVisible = await locator.isVisible();
+      return isElementVisible;
+    });
+  }
+);
