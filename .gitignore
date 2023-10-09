@@ -23,3 +23,5 @@ public/config.json
 !e2e/yarn.lock
 e2e/node_modules
 e2e/reports
+e2e/dist
+e2e/env
