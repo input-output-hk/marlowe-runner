@@ -48,14 +48,13 @@ import Data.List (intercalate)
 import Data.List as List
 import Data.Map (Map, lookup)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, isNothing)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid as Monoid
 import Data.Set as Set
 import Data.String (contains, length)
 import Data.String as String
 import Data.String.Pattern (Pattern(..))
 import Data.Time.Duration as Duration
-import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
@@ -74,7 +73,7 @@ import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.DOM.Simplified.ToJSX (class ToJSX)
 import React.Basic.Events (EventHandler, handler, handler_)
-import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useContext, useState, useState', (/\))
+import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useState, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import ReactBootstrap (overlayTrigger, tooltip)
@@ -116,10 +115,11 @@ newtype NotSyncedYetInserts = NotSyncedYetInserts
   }
 
 type Props =
-  { possibleContracts :: Maybe (Array SomeContractInfo) -- `Maybe` indicates if the contracts where fetched already
+  { walletInfo :: WalletInfo Wallet.Api
+  , walletContext :: WalletContext
+  , possibleContracts :: Maybe (Array SomeContractInfo) -- `Maybe` indicates if the contracts where fetched already
   , contractMapInitialized :: Boolean
   , notSyncedYetInserts :: NotSyncedYetInserts
-  , connectedWallet :: Maybe (WalletInfo Wallet.Api)
   , possibleInitialModalAction :: Maybe ModalAction
   , setPage :: Page -> Effect Unit
   , submittedWithdrawalsInfo :: Map ContractId (Array TxOutRef) /\ (ContractId -> TxOutRef -> Effect Unit)
@@ -195,8 +195,6 @@ someContractTags (NotSyncedCreatedContract { tags }) = runLiteTags tags
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
-  Runtime runtime <- asks _.runtime
-  walletInfoCtx <- asks _.walletInfoCtx
 
   createContractComponent <- CreateContract.mkComponent
   applyInputsComponent <- ApplyInputs.mkComponent
@@ -213,11 +211,11 @@ mkContractList = do
     timeInterval = V1.TimeInterval invalidBefore invalidHereafter
     environment = V1.Environment { timeInterval }
 
-  liftEffect $ component "ContractList" \props@{ connectedWallet, possibleInitialModalAction, possibleContracts, contractMapInitialized, submittedWithdrawalsInfo } -> React.do
+  liftEffect $ component "ContractList" \props@{ walletInfo, walletContext, possibleInitialModalAction, possibleContracts, contractMapInitialized, submittedWithdrawalsInfo } -> React.do
     let
       NotSyncedYetInserts notSyncedYetInserts = props.notSyncedYetInserts
 
-    possibleWalletContext <- useContext walletInfoCtx <#> map snd
+    -- possibleWalletContext <- useContext walletInfoCtx <#> map snd
 
     possibleModalAction /\ setModalAction /\ resetModalAction <- React.do
       p /\ set /\ reset <- useMaybeValue possibleInitialModalAction
@@ -282,9 +280,9 @@ mkContractList = do
         onError error = do
           msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission: " <> error ]
           resetModalAction
-      case possibleModalAction, connectedWallet, submittedWithdrawalsInfo of
-        Just (NewContract possibleInitialContract), Just cw, _ -> createContractComponent
-          { connectedWallet: cw
+      case possibleModalAction, submittedWithdrawalsInfo of
+        Just (NewContract possibleInitialContract), _ -> createContractComponent
+          { connectedWallet: walletInfo
           , onDismiss: resetModalAction
           , onSuccess: \contractCreated -> do
               msgHubProps.add $ Success $ DOOM.text $ String.joinWith " "
@@ -296,7 +294,7 @@ mkContractList = do
           , onError
           , possibleInitialContract
           }
-        Just (ApplyInputs contractInfo transactionsEndpoint marloweContext), Just cw, _ -> do
+        Just (ApplyInputs contractInfo transactionsEndpoint marloweContext), _ -> do
           let
             onSuccess = \contractUpdated -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
@@ -308,11 +306,11 @@ mkContractList = do
             , contractInfo
             , marloweContext
             , onError
-            , connectedWallet: cw
+            , connectedWallet: walletInfo
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Just (Withdrawal walletContext roles contractId unclaimedPayouts), Just cw, _ /\ updateSubmitted -> do
+        Just (Withdrawal walletContext roles contractId unclaimedPayouts), _ /\ updateSubmitted -> do
           let
             onSuccess = \_ -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
@@ -320,7 +318,7 @@ mkContractList = do
               resetModalAction
           withdrawalsComponent
             { roles
-            , connectedWallet: cw
+            , connectedWallet: walletInfo
             , onSuccess
             , onError
             , onDismiss: resetModalAction
@@ -328,31 +326,31 @@ mkContractList = do
             , updateSubmitted: updateSubmitted contractId
             , walletContext
             }
-        Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints }), _, _ -> do
+        Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints }), _ -> do
           let
             onClose = resetModalAction
           contractDetails { contract, onClose, state, transactionEndpoints, initialContract, initialState }
 
         -- This should be fixed later on - for now we put some stubs
-        Just (ContractTemplate Escrow), _, _ -> escrowComponent
+        Just (ContractTemplate Escrow), _ -> escrowComponent
           { onSuccess: \_ -> resetModalAction
           , onDismiss: resetModalAction
           }
 
-        Just (ContractTemplate Swap), _, _ -> swapComponent
+        Just (ContractTemplate Swap), _ -> swapComponent
           { onSuccess: \_ -> resetModalAction
           , onDismiss: resetModalAction
           }
 
-        Just (ContractTemplate ContractForDifferencesWithOracle), _, _ -> contractForDifferencesWithOracleComponent
+        Just (ContractTemplate ContractForDifferencesWithOracle), _ -> contractForDifferencesWithOracleComponent
           { onSuccess: \_ -> resetModalAction
           , onDismiss: resetModalAction
           }
 
-        Nothing, _, _ -> React.fragment
+        Nothing, _ -> React.fragment
           [ DOM.div { className: "container" } $ DOM.div { className: "row" } do
               let
-                disabled = isNothing connectedWallet
+                disabled = false -- isNothing connectedWallet
                 newContractButton = buttonOutlinedPrimary
                   { label: DOOM.text "Create a contract"
                   , onClick: do
@@ -531,11 +529,12 @@ mkContractList = do
                                   transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
                                 tdContractId contractId marloweInfo transactionEndpoints
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered
-                                [ case endpoints.transactions, marloweInfo, possibleWalletContext, submittedWithdrawalsInfo of
+                            , tdCentered do
+                                let
+                                  WalletContext { usedAddresses, balance: Cardano.Value balance } = walletContext
+                                [ case endpoints.transactions, marloweInfo, submittedWithdrawalsInfo of
                                     Just transactionsEndpoint,
                                     Just (MarloweInfo { currencySymbol, initialContract, state: Just state, currentContract: Just contract }),
-                                    Just (WalletContext { usedAddresses, balance: Cardano.Value balance }),
                                     _ -> do
                                       let
                                         rolesInContract = case currencySymbol of
@@ -550,10 +549,9 @@ mkContractList = do
                                         -- , extraClassNames: "font-weight-bold btn-outline-primary"
                                         , onClick: setModalAction $ ApplyInputs ci transactionsEndpoint { initialContract, state, contract }
                                         }
-                                    _, Just (MarloweInfo { state: Nothing, currentContract: Nothing, currencySymbol: Nothing }), _, _ -> DOOM.text "Complete"
+                                    _, Just (MarloweInfo { state: Nothing, currentContract: Nothing, currencySymbol: Nothing }), _ -> DOOM.text "Complete"
                                     _,
                                     Just (MarloweInfo { state: Nothing, currentContract: Nothing, currencySymbol: Just currencySymbol, unclaimedPayouts }),
-                                    Just (WalletContext { balance: Cardano.Value balance }),
                                     submittedPayouts /\ _ -> do
                                       let
                                         payouts = remainingPayouts contractId submittedPayouts unclaimedPayouts
@@ -562,11 +560,10 @@ mkContractList = do
                                         (null rolesConsidered)
                                         DOOM.text
                                         "Complete"
-                                    _, _, _, _ -> buttonOutlinedInactive { label: DOOM.text "Syncing" }
-                                , case marloweInfo, possibleWalletContext, submittedWithdrawalsInfo of
-                                    Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), Just walletContext, submittedPayouts /\ _ -> do
+                                    _, _, _ -> buttonOutlinedInactive { label: DOOM.text "Syncing" }
+                                , case marloweInfo, submittedWithdrawalsInfo of
+                                    Just (MarloweInfo { currencySymbol: Just currencySymbol, state: _, unclaimedPayouts }), submittedPayouts /\ _ -> do
                                       let
-                                        WalletContext { balance: Cardano.Value balance } = walletContext
                                         payouts = remainingPayouts contractId submittedPayouts unclaimedPayouts
                                         rolesConsidered = remainingRoles currencySymbol balance payouts
 
@@ -577,7 +574,7 @@ mkContractList = do
                                           , onClick: setModalAction $ Withdrawal walletContext (NonEmptyArray.cons' head tail) contractId payouts
                                           }
                                         _ -> mempty
-                                    _, _, _ -> mempty
+                                    _, _ -> mempty
                                 ]
                             ]
                           NotSyncedCreatedContract {} -> do
@@ -585,7 +582,7 @@ mkContractList = do
                             , tdInstant $ updatedAt <|> createdAt
                             , tdContractId contractId Nothing []
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
+                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "SC: Syncing" } ]
                             ]
                           NotSyncedUpdatedContract { contractInfo } -> do
                             [ tdInstant createdAt
@@ -596,10 +593,9 @@ mkContractList = do
                                   transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
                                 tdContractId contractId Nothing transactionEndpoints
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
+                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "UC: Syncing" } ]
                             ]
           ]
-        _, _, _ -> mempty
 
 assetToString :: Cardano.AssetId -> Maybe String
 assetToString Cardano.AdaAssetId = Nothing
@@ -628,3 +624,4 @@ remainingPayouts contractId submittedPayouts unclaimedPayouts = do
   case lookup contractId submittedPayouts of
     Just s -> filter ((\(Payout { payoutId }) -> not (elem payoutId s))) unclaimedPayouts
     Nothing -> unclaimedPayouts
+

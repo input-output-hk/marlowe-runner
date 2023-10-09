@@ -12,8 +12,8 @@ import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
-import Component.Types.ContractInfo (SomeContractInfo)
 import Component.Types.ContractInfo (ContractCreated(..), ContractUpdated(..)) as ContractInfo
+import Component.Types.ContractInfo (SomeContractInfo)
 import Component.Types.ContractInfoMap as ContractInfoMap
 import Component.Widgets (link, linkWithIcon)
 import Contrib.React.Svg (svgImg)
@@ -35,6 +35,7 @@ import Data.String.Extra as String
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple.Nested ((/\))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
@@ -377,7 +378,6 @@ mkApp = do
         -- FIXME:
         --  * we should probably move this whole container to message hub
         --  * adding here margins etc. can break the layout consistency
-        -- FIXME: Larry this is message box which should be probably positioned using `position: fixed` or `sticky` or something like that ;-)
         , ReactContext.consumer msgHubProps.ctx \_ ->
             pure $ offcanvas
               { onHide: setCheckingNotifications false
@@ -405,16 +405,19 @@ mkApp = do
                 , inModal: true
                 }
             jsx
-        , do
-            subcomponents.contractListComponent
-              { possibleContracts
-              , contractMapInitialized
-              , notSyncedYetInserts
-              , connectedWallet: possibleWalletInfo
-              , submittedWithdrawalsInfo
-              , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
-              , setPage: props.setPage
-              }
+        , case possibleWalletContext, possibleWalletInfo of
+            Just walletContext, Just walletInfo -> do
+              subcomponents.contractListComponent
+                { walletInfo
+                , walletContext
+                , possibleContracts
+                , contractMapInitialized
+                , notSyncedYetInserts
+                , submittedWithdrawalsInfo
+                , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
+                , setPage: props.setPage
+                }
+            _, _ -> DOOM.text "Wallet missing"
         , footer
         ]
 
