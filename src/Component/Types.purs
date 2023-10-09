@@ -65,6 +65,7 @@ type MkContextBase r =
   , runtime :: Runtime
   , msgHub :: MessageHub
   , slotting :: Slotting
+  , develMode :: Boolean
   | r
   }
 

@@ -19,3 +19,4 @@ output-es
 public/*bundle.js*
 public/*module.wasm 
 public/config.json
+./prototypes/marlowe-graph/node_modules

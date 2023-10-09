@@ -181,7 +181,6 @@ mkApp = do
             launchAff_ $ resyncLoop contractId
             updateContractInfoMap $ \(contractMap /\ initialized) ->
               ContractInfoMap.insertContractUpdated cu contractMap /\ initialized
-
         { add, update }
 
       walletCtx = un WalletContext <$> possibleWalletContext
