@@ -43,9 +43,9 @@ lib.iogx.mkShell {
     pkgs.python38
   ];
 
-  scripts.refresh-package-json = {
+  scripts.gen-nix-lockfiles = {
     group = "marlowe-runner";
-    description = "Run this whenever package-json.lock changes.";
+    description = "Run this whenever package-json.lock or packages.dhall change.";
     exec = ''
       cd "$(git rev-parse --show-toplevel)"
 

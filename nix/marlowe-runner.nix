@@ -6,6 +6,13 @@ let
 
 in
 
+# buildNpmPackage is able to make a pure nix build by using npmDepsHash.
+  # That is the hash of package-lock.json.
+  # Its value is generated using the prefetch-npm-deps command (see shell.nix).
+  # We set dontNpmBuild and dontNpmInstall to true to significantly speed up the 
+  # build: this works because we have a custom buildPhase that invokes webpack-cli
+  # explicitely.
+
 pkgs.buildNpmPackage {
 
   pname = "marlowe-runner";
@@ -36,6 +43,7 @@ pkgs.buildNpmPackage {
     spago-pkgs.buildSpagoStyle
     repoRoot.nix.purescript.purs-0_15_10
     repoRoot.nix.purescript.spago2nix
+    pkgs.nodejs_18
     pkgs.nodejs_18.pkgs.webpack-cli
   ];
 
