@@ -6,12 +6,6 @@ let
 
 in
 
-# buildNpmPackage is able to make a pure nix build by using npmDepsHash.
-  # That is the hash of package-lock.json.
-  # Its value is generated using the prefetch-npm-deps command (see shell.nix).
-  # We set dontNpmBuild and dontNpmInstall to true to significantly speed up the 
-  # build: this works because we have a custom buildPhase that invokes webpack-cli
-  # explicitely.
 
 pkgs.buildNpmPackage {
 
@@ -36,6 +30,12 @@ pkgs.buildNpmPackage {
     "^webpack.js$"
   ];
 
+  # buildNpmPackage is able to make a pure nix build by using npmDepsHash.
+  # That is the hash of package-lock.json.
+  # Its value is generated using the prefetch-npm-deps command (see shell.nix).
+  # We set dontNpmBuild and dontNpmInstall to true to significantly speed up the 
+  # build: this works because we have a custom buildPhase that invokes webpack-cli
+  # explicitely.
   npmDepsHash = import ./gen/npm-deps-hash.nix;
 
   nativeBuildInputs = [
