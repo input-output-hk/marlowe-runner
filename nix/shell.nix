@@ -26,16 +26,11 @@ lib.iogx.mkShell {
     purescript.spago
     purescript.spago2nix
 
-    pkgs.podman
     pkgs.jq
-    pkgs.node2nix
-    pkgs.docker
     pkgs.prefetch-npm-deps
     pkgs.nodejs-18_x
-    pkgs.nodejs-18_x.pkgs.yarn
     pkgs.nodejs-18_x.pkgs.bower
     pkgs.nodejs-18_x.pkgs.jshint
-    pkgs.nodejs-18_x.pkgs.yarn
     pkgs.nodejs-18_x.pkgs.webpack
     pkgs.nodejs-18_x.pkgs.webpack-cli
     pkgs.dhall
