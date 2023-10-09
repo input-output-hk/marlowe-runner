@@ -25,3 +25,4 @@ e2e/node_modules
 e2e/reports
 e2e/dist
 e2e/env
+./prototypes/marlowe-graph/node_modules

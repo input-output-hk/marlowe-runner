@@ -75,7 +75,7 @@ type Case
   = { case: Action, then: Contract }
   | { case: Action, merkleized_then: string }
 
-type Contract
+export type Contract
   = "close"
   | { pay: Value, token: Token, to: Payee, from_account: AccountId, then: Contract }
   | { if: Observation, then: Contract, else: Contract }
@@ -203,31 +203,37 @@ const nodeTypes: NodeTypes = {
     return <div style={style_}>Not implemented!</div>
   }
 }
+// executed: black, opacity 100%, width 3px
+// still-possible: gray, width 3px
+// skipped: opacity 30%, width 1px
+type ContractEdgeStatus = 'executed' | 'skipped' | 'still-possible';
 
 type ContractEdgeData = {
-  disabled: boolean | null;
+  status: ContractEdgeStatus,
+}
+
+const statusToStyle = (status: ContractEdgeStatus, defaultStyle: React.CSSProperties): React.CSSProperties => {
+  switch (status) {
+    case 'executed':
+      return { ...defaultStyle, strokeOpacity: "100%", strokeWidth: 3, stroke: "black" }
+    case 'skipped':
+      return { ...defaultStyle, strokeOpacity: "30%", strokeWidth: 1 }
+    case 'still-possible':
+      return { ...defaultStyle, strokeOpacity: "100%", strokeWidth: 1 }
+  }
 }
 
 const edgeTypes: EdgeTypes = {
   ContractEdge({ data, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, markerEnd, style = {} }: EdgeProps<ContractEdgeData>): JSX.Element {
     const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
-    const style_: React.CSSProperties =
-      data && data.disabled
-        ? { ...style, strokeOpacity: "30%" }
-        : {
-          ...style, strokeOpacity: "100%",
-          strokeWidth: 3,
-          // strokeDasharray: "5",
-          // strokeDashoffset: "0",
-          // animation: "edgeflow 1000ms linear infinite",
-        }
+    const style_: React.CSSProperties = data?statusToStyle(data.status, style):style;
     return <BaseEdge path={edgePath} markerEnd={markerEnd} style={style_} />
   }
 }
 
 type ContractPathHistory = ReadonlyArray<number | null>
 
-const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number } => {
+const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path?: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number } => {
   if (contract === "close")
     return {
       nodes: [{ id, position: { x, y }, data: { type: "close", disabled: false }, type: "ContractNode" }],
@@ -236,29 +242,39 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
     }
 
   if ("if" in contract) {
-    const [index, ...indices] = path
+    // const [index, ...indices] = path
+    const if_executed = path && path[0] === 0;
+    const else_executed = path && path[0] === 1;
+
+    const if_path = if_executed?path.slice(1):undefined;
+    const else_path = else_executed?path.slice(1):undefined;
+
+    const if_status = if_executed?'executed':(path === undefined?'skipped':'still-possible');
+    const else_status = else_executed?'executed':(path === undefined?'skipped':'still-possible');
+
     const { else: else_, then, ...type } = contract
     const then_id = `1-${id}`
     const else_id = `2-${id}`
-    const { max_y: then_max_y, nodes: then_nodes, edges: then_edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, indices)
-    const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET, indices)
+    const { max_y: then_max_y, nodes: then_nodes, edges: then_edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, if_path);
+    const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET, else_path);
     return {
       nodes: [
-        ...then_nodes.map(node => index === 0 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
-        ...else_nodes.map(node => index === 1 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
+        ...then_nodes, // .map(node => index === 0 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
+        ...else_nodes, // .map(node => index === 1 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
         { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
       ],
       edges: [
-        ...then_edges.map(edge => index === 0 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
-        ...else_edges.map(edge => index === 1 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
-        { id: `then-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { disabled: !(index === 0 || index === undefined) } },
-        { id: `else-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { disabled: !(index === 1 || index === undefined) } },
+        ...then_edges, //.map(edge => index === 0 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
+        ...else_edges, // .map(edge => index === 1 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
+        { id: `then-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { status: if_status } },
+        { id: `else-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { status: else_status } },
       ],
       max_y,
     }
   }
 
   if ("pay" in contract) {
+    const status = path === undefined?'skipped':(path.length === 0?'still-possible':'executed');
     const { then, ...type } = contract
     const then_id = `1-${id}`
     const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
@@ -269,13 +285,14 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { status }}
       ],
       max_y,
     }
   }
 
   if ("let" in contract) {
+    const status = path === undefined?'skipped':(path.length === 0?'still-possible':'executed');
     const { then, ...type } = contract
     const then_id = `1-${id}`
     const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
@@ -286,13 +303,14 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { status } },
       ],
       max_y,
     }
   }
 
   if ("assert" in contract) {
+    const status = path === undefined?'skipped':(path.length === 0?'still-possible':'executed');
     const { then, ...type } = contract
     const then_id = `1-${id}`
     const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
@@ -303,28 +321,31 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       ],
       edges: [
         ...edges,
-        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+        { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { status }},
       ],
       max_y,
     }
   }
 
   if ("when" in contract) {
-    const [index, ...indices] = path
+    const index = path && path[0];
+    const indices = path && path.slice(1);
+
     const { timeout_continuation, ...type } = contract
     const { nodes, edges, max_y } = type.when.reduce<{ nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number }>((acc, on, i) => {
       if ("then" in on) {
+        const status = index === i?'executed':(index === undefined?'skipped':'still-possible');
         const then_id = `${i}-${id}`
         const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, indices)
         return {
           nodes: [
-            ...nodes.map(node => index === i || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
+            ...nodes, // .map(node => index === i || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
             ...acc.nodes,
           ],
           edges: [
-            ...edges.map(edge => index === i || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
+            ...edges, // .map(edge => index === i || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
             ...acc.edges,
-            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { disabled: !(index === i || index === undefined) } },
+            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { status }}
           ],
           max_y
         }
@@ -338,16 +359,18 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       max_y: y - Y_OFFSET
     })
     const timeout_then_id = `${type.when.length}-${id}`
-    const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, indices)
+    const timeout_status = index == null?'executed':(index === undefined?'skipped':'still-possible');
+    const timeout_indices = index == null?indices:undefined;
+    const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, timeout_indices);
     return {
       nodes: [
-        ...timeout_graph.nodes.map(node => index === null || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
+        ...timeout_graph.nodes, // .nodes.map(node => index === null || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
         ...nodes,
       ],
       edges: [
-        ...timeout_graph.edges.map(edge => index === null || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
+        ...timeout_graph.edges, //.edges.map(edge => index === null || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
         ...edges,
-        { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { disabled: !(index === null || index === undefined) } },
+        { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { status: timeout_status } },
       ],
       max_y: timeout_graph.max_y
     }

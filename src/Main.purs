@@ -206,6 +206,7 @@ main configJson = launchAff_ do
       let
         mkAppCtx =
           { cardanoMultiplatformLib
+          , develMode: config.develMode
           , walletInfoCtx
           , logger
           , msgHub

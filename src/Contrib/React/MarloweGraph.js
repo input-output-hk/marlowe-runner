@@ -93,11 +93,20 @@ const nodeTypes = {
         return React.createElement("div", { style: style_ }, "Not implemented!");
     }
 };
+const statusToStyle = (status, defaultStyle) => {
+    switch (status) {
+        case 'executed':
+            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", strokeWidth: 3, stroke: "black" });
+        case 'skipped':
+            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "30%", strokeWidth: 1 });
+        case 'still-possible':
+            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", strokeWidth: 1 });
+    }
+};
 const edgeTypes = {
     ContractEdge({ data, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, markerEnd, style = {} }) {
         const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
-        const style_ = data && data.disabled
-            ? Object.assign(Object.assign({}, style), { strokeOpacity: "30%" }) : Object.assign(Object.assign({}, style), { strokeOpacity: "100%", strokeWidth: 3 });
+        const style_ = data ? statusToStyle(data.status, style) : style;
         return React.createElement(BaseEdge, { path: edgePath, markerEnd: markerEnd, style: style_ });
     }
 };
@@ -109,28 +118,35 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
             max_y: y,
         };
     if ("if" in contract) {
-        const [index, ...indices] = path;
+        // const [index, ...indices] = path
+        const if_executed = path && path[0] === 0;
+        const else_executed = path && path[0] === 1;
+        const if_path = if_executed ? path.slice(1) : undefined;
+        const else_path = else_executed ? path.slice(1) : undefined;
+        const if_status = if_executed ? 'executed' : (path === undefined ? 'skipped' : 'still-possible');
+        const else_status = else_executed ? 'executed' : (path === undefined ? 'skipped' : 'still-possible');
         const { else: else_, then } = contract, type = __rest(contract, ["else", "then"]);
         const then_id = `1-${id}`;
         const else_id = `2-${id}`;
-        const { max_y: then_max_y, nodes: then_nodes, edges: then_edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, indices);
-        const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET, indices);
+        const { max_y: then_max_y, nodes: then_nodes, edges: then_edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, if_path);
+        const { max_y, nodes: else_nodes, edges: else_edges } = contract2NodesAndEdges(else_, else_id, x + X_OFFSET, then_max_y + Y_OFFSET, else_path);
         return {
             nodes: [
-                ...then_nodes.map(node => index === 0 || index === undefined ? node : Object.assign(Object.assign({}, node), { data: Object.assign(Object.assign({}, node.data), { disabled: true }) })),
-                ...else_nodes.map(node => index === 1 || index === undefined ? node : Object.assign(Object.assign({}, node), { data: Object.assign(Object.assign({}, node.data), { disabled: true }) })),
+                ...then_nodes,
+                ...else_nodes,
                 { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
             ],
             edges: [
-                ...then_edges.map(edge => index === 0 || index === undefined ? edge : Object.assign(Object.assign({}, edge), { data: edge.data && Object.assign(Object.assign({}, edge.data), { disabled: true }) })),
-                ...else_edges.map(edge => index === 1 || index === undefined ? edge : Object.assign(Object.assign({}, edge), { data: edge.data && Object.assign(Object.assign({}, edge.data), { disabled: true }) })),
-                { id: `then-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { disabled: !(index === 0 || index === undefined) } },
-                { id: `else-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { disabled: !(index === 1 || index === undefined) } },
+                ...then_edges,
+                ...else_edges,
+                { id: `then-${id}`, source: id, target: then_id, sourceHandle: "then", type: "ContractEdge", data: { status: if_status } },
+                { id: `else-${id}`, source: id, target: else_id, sourceHandle: "else", type: "ContractEdge", data: { status: else_status } },
             ],
             max_y,
         };
     }
     if ("pay" in contract) {
+        const status = path === undefined ? 'skipped' : (path.length === 0 ? 'still-possible' : 'executed');
         const { then } = contract, type = __rest(contract, ["then"]);
         const then_id = `1-${id}`;
         const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path);
@@ -141,12 +157,13 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
             ],
             edges: [
                 ...edges,
-                { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+                { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { status } }
             ],
             max_y,
         };
     }
     if ("let" in contract) {
+        const status = path === undefined ? 'skipped' : (path.length === 0 ? 'still-possible' : 'executed');
         const { then } = contract, type = __rest(contract, ["then"]);
         const then_id = `1-${id}`;
         const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path);
@@ -157,12 +174,13 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
             ],
             edges: [
                 ...edges,
-                { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+                { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { status } },
             ],
             max_y,
         };
     }
     if ("assert" in contract) {
+        const status = path === undefined ? 'skipped' : (path.length === 0 ? 'still-possible' : 'executed');
         const { then } = contract, type = __rest(contract, ["then"]);
         const then_id = `1-${id}`;
         const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path);
@@ -173,27 +191,29 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
             ],
             edges: [
                 ...edges,
-                { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { disabled: false } },
+                { id: `then-${id}`, source: id, target: then_id, type: "ContractEdge", data: { status } },
             ],
             max_y,
         };
     }
     if ("when" in contract) {
-        const [index, ...indices] = path;
+        const index = path && path[0];
+        const indices = path && path.slice(1);
         const { timeout_continuation } = contract, type = __rest(contract, ["timeout_continuation"]);
         const { nodes, edges, max_y } = type.when.reduce((acc, on, i) => {
             if ("then" in on) {
+                const status = index === i ? 'executed' : (index === undefined ? 'skipped' : 'still-possible');
                 const then_id = `${i}-${id}`;
                 const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, indices);
                 return {
                     nodes: [
-                        ...nodes.map(node => index === i || index === undefined ? node : Object.assign(Object.assign({}, node), { data: Object.assign(Object.assign({}, node.data), { disabled: true }) })),
+                        ...nodes,
                         ...acc.nodes,
                     ],
                     edges: [
-                        ...edges.map(edge => index === i || index === undefined ? edge : Object.assign(Object.assign({}, edge), { data: edge.data && Object.assign(Object.assign({}, edge.data), { disabled: true }) })),
+                        ...edges,
                         ...acc.edges,
-                        { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { disabled: !(index === i || index === undefined) } },
+                        { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { status } }
                     ],
                     max_y
                 };
@@ -207,16 +227,18 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
             max_y: y - Y_OFFSET
         });
         const timeout_then_id = `${type.when.length}-${id}`;
-        const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, indices);
+        const timeout_status = index == null ? 'executed' : (index === undefined ? 'skipped' : 'still-possible');
+        const timeout_indices = index == null ? indices : undefined;
+        const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, timeout_indices);
         return {
             nodes: [
-                ...timeout_graph.nodes.map(node => index === null || index === undefined ? node : Object.assign(Object.assign({}, node), { data: Object.assign(Object.assign({}, node.data), { disabled: true }) })),
+                ...timeout_graph.nodes,
                 ...nodes,
             ],
             edges: [
-                ...timeout_graph.edges.map(edge => index === null || index === undefined ? edge : Object.assign(Object.assign({}, edge), { data: edge.data && Object.assign(Object.assign({}, edge.data), { disabled: true }) })),
+                ...timeout_graph.edges,
                 ...edges,
-                { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { disabled: !(index === null || index === undefined) } },
+                { id: `timeout_continuation-${id}`, source: id, target: timeout_then_id, sourceHandle: "timeout_continuation", type: "ContractEdge", data: { status: timeout_status } },
             ],
             max_y: timeout_graph.max_y
         };
