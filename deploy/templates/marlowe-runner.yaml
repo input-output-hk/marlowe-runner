@@ -29,24 +29,24 @@ spec:
             rules:
               - port: 8080
           type: https-route
-      - type: init-container
-        properties:
-          name: load-runner-client
-          image: ghcr.io/input-output-hk/marlowe-runner:{{ $.Values.images.stagingTag }}
-          args:
-            - -c
-            - |
-                root="$(dirname $(readlink -f /profile/index.html))"
-                cp -a $root/* /share/marlowe-runner/static
-                cat > /share/marlowe-runner/static/config.json <<EOF
-                {
-                  "marloweWebServerUrl": "https://marlowe-runtime-{{ $network }}-web.scdev.aws.iohkdev.io",
-                  "develMode": false
-                }
-                EOF
-          mountName: client-www
-          initMountPath: /share/marlowe-runner/static
-          appMountPath: /client-www
+        - type: init-container
+          properties:
+            name: load-runner-client
+            image: ghcr.io/input-output-hk/marlowe-runner:{{ $.Values.images.stagingTag }}
+            args:
+              - -c
+              - |
+                  root="$(dirname $(readlink -f /profile/index.html))"
+                  cp -a $root/* /share/marlowe-runner/static
+                  cat > /share/marlowe-runner/static/config.json <<EOF
+                  {
+                    "marloweWebServerUrl": "https://marlowe-runtime-{{ $network }}-web.scdev.aws.iohkdev.io",
+                    "develMode": false
+                  }
+                  EOF
+            mountName: client-www
+            initMountPath: /share/marlowe-runner/static
+            appMountPath: /client-www
       type: webservice
   policies:
     - name: marlowe-runner
