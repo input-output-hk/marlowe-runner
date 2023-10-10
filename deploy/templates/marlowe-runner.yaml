@@ -1,13 +1,13 @@
-{{- range .Values.networks }}
+{{- range $index, $network := .Values.networks }}
 ---
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: marlowe-runner-{{ . }}
+  name: marlowe-runner-{{ $network }}
   namespace: marlowe-production
 spec:
   components:
-    - name: marlowe-runner-{{ . }}
+    - name: marlowe-runner-{{ $network }}
       properties:
         image: p3terx/darkhttpd
         args:
@@ -25,7 +25,7 @@ spec:
           type: scaler
         - properties:
             domains:
-              - runner-{{ . }}.scdev.aws.iohkdev.io
+              - runner-{{ $network }}.scdev.aws.iohkdev.io
             rules:
               - port: 8080
           type: https-route
@@ -40,7 +40,7 @@ spec:
                 cp -a $root/* /share/marlowe-runner/static
                 cat > /share/marlowe-runner/static/config.json <<EOF
                 {
-                  "marloweWebServerUrl": "https://marlowe-runtime-{{ . }}-web.scdev.aws.iohkdev.io",
+                  "marloweWebServerUrl": "https://marlowe-runtime-{{ $network }}-web.scdev.aws.iohkdev.io",
                   "develMode": false
                 }
                 EOF
