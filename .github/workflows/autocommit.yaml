@@ -1,0 +1,38 @@
+---
+name: Auto Commit
+on:
+  push:
+    branches:
+      - main
+      - production
+
+jobs:
+  run:
+    name: Auto Commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          ref: main
+
+      - name: Update publish version
+        id: update
+        run: |
+          VERSION=${GITHUB_SHA::8}
+          if "$GITHUB_REF" == production; then
+            TYPE=production
+          else
+            TYPE=staging
+          fi
+          echo ::set-output name=VERSION::${VERSION}
+          # replace app.yaml with your app file name
+          sed -i "s|${TYPE}Tag:.*|${TYPE}Tag: $VERSION|g" deploy/values.yaml
+
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v7
+        with:
+          default_author: github_actions
+          add: '.'
+          message: "[ci skip] deploy from ${{ steps.update.outputs.VERSION }}"
+          signoff: true
