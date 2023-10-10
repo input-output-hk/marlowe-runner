@@ -178,24 +178,6 @@ in  upstream
         "https://github.com/purescript-polyform/batteries-urlencoded.git"
         "v0.4.1"
 
-  with
-    -- react-bootstrap = ../purescript-react-bootstrap/spago.dhall as Location
-    react-bootstrap = mkPackage
-      [ "aff", "arrays", "atleast", "bifunctors", "console", "control"
-      , "convertable-options", "datetime", "datetime-iso", "debug", "decimals"
-      , "effect", "either", "enums", "foldable-traversable", "formatters"
-      , "functors", "halogen-subscriptions", "identity", "integers"
-      , "js-timers", "maybe", "newtype", "nullable", "ordered-collections"
-      , "parsing", "polyform", "polyform-batteries-core"
-      , "polyform-batteries-urlencoded", "prelude", "profunctor", "random"
-      , "react-basic", "react-basic-dom", "react-basic-hooks", "record", "refs"
-      , "safe-coerce", "strings", "tailrec", "transformers", "tuples"
-      , "typelevel-prelude", "undefined-is-not-a-problem", "unsafe-coerce"
-      , "validation", "web-html"
-      ]
-      "https://github.com/paluh/purescript-react-bootstrap.git"
-      "v0.0.1"
-
   with react-basic-hooks =
       mkPackage
         [ "aff"
@@ -227,8 +209,8 @@ in  upstream
         ]
         "https://github.com/purescript-react/purescript-react-basic-hooks.git"
         "v8.2.0"
-
   with
+    -- react-bootstrap = ../purescript-react-bootstrap/spago.dhall as Location
     react-bootstrap = mkPackage
       [ "aff", "arrays", "atleast", "bifunctors", "console", "control"
       , "convertable-options", "datetime", "datetime-iso", "debug", "decimals"
@@ -243,8 +225,8 @@ in  upstream
       , "validation", "web-html"
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
-      "39c055d3a3d4fadca6afba31326fdf27d315aec8"
-      
+      "v0.0.3"
+
   with datetime-iso =
       mkPackage
         [ "aff"

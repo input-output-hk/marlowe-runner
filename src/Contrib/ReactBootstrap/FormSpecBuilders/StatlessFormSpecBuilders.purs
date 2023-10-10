@@ -642,10 +642,13 @@ renderTextArea
      , placeholder :: String
      , rows :: Int
      , extraClassName :: Maybe String
+     , role :: Opt String
+     , "aria-label" :: Opt String
+     , "aria-labelledby" :: Opt String
      }
   -> InputState String
   -> JSX
-renderTextArea { extraClassName, layout, possibleLabel, helpText, name, placeholder, rows } { value, errors, onChange, touched } = do
+renderTextArea props@{ extraClassName, layout, possibleLabel, helpText, name, placeholder, role, rows } { value, errors, onChange, touched } = do
   let
     nameStr = un FieldId name
 
@@ -676,6 +679,9 @@ renderTextArea { extraClassName, layout, possibleLabel, helpText, name, placehol
           , isValid
           , isInvalid
           , className: fold extraClassName
+          , role
+          , "aria-label": props."aria-label"
+          , "aria-labelledby": props."aria-labelledby"
           }
           <> do
             fold
@@ -709,6 +715,9 @@ textArea props = formSpecBuilderT do
           , helpText: props'.helpText
           , placeholder: props'.placeholder
           , rows: props'.rows
+          , role: props'.role
+          , "aria-label": props'."aria-label"
+          , "aria-labelledby": props'."aria-labelledby"
           }
       )
       props'.touched
