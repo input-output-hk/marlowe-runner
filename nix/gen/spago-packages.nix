@@ -883,11 +883,11 @@ let
 
     "marlowe-runtime-client" = pkgs.stdenv.mkDerivation {
       name = "marlowe-runtime-client";
-      version = "v0.0.7";
+      version = "v0.0.9";
       src = pkgs.fetchgit {
         url = "https://github.com/input-output-hk/purescript-marlowe-runtime-client.git";
-        rev = "342455d9a8450187358d6bd89e85df85a5984663";
-        sha256 = "1wwp114ffj0jbhqjkqgg56l7bi9cy0rhvpsc731ja218frds2xk6";
+        rev = "9a822b66d17d0fde45200882de6af83c3929befc";
+        sha256 = "00p92l6p7fcipkb8jklcc6vjqv9zpnykzrdm9kn9yf9kavkr8dfc";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";
@@ -1315,11 +1315,11 @@ let
 
     "react-bootstrap" = pkgs.stdenv.mkDerivation {
       name = "react-bootstrap";
-      version = "39c055d3a3d4fadca6afba31326fdf27d315aec8";
+      version = "v0.0.3";
       src = pkgs.fetchgit {
         url = "https://github.com/paluh/purescript-react-bootstrap.git";
-        rev = "39c055d3a3d4fadca6afba31326fdf27d315aec8";
-        sha256 = "1acksdpih9gnhwa6066akznmqyvgl0w4yk17n1dlr2b24qybx7pf";
+        rev = "e7d73a91c4a1e3c8f0bf68df573b0b84073b941d";
+        sha256 = "1w22vsz21c6ll56n8n15f5vs19bzzfbgg94vva724fadlyxhqabq";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";
