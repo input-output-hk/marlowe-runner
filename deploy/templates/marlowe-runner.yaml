@@ -9,11 +9,12 @@ spec:
   components:
     - name: marlowe-runner-{{ . }}
       properties:
-        env:
-          - name: MARLOWE_WEB_SERVER_URL
-            value: https://marlowe-runtime-{{ . }}-web.scdev.aws.iohkdev.io
-        image: ghcr.io/input-output-hk/marlowe-runner:b2ddafc
-        imagePullPolicy: IfNotPresent
+        image: p3terx/darkhttpd
+        args:
+          - /client-www
+          - --port
+          - "8080"
+        imagePullPolicy: Always
         ports:
           - expose: true
             port: 8080
@@ -27,8 +28,25 @@ spec:
               - runner-{{ . }}.scdev.aws.iohkdev.io
             rules:
               - port: 8080
-                serviceName: marlowe-runner-{{ . }}
           type: https-route
+      - type: init-container
+        properties:
+          name: load-runner-client
+          image: ghcr.io/input-output-hk/marlowe-runner:{{ $.Values.images.stagingTag }}
+          args:
+            - -c
+            - |
+                root="$(dirname $(readlink -f /profile/index.html))"
+                cp -a $root/* /share/marlowe-runner/static
+                cat > /share/marlowe-runner/static/config.json <<EOF
+                {
+                  "marloweWebServerUrl": "https://marlowe-runtime-{{ . }}-web.scdev.aws.iohkdev.io",
+                  "develMode": false
+                }
+                EOF
+          mountName: client-www
+          initMountPath: /share/marlowe-runner/static
+          appMountPath: /client-www
       type: webservice
   policies:
     - name: marlowe-runner
@@ -38,10 +56,24 @@ spec:
         namespace: marlowe-production
       type: topology
   workflow:
+    mode:
+      steps: DAG
     steps:
+      - meta:
+          alias: Push staging image
+        name: push-image-staging
+        type: build-nix-image
+        properties:
+          image: ghcr.io/input-output-hk/marlowe-runner:{{ $.Values.images.stagingTag }}
+          requests:
+            ephemeralStorage: 25Gi
+          includedFlakeURIs:
+            - "github:input-output-hk/marlowe-runner#marlowe-runner"
       - type: deploy
         meta:
           alias: Deploy marlowe-runner
+        dependsOn:
+          - push-image-staging
         name: marlowe-runner
         properties:
           policies:
