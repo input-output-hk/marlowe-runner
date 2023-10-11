@@ -16,72 +16,7 @@ import {
 } from "reactflow"
 
 import 'reactflow/dist/style.css'
-
-type Address = string
-type TokeName = string
-type CurrencySymbol = string
-type ValueId = string
-type Timeout = number
-
-type ChoiceId = { choice_name: string, choice_owner: Party }
-
-type Payee
-  = { account: AccountId }
-  | { party: Party }
-
-type Party
-  = { address: Address }
-  | { role_token: TokeName }
-
-type AccountId = Party
-
-type Token = { currency_symbol: CurrencySymbol, token_name: TokeName }
-
-type Value
-  = { amount_of_token: Token, in_account: AccountId }
-  | { negate: Value }
-  | { add: Value, and: Value }
-  | { value: Value, minus: Value }
-  | { multiply: Value, times: Value }
-  | { divide: Value, by: Value }
-  | { value_of_choice: ChoiceId }
-  | { use_value: ValueId }
-  | { if: Observation, then: Value, else: Value }
-  | "time_interval_start"
-  | "time_interval_end"
-  | number
-
-type Observation
-  = { both: Observation, and: Observation }
-  | { either: Observation, or: Observation }
-  | { not: Observation }
-  | { chose_something_for: ChoiceId }
-  | { value: Value, ge_than: Value }
-  | { value: Value, gt: Value }
-  | { value: Value, lt: Value }
-  | { value: Value, le_than: Value }
-  | { value: Value, equal_to: Value }
-  | true
-  | false
-
-type Bound = { from: number, to: number }
-
-type Action
-  = { party: Party, deposits: Value, of_token: Token, into_account: AccountId }
-  | { choose_between: Bound[], for_choice: ChoiceId }
-  | { notify_if: Observation }
-
-type Case
-  = { case: Action, then: Contract }
-  | { case: Action, merkleized_then: string }
-
-export type Contract
-  = "close"
-  | { pay: Value, token: Token, to: Payee, from_account: AccountId, then: Contract }
-  | { if: Observation, then: Contract, else: Contract }
-  | { when: Case[], timeout: Timeout, timeout_continuation: Contract }
-  | { let: ValueId, be: Value, then: Contract }
-  | { assert: Observation, then: Contract }
+import { Action, AccountId, Contract, ContractNodeEvents, ContractEdgeEvents, Observation, Payee, Timeout, Token, ValueId, Value } from "./MarloweGraph/Marlowe"
 
 const X_OFFSET = 200
 const Y_OFFSET = 40
@@ -111,12 +46,13 @@ type ContractNodeType
 
 type ContractNodeData = {
   type: ContractNodeType,
-  disabled: boolean,
+  status: ContractEdgeStatus
 }
 
 const nodeTypes: NodeTypes = {
-  ContractNode({ data: { type, disabled } }: { data: ContractNodeData }): JSX.Element {
-    const style_: React.CSSProperties = { ...contractNodeStyle, opacity: disabled ? "30%" : "100%" }
+  ContractNode({ data: { type, status } }: { data: ContractNodeData }): JSX.Element {
+    // const style_: React.CSSProperties = { ...contractNodeStyle, opacity: disabled ? "30%" : "100%" }
+    const style_: React.CSSProperties = statusToNodeStyle(status, contractNodeStyle);
     if (type === "close")
       return <div style={style_}>
         Close
@@ -208,49 +144,99 @@ const nodeTypes: NodeTypes = {
 // skipped: opacity 30%, width 1px
 type ContractEdgeStatus = 'executed' | 'skipped' | 'still-possible';
 
+// export type ContractPathHistory = ReadonlyArray<number | null>
+
+export type ContractPathHistory
+  = ReadonlyArray<number | null>   // We are on the path. When the list is empty we are in the last selected
+                                   // node and should switch to `still-possible`.
+  | 'still-possible'               // No branch chosen yet or parent chosen already.
+  | 'skipped';                     // Parent or edge skipped.
+
+const contractPathHistoryToNodeStatus = (history: ContractPathHistory): ContractEdgeStatus => {
+  if (history === 'still-possible')
+    return 'still-possible';
+  if (history === 'skipped')
+    return 'skipped';
+  // Array case means we are on the path or at the end of the path.
+  return 'executed';
+}
+
+// In both functions the value of `index` value has following semantics:
+// * `undefined` - we are inside the node which is not branching node (`Assert`, `Let`, `Pay`)
+// * `null` - we are in when and checking continuation for timeout
+// * `number` - we are in some branching node and picking the branch
+const contractPathHistoryToEdgeStatus = (index: number | null | undefined, history: ContractPathHistory): ContractEdgeStatus => {
+  if (history === 'still-possible')
+    return 'still-possible';
+  if (history === 'skipped')
+    return 'skipped';
+  if (history.length === 0)
+    return 'still-possible';
+  return (index === undefined || index === history[0])? 'executed' : 'skipped';
+}
+
+const contractPathHistoryContinuation = (index: number | null | undefined, history: ContractPathHistory): ContractPathHistory => {
+  if (history == 'still-possible')
+    return 'still-possible';
+  if (history == 'skipped')
+    return 'skipped';
+  if (index === undefined)
+    return history;
+  if(history.length === 0)
+    return 'still-possible';
+  return index === history[0] ? history.slice(1) : 'skipped';
+}
+
 type ContractEdgeData = {
   status: ContractEdgeStatus,
 }
 
-const statusToStyle = (status: ContractEdgeStatus, defaultStyle: React.CSSProperties): React.CSSProperties => {
+const statusToEdgeStyle = (status: ContractEdgeStatus, defaultStyle: React.CSSProperties): React.CSSProperties => {
   switch (status) {
     case 'executed':
       return { ...defaultStyle, strokeOpacity: "100%", strokeWidth: 3, stroke: "black" }
     case 'skipped':
-      return { ...defaultStyle, strokeOpacity: "30%", strokeWidth: 1 }
+      return { ...defaultStyle, strokeOpacity: "50%", strokeWidth: 1 }
     case 'still-possible':
-      return { ...defaultStyle, strokeOpacity: "100%", strokeWidth: 1 }
+      return { ...defaultStyle, strokeOpacity: "100%", strokeWidth: 2 }
   }
 }
+
+const statusToNodeStyle = (status: ContractEdgeStatus, defaultStyle: React.CSSProperties): React.CSSProperties => {
+  switch (status) {
+    case 'executed':
+      return { ...defaultStyle, strokeOpacity: "100%" }
+    case 'still-possible':
+      return { ...defaultStyle, opacity: "75%" }
+    case 'skipped':
+      return { ...defaultStyle, opacity: "30%" }
+  }
+}
+
 
 const edgeTypes: EdgeTypes = {
   ContractEdge({ data, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, markerEnd, style = {} }: EdgeProps<ContractEdgeData>): JSX.Element {
     const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
-    const style_: React.CSSProperties = data?statusToStyle(data.status, style):style;
+    const style_: React.CSSProperties = data?statusToEdgeStyle(data.status, style):style;
     return <BaseEdge path={edgePath} markerEnd={markerEnd} style={style_} />
   }
 }
 
-type ContractPathHistory = ReadonlyArray<number | null>
-
-const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path?: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number } => {
+const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number } => {
+  var nodeStatus:ContractEdgeStatus = contractPathHistoryToNodeStatus(path);
   if (contract === "close")
     return {
-      nodes: [{ id, position: { x, y }, data: { type: "close", disabled: false }, type: "ContractNode" }],
+      nodes: [{ id, position: { x, y }, data: { type: "close", status: nodeStatus }, type: "ContractNode" }],
       edges: [],
       max_y: y,
     }
 
   if ("if" in contract) {
-    // const [index, ...indices] = path
-    const if_executed = path && path[0] === 0;
-    const else_executed = path && path[0] === 1;
+    const if_status = contractPathHistoryToEdgeStatus(0, path);
+    const else_status = contractPathHistoryToEdgeStatus(1, path);
 
-    const if_path = if_executed?path.slice(1):undefined;
-    const else_path = else_executed?path.slice(1):undefined;
-
-    const if_status = if_executed?'executed':(path === undefined?'skipped':'still-possible');
-    const else_status = else_executed?'executed':(path === undefined?'skipped':'still-possible');
+    const if_path = contractPathHistoryContinuation(0, path);
+    const else_path = contractPathHistoryContinuation(1, path);
 
     const { else: else_, then, ...type } = contract
     const then_id = `1-${id}`
@@ -261,7 +247,7 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       nodes: [
         ...then_nodes, // .map(node => index === 0 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
         ...else_nodes, // .map(node => index === 1 || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
       ],
       edges: [
         ...then_edges, //.map(edge => index === 0 || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
@@ -274,14 +260,14 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 
   if ("pay" in contract) {
-    const status = path === undefined?'skipped':(path.length === 0?'still-possible':'executed');
+    const status = contractPathHistoryToEdgeStatus(undefined, path);
     const { then, ...type } = contract
     const then_id = `1-${id}`
     const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
@@ -292,14 +278,14 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 
   if ("let" in contract) {
-    const status = path === undefined?'skipped':(path.length === 0?'still-possible':'executed');
+    const status = contractPathHistoryToEdgeStatus(undefined, path);
     const { then, ...type } = contract
     const then_id = `1-${id}`
     const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
@@ -310,14 +296,14 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 
   if ("assert" in contract) {
-    const status = path === undefined?'skipped':(path.length === 0?'still-possible':'executed');
+    const status = contractPathHistoryToEdgeStatus(undefined, path);
     const { then, ...type } = contract
     const then_id = `1-${id}`
     const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
     return {
       nodes: [
         ...nodes,
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
       ],
       edges: [
         ...edges,
@@ -329,14 +315,15 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
 
   if ("when" in contract) {
     const index = path && path[0];
-    const indices = path && path.slice(1);
+    // const indices = path && path.slice(1);
 
     const { timeout_continuation, ...type } = contract
-    const { nodes, edges, max_y } = type.when.reduce<{ nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number }>((acc, on, i) => {
+    const { nodes, edges, max_y } = type.when.reduce<{ nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number }>((acc, on:any, i:number) => {
       if ("then" in on) {
-        const status = index === i?'executed':(index === undefined?'skipped':'still-possible');
+        const edgeStatus = contractPathHistoryToEdgeStatus(i, path);
+        const pathContinuation = contractPathHistoryContinuation(i, path);
         const then_id = `${i}-${id}`
-        const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, indices)
+        const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, pathContinuation);
         return {
           nodes: [
             ...nodes, // .map(node => index === i || index === undefined ? node : { ...node, data: { ...node.data, disabled: true } }),
@@ -345,7 +332,7 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
           edges: [
             ...edges, // .map(edge => index === i || index === undefined ? edge : { ...edge, data: edge.data && { ...edge.data, disabled: true } }),
             ...acc.edges,
-            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { status }}
+            { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { status: edgeStatus }}
           ],
           max_y
         }
@@ -353,14 +340,14 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
       return acc
     }, {
       nodes: [
-        { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+        { id, position: { x, y }, data: { type, status: nodeStatus}, type: "ContractNode" },
       ],
       edges: [],
       max_y: y - Y_OFFSET
     })
     const timeout_then_id = `${type.when.length}-${id}`
-    const timeout_status = index == null?'executed':(index === undefined?'skipped':'still-possible');
-    const timeout_indices = index == null?indices:undefined;
+    const timeout_status = contractPathHistoryToEdgeStatus(null, path);
+    const timeout_indices = contractPathHistoryContinuation(null, path);
     const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, timeout_indices);
     return {
       nodes: [

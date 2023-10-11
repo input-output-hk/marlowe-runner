@@ -1,0 +1,28 @@
+{
+  "name": "marlowe-graph",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-bootstrap": "^2.7.0",
+    "react-dom": "^18.2.0",
+    "reactflow": "^11.7.2"
+  },
+  "devDependencies": {
+    "@babel/register": "^7.18.9",
+    "@types/react-dom": "^18.2.4",
+    "sass": "^1.57.1",
+    "sass-loader": "^13.2.0",
+    "style-loader": "^3.3.1",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.2.2",
+    "typescript-language-server": "^3.3.2",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  },
+  "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
+  "scripts": {},
+  "sideEffects": false
+}
