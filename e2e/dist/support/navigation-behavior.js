@@ -19,10 +19,13 @@ var navigateToPage = /*#__PURE__*/function () {
           hostPath = hostsConfig["".concat(environmentId)];
           url = new URL(hostPath);
           pagesConfigItem = pagesConfig[pageId];
+          if (!!pagesConfigItem.query) {
+            url.search = pagesConfigItem.query;
+          }
           url.pathname = pagesConfigItem.route;
-          _context.next = 8;
+          _context.next = 9;
           return page["goto"](url.href);
-        case 8:
+        case 9:
         case "end":
           return _context.stop();
       }
@@ -39,6 +42,8 @@ var pathMatchesPageId = function pathMatchesPageId(pathname, hash, pageId, _ref3
   var pagesConfigItem = pagesConfig[pageId];
   var pageRegexString = pagesConfigItem.regex;
   var pageRegex = new RegExp(pageRegexString);
+  console.log("PAGE REGEX: ", pageRegex);
+  console.log("CURRENT PATH: ", currentPath);
   return pageRegex.test(currentPath);
 };
 var currentPathMatchesPageId = function currentPathMatchesPageId(page, pageId, globalConfig) {

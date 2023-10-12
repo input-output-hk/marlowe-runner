@@ -123,3 +123,25 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
     return _ref5.apply(this, arguments);
   };
 }());
+function sleep(seconds) {
+  return new Promise(function (resolve) {
+    return setTimeout(resolve, seconds * 1000);
+  });
+}
+(0, _cucumber.When)('I wait for {int} seconds', /*#__PURE__*/function () {
+  var _ref7 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7(seconds) {
+    return _regeneratorRuntime().wrap(function _callee7$(_context7) {
+      while (1) switch (_context7.prev = _context7.next) {
+        case 0:
+          _context7.next = 2;
+          return sleep(seconds);
+        case 2:
+        case "end":
+          return _context7.stop();
+      }
+    }, _callee7);
+  }));
+  return function (_x8) {
+    return _ref7.apply(this, arguments);
+  };
+}());

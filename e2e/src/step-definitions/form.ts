@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { When } from "@cucumber/cucumber";
 import { ScenarioWorld } from './setup/world';
 import { getElementLocator } from '../support/web-element-helper';
@@ -7,6 +9,11 @@ import { waitFor } from "../support/wait-for-behavior";
 import {
   inputValue,
 } from '../support/html-behavior';
+
+function sleep(seconds: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+}
+
 
 When(
   /^I fill in the "([^"]*)" input with "([^"]*)"$/,
@@ -78,4 +85,29 @@ When('I press {string} on the keyboard {string} times', async function (this: Sc
     }
     return true;
   });
+});
+
+When('I enter the contents of {string} into the {string} field',
+  async function (this: ScenarioWorld, fileNameAndPath: string, name: string) {
+    const {
+      screen: { page },
+      globalConfig
+    } = this;
+
+    const filePath = path.join(__dirname, fileNameAndPath);
+    const input = fs.readFileSync(filePath, 'utf-8');
+
+    console.log("INPUT", input);
+
+    const role = "textbox";
+
+    await waitFor(async() => {
+      const locator = await page.getByRole(role as ValidAccessibilityRoles, { name })
+      const result = await locator.isVisible();
+
+      if (result) {
+        await inputValue(locator, input);
+        return result;
+      }
+    });
 });

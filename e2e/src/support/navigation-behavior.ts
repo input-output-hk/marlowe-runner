@@ -13,8 +13,11 @@ export const navigateToPage = async (
   const hostPath = hostsConfig[`${environmentId}`];
   const url = new URL(hostPath);
   const pagesConfigItem = pagesConfig[pageId];
-  url.pathname = pagesConfigItem.route;
 
+  if (!!pagesConfigItem.query) {
+    url.search = pagesConfigItem.query;
+  }
+  url.pathname = pagesConfigItem.route;
   await page.goto(url.href);
 }
 
@@ -28,6 +31,8 @@ const pathMatchesPageId = (
   const pagesConfigItem = pagesConfig[pageId]
   const pageRegexString = pagesConfigItem.regex;
   const pageRegex = new RegExp(pageRegexString);
+  console.log("PAGE REGEX: ", pageRegex)
+  console.log("CURRENT PATH: ", currentPath)
   return pageRegex.test(currentPath);
 }
 

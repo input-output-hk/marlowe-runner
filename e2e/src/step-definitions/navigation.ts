@@ -65,3 +65,11 @@ When(
     });
   }
 )
+
+function sleep(seconds: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+}
+
+When('I wait for {int} seconds', async function (seconds: number) {
+  await sleep(seconds);
+});

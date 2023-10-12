@@ -59,6 +59,7 @@ import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
+import Foreign.Object as Object
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
@@ -518,7 +519,8 @@ mkContractList = do
                           possibleContract = ContractInfo.someContractCurrentContract someContract
                           isClosed = isContractComplete possibleContract
                           trClassName = "align-middle border-bottom-white border-bottom-4px" <> Monoid.guard isClosed " bg-secondary"
-                        DOM.tr { className: trClassName } $ case someContract of
+                          _data = Object.fromHomogeneous { testId: txOutRefToString contractId }
+                        DOM.tr { className: trClassName, _data: _data } $ case someContract of
                           (SyncedConractInfo ci@(ContractInfo { _runtime, endpoints, marloweInfo })) -> do
                             let
                               ContractHeader { contractId } = _runtime.contractHeader
@@ -582,7 +584,7 @@ mkContractList = do
                             , tdInstant $ updatedAt <|> createdAt
                             , tdContractId contractId Nothing []
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "SC: Syncing" } ]
+                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
                             ]
                           NotSyncedUpdatedContract { contractInfo } -> do
                             [ tdInstant createdAt

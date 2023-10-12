@@ -54,36 +54,30 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
     return _ref.apply(this, arguments);
   };
 }());
-(0, _cucumber.Then)(/^I should see a "([^"]*)" with "([^"]*)" text within the "([^"]*)" "([^"]*)"$/, /*#__PURE__*/function () {
-  var _ref3 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4(role, name, parentName, parentRole) {
+(0, _cucumber.Then)(/^I should see the first "([^"]*)" showing "([^"]*)" text$/, /*#__PURE__*/function () {
+  var _ref3 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4(role, name) {
     var page;
     return _regeneratorRuntime().wrap(function _callee4$(_context4) {
       while (1) switch (_context4.prev = _context4.next) {
         case 0:
-          page = this.screen.page; // NOTE: This locator uses html accessibility roles and names to find elements.
-          // If your test is not finding an element, please verify that the role and name are correct.
+          page = this.screen.page;
           _context4.next = 3;
           return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
-            var locator, isElementVisible;
+            var tableLocator, textContent;
             return _regeneratorRuntime().wrap(function _callee3$(_context3) {
               while (1) switch (_context3.prev = _context3.next) {
                 case 0:
-                  _context3.next = 2;
-                  return page.getByRole(parentRole, {
-                    name: parentName,
-                    exact: true
-                  }).getByRole(role, {
-                    name: name,
-                    exact: true
-                  });
-                case 2:
-                  locator = _context3.sent;
-                  _context3.next = 5;
-                  return locator.isVisible();
-                case 5:
-                  isElementVisible = _context3.sent;
-                  return _context3.abrupt("return", isElementVisible);
-                case 7:
+                  tableLocator = page.locator('table');
+                  _context3.next = 3;
+                  return tableLocator.locator("".concat(role, ":nth-of-type(1)")).nth(0).textContent();
+                case 3:
+                  textContent = _context3.sent;
+                  if (!textContent) {
+                    _context3.next = 6;
+                    break;
+                  }
+                  return _context3.abrupt("return", textContent.includes(name));
+                case 6:
                 case "end":
                   return _context3.stop();
               }
@@ -95,12 +89,17 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
       }
     }, _callee4, this);
   }));
-  return function (_x5, _x6, _x7, _x8, _x9) {
+  return function (_x5, _x6, _x7) {
     return _ref3.apply(this, arguments);
   };
 }());
-(0, _cucumber.Then)(/^I should see "([^"]*)" text$/, /*#__PURE__*/function () {
-  var _ref5 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6(text) {
+function sleep(seconds) {
+  return new Promise(function (resolve) {
+    return setTimeout(resolve, seconds * 1000);
+  });
+}
+(0, _cucumber.Then)(/^I should see a "([^"]*)" with "([^"]*)" text within the "([^"]*)" "([^"]*)"$/, /*#__PURE__*/function () {
+  var _ref5 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6(role, name, parentName, parentRole) {
     var page;
     return _regeneratorRuntime().wrap(function _callee6$(_context6) {
       while (1) switch (_context6.prev = _context6.next) {
@@ -114,7 +113,13 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
               while (1) switch (_context5.prev = _context5.next) {
                 case 0:
                   _context5.next = 2;
-                  return page.getByText(text);
+                  return page.getByRole(parentRole, {
+                    name: parentName,
+                    exact: true
+                  }).getByRole(role, {
+                    name: name,
+                    exact: true
+                  });
                 case 2:
                   locator = _context5.sent;
                   _context5.next = 5;
@@ -134,7 +139,46 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
       }
     }, _callee6, this);
   }));
-  return function (_x10, _x11) {
+  return function (_x8, _x9, _x10, _x11, _x12) {
     return _ref5.apply(this, arguments);
+  };
+}());
+(0, _cucumber.Then)(/^I should see "([^"]*)" text$/, /*#__PURE__*/function () {
+  var _ref7 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee8(text) {
+    var page;
+    return _regeneratorRuntime().wrap(function _callee8$(_context8) {
+      while (1) switch (_context8.prev = _context8.next) {
+        case 0:
+          page = this.screen.page; // NOTE: This locator uses html accessibility roles and names to find elements.
+          // If your test is not finding an element, please verify that the role and name are correct.
+          _context8.next = 3;
+          return (0, _waitForBehavior.waitFor)( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7() {
+            var locator, isElementVisible;
+            return _regeneratorRuntime().wrap(function _callee7$(_context7) {
+              while (1) switch (_context7.prev = _context7.next) {
+                case 0:
+                  _context7.next = 2;
+                  return page.getByText(text);
+                case 2:
+                  locator = _context7.sent;
+                  _context7.next = 5;
+                  return locator.isVisible();
+                case 5:
+                  isElementVisible = _context7.sent;
+                  return _context7.abrupt("return", isElementVisible);
+                case 7:
+                case "end":
+                  return _context7.stop();
+              }
+            }, _callee7);
+          })));
+        case 3:
+        case "end":
+          return _context8.stop();
+      }
+    }, _callee8, this);
+  }));
+  return function (_x13, _x14) {
+    return _ref7.apply(this, arguments);
   };
 }());

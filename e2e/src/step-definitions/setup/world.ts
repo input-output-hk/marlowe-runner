@@ -10,7 +10,6 @@ import { env } from '../../env/parseEnv'
 import { World, IWorldOptions, setWorldConstructor } from "@cucumber/cucumber";
 import { GlobalConfig } from '../../env/global';
 import GlobalStateManager from "../../support/globalStateManager";
-import { testWallet } from "../../support/walletConfiguration";
 
 export type Screen = {
   context: BrowserContext;
@@ -35,48 +34,6 @@ export class ScenarioWorld extends World {
 
     const context = await this.newContext();
     const page = await context.newPage();
-
-    const EXTENSION_URL = 'chrome-extension://gafhhkghbfjjkeiendhlofajokpaflmk';
-
-    await page.goto(`${EXTENSION_URL}/app.html`);
-    await page.addInitScript((testWallet) => {
-      window.localStorage.setItem('lock', testWallet.lock);
-      window.localStorage.setItem('analyticsAccepted', testWallet.analyticsAccepted);
-      window.localStorage.setItem('showDappBetaModal', testWallet.showDappBetaModal);
-      window.localStorage.setItem('wallet', testWallet.wallet);
-      const keyAgentData = JSON.parse(testWallet?.backgroundStorage?.keyAgentsByChain);
-      const mnemonicData = JSON.parse(testWallet?.backgroundStorage?.mnemonic);
-      const backgroundStorage = {
-        mnemonic: mnemonicData,
-        keyAgentsByChain: keyAgentData,
-        MIGRATION_STATE: { state: 'up-to-date' }
-      };
-      window.localStorage.setItem('BACKGROUND_STORAGE', JSON.stringify(backgroundStorage));
-      window.localStorage.setItem('appSettings', testWallet.appSettings);
-      window.localStorage.setItem('keyAgentData', testWallet.keyAgentData);
-    }, testWallet);
-    await page.goto(`${EXTENSION_URL}/app.html`);
-    await page.waitForTimeout(5000);
-    await page.reload();
-
-    // authorize Dapp
-    // await page.getByRole('button').filter({ hasText: 'Lace' }).click();
-
-    // const popupPromise = context.waitForEvent('page');
-    // await Promise.race([
-    //   new Promise((resolve) => setTimeout(resolve, 5000)),
-    //   page.evaluate(async () => await window['cardano']['lace'].enable())
-    // ]);
-    // const popup = await popupPromise;
-    // await popup.waitForLoadState();
-    // await popup.waitForTimeout(5000);
-
-    // await page.getByRole('button').filter({ hasText: 'Authorize' }).click();
-    // await page.getByRole('button').filter({ hasText: 'Always' }).click();
-
-    // await page.goto(`${EXTENSION_URL}/app.html`);
-    // await page.waitForTimeout(5000);
-    // await page.reload();
 
     this.screen = { context, page };
 

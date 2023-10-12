@@ -27,6 +27,30 @@ Then(
 );
 
 Then(
+  /^I should see the first "([^"]*)" showing "([^"]*)" text$/,
+  async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string) {
+
+    const {
+      screen: { page },
+    } = this;
+
+    await waitFor(async () => {
+      const tableLocator = page.locator('table');
+
+      const textContent = await tableLocator.locator(`${role}:nth-of-type(1)`).nth(0).textContent();
+
+      if (!!textContent) {
+        return textContent.includes(name);
+      }
+    });
+  }
+);
+
+function sleep(seconds: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+}
+
+Then(
   /^I should see a "([^"]*)" with "([^"]*)" text within the "([^"]*)" "([^"]*)"$/,
   async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string, parentName: string, parentRole: ValidAccessibilityRoles) {
 

@@ -2,5 +2,10 @@
   "home": {
     "route": "/",
     "regex": "^/$"
+  },
+  "close contract": {
+    "route": "/",
+    "query": "?contract=\"close\"",
+    "regex": "^/$"
   }
 }

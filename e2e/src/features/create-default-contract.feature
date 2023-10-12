@@ -1,17 +1,18 @@
-@dev
 @smoke
 @regression
+@dev
 
-Feature: As a user I should be able to choose a wallet
+Feature: As a user, I would like to create a default contract with my lace wallet
 
-    As a user I should be able to navigate to the marlowe runner home page and
-    see all the starting point options available
+    As a user I would like to log into runner with my lace wallet
+    And create a default contract
 
-    Scenario: As a user I expect to be able to choose the Lace wallet
-      Given I am on the "home" page
+    Scenario: Creating default escrow contract with Lace wallet
+      Given I configure my lace wallet
+      And I am on the "home" page
       Then I should see a "heading" with "Choose a wallet" text
 
-      When I authorize my "lace" wallet
+      When I authorize my lace wallet
       Then I should see a "button" with "Create a contract" text
 
       When I click the "button" with "Create a contract" text
@@ -23,3 +24,5 @@ Feature: As a user I should be able to choose a wallet
 
       When I click the "button" with "Submit contract" text And sign the transaction
       Then I should see "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain." text
+      And I should see the first "button" showing "Syncing" text
+      And I should see the first "button" showing "Advance" text
