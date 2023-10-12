@@ -36,3 +36,4 @@ jobs:
           add: '.'
           message: "[ci skip] deploy from ${{ steps.update.outputs.VERSION }}"
           signoff: true
+          branch: main
