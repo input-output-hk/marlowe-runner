@@ -3,7 +3,7 @@ name: Auto Commit
 on:
   push:
     branches:
-      - main-disabled
+      - main
       - production
 
 jobs:
@@ -20,13 +20,12 @@ jobs:
         id: update
         run: |
           VERSION=${GITHUB_SHA::8}
-          if "$GITHUB_REF" == production; then
+          if [ "$GITHUB_REF" = refs/heads/production ]; then
             TYPE=production
           else
             TYPE=staging
           fi
           echo ::set-output name=VERSION::${VERSION}
-          # replace app.yaml with your app file name
           sed -i "s|${TYPE}Tag:.*|${TYPE}Tag: $VERSION|g" deploy/values.yaml
 
       - name: Commit changes
