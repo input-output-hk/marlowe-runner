@@ -25,7 +25,7 @@ spec:
           type: scaler
         - properties:
             domains:
-              - {{ $network }}.runner.iohk.io
+              - {{ $network }}.runner.marlowe.iohk.io
             rules:
               - port: 8080
           type: https-route
