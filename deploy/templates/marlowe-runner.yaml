@@ -67,7 +67,7 @@ spec:
       type: override
       properties:
         components:
-          - name: marlowe-runner-{{ $network }}-staging
+          - name: marlowe-runner-{{ $network }}
             properties:
               image: p3terx/darkhttpd
               args:
