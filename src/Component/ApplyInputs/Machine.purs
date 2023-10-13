@@ -414,14 +414,22 @@ nextRequest env state = do
       Just $ RuntimeRequest $ SubmitTxRequest { txWitnessSet, createTxResponse, serverURL }
     _ -> Nothing
 
+nextTimeout :: V1.Contract -> Maybe V1.Timeout
+nextTimeout = case _ of
+  V1.When _ timeout _ -> Just timeout
+  _ -> Nothing
+
 -- This is pretty arbitrary choice - we should keep track which inputs are relevant
 -- during the further steps.
-mkEnvironment :: Effect V1.Environment
-mkEnvironment = do
-  invalidBefore <- millisecondsFromNow (Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
-  invalidHereafter <- millisecondsFromNow (Milliseconds (Int.toNumber $ 5 * 60 * 1000))
+mkEnvironment :: V1.Contract -> Effect V1.Environment
+mkEnvironment contract = do
+  n <- now
+  inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 15 * 60 * 1000))
   let
-    timeInterval = V1.TimeInterval invalidBefore invalidHereafter
+    timeInterval = case nextTimeout contract of
+      Just timeout | n < timeout -> V1.TimeInterval n (min inTenMinutes timeout)
+      _ -> V1.TimeInterval n inTenMinutes
+  let
     environment = V1.Environment { timeInterval }
   pure environment
 
@@ -439,7 +447,7 @@ requestToAffAction = case _ of
         Right (Just (WalletContext { changeAddress, usedAddresses })) -> liftEffect $ do
           -- TODO: investingate if this is good strategy. We should probably migrate to something similiar to the
           -- next endpoint implementation.
-          environment <- mkEnvironment
+          environment <- mkEnvironment marloweContext.contract
           let
             { contract, state } = marloweContext
             allInputsChoices = case nextTimeoutAdvance environment state contract of

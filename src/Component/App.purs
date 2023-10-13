@@ -11,7 +11,7 @@ import Component.ContractList (ModalAction(..), NotSyncedYetInserts(..), mkContr
 import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
-import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
+import Component.Types (ConfigurationError(..), ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
 import Component.Types.ContractInfo (ContractCreated(..), ContractUpdated(..)) as ContractInfo
 import Component.Types.ContractInfo (SomeContractInfo)
 import Component.Types.ContractInfoMap as ContractInfoMap
@@ -31,6 +31,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
 import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Newtype as Newtype
+import Data.String as String
 import Data.String.Extra as String
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
@@ -54,6 +55,7 @@ import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import ReactBootstrap.Icons (unsafeIcon)
 import ReactBootstrap.Icons as Icons
+import ReactBootstrap.Modal (modal, modalBody, modalHeader)
 import ReactBootstrap.Offcanvas (offcanvas)
 import ReactBootstrap.Offcanvas as Offcanvas
 import Record as Record
@@ -114,6 +116,7 @@ type ContractInfoMap = Map Runtime.ContractId SomeContractInfo
 type Props =
   { possibleInitialContract :: Maybe ContractJsonString
   , setPage :: Page -> Effect Unit
+  , possibleConfigurationError :: Maybe ConfigurationError
   }
 
 mkApp :: MkComponentMBase () (Props -> JSX)
@@ -321,6 +324,27 @@ mkApp = do
         liftEffect $ setWalletInfo $ Just walletInfo
 
     let
+      appError = case props.possibleConfigurationError of
+        Just (RuntimeNotResponding _ _) -> modal
+          { -- onHide: onDismiss -- : setConfiguringWallet false
+            -- , footer: formActions
+            -- , body: formBody
+            -- , title: DOOM.text "Connect wallet"
+            show: true
+          }
+          [ modalHeader {} $ DOOM.text "App configuration error"
+          , modalBody {}
+              [ DOM.div { className: "container" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" }
+                  $ DOM.div { className: "alert alert-danger" }
+                  $ DOOM.text
+                  $ String.joinWith " "
+                      [ "It seems that there is a connection problem with the backend and we are not able to initilize the app."
+                      , "Please try again later by refreshing the page or contact support."
+                      ]
+              ]
+          -- , modalFooter {} formActions
+          ]
+        Nothing -> mempty
       possibleContracts = Array.fromFoldable <$> ContractInfoMap.getContractsMap contractInfoMap
       topNavbar = provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
         [ DOM.div { className: "container" }
@@ -364,6 +388,7 @@ mkApp = do
             $ DOM.div { className: "row" }
             $ messagePreview msgHub
         , topNavbar
+        , appError
         -- FIXME:
         --  * we should probably move this whole container to message hub
         --  * adding here margins etc. can break the layout consistency
@@ -376,6 +401,7 @@ mkApp = do
               }
               [ DOM.div { className: "p-3 overflow-auto" } $ messageBox msgHub
               ]
+
         -- This section appeared on click
         -- , Monoid.guard configuringWallet do
         --     let
@@ -409,6 +435,7 @@ mkApp = do
         ]
       _, _ -> DOM.div {} $
         [ topNavbar
+        , appError
         , landingPage { setWalletInfo: setWalletInfo <<< Just }
         ]
 

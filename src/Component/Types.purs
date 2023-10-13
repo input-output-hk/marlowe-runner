@@ -1,5 +1,6 @@
 module Component.Types
   ( ContractJsonString(..)
+  , ConfigurationError(..)
   , MkContextBase(..)
   , MkComponentMBase(..)
   , MkComponentM
@@ -16,6 +17,7 @@ import Prelude
 
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.Types.ContractInfo (ContractInfo(..)) as Exports
+import Contrib.Cardano (Slotting)
 import Control.Monad.Reader (ReaderT)
 import Data.List (List)
 import Data.Maybe (Maybe)
@@ -23,8 +25,8 @@ import Data.Newtype (class Newtype)
 import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Marlowe.Runtime.Web (Runtime)
+import Marlowe.Runtime.Web.Types (ServerURL)
 import React.Basic (JSX, ReactContext)
-import Contrib.Cardano (Slotting)
 import Wallet as Wallet
 import WalletContext (WalletContext)
 
@@ -90,3 +92,4 @@ data Page
 
 derive instance Eq Page
 
+data ConfigurationError = RuntimeNotResponding ServerURL String

@@ -5,7 +5,7 @@ import Prelude
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import Component.App (mkApp)
 import Component.MessageHub (mkMessageHub)
-import Component.Types (ContractJsonString(..), Page(..))
+import Component.Types (ConfigurationError(RuntimeNotResponding), ContractJsonString(..), Page(..))
 import Contrib.Cardano (Slotting(..))
 import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
@@ -187,9 +187,9 @@ main configJson = launchAff_ do
 
   reactRoot <- liftEffect $ createRoot appContainer
 
-  HealthCheck { networkId } <- Marlowe.Runtime.Web.getHealthCheck serverURL >>= case _ of
-    Left err -> liftEffect $ throw $ unsafeStringify err
-    Right healthCheck -> pure healthCheck
+  networkId /\ possibleConfigurationError <- Marlowe.Runtime.Web.getHealthCheck serverURL >>= case _ of
+    Left err -> pure ((Testnet (NetworkMagic 1)) /\ Just (RuntimeNotResponding serverURL $ unsafeStringify err))
+    Right (HealthCheck { networkId }) -> pure (networkId /\ Nothing)
 
   let
     -- FIXME: Slotting numbers have to be provided by Marlowe Runtime
@@ -223,4 +223,4 @@ main configJson = launchAff_ do
         Just contractJson -> CreateContractPage (Just contractJson)
 
       app <- liftEffect $ runReaderT mkApp mkAppCtx
-      liftEffect $ renderRoot reactRoot $ msgHubComponent [ app { possibleInitialContract, setPage } ]
+      liftEffect $ renderRoot reactRoot $ msgHubComponent [ app { possibleConfigurationError, possibleInitialContract, setPage } ]

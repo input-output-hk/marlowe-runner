@@ -67,7 +67,7 @@ renderWallet :: Effect Unit -> WalletInfo Wallet -> JSX
 renderWallet onSubmit (WalletInfo { icon, name }) =
   DOM.div { className: "row mt-2" } do
     let
-      _aria = Object.fromHomogeneous { labelledBy: "button", label: name }
+      _aria = Object.fromHomogeneous { labelledby: "button", label: name }
     [ DOM.div
         { className: "col-12 d-flex rounded p-2 align-items-center border border-2 border-secondary justify-content-between cursor-pointer background-color-gray-100-hover"
         , onClick: handler_ onSubmit
