@@ -7,7 +7,7 @@ import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
 import Component.InputHelper (ChoiceInput, DepositInput, NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Types (WalletInfo(..))
-import Contrib.Data.DateTime.Instant (millisecondsFromNow)
+import Contrib.Data.DateTime.Instant (millisecondsFromNow, unsafeInstant)
 import Contrib.Fetch (FetchError)
 import Control.Alt ((<|>))
 import Control.Alternative as Alternative
@@ -15,7 +15,7 @@ import Control.Monad.Error.Class (catchError)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmpty
-import Data.DateTime.Instant (Instant, toDateTime)
+import Data.DateTime.Instant (Instant, toDateTime, unInstant)
 import Data.Either (Either(..), isLeft)
 import Data.Foldable (foldMap)
 import Data.Int as Int
@@ -424,11 +424,15 @@ nextTimeout = case _ of
 mkEnvironment :: V1.Contract -> Effect V1.Environment
 mkEnvironment contract = do
   n <- now
-  inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 15 * 60 * 1000))
+  inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
+  twoMinutesAgo <- millisecondsFromNow (Milliseconds (Int.toNumber $ -2 * 60 * 1000))
   let
     timeInterval = case nextTimeout contract of
-      Just timeout | n < timeout -> V1.TimeInterval n (min inTenMinutes timeout)
-      _ -> V1.TimeInterval n inTenMinutes
+      Just timeout | n < timeout -> do
+        let
+          timeout' = unsafeInstant $ unInstant timeout <> (Milliseconds (-1.0))
+        V1.TimeInterval twoMinutesAgo (min inTenMinutes timeout')
+      _ -> V1.TimeInterval twoMinutesAgo inTenMinutes
   let
     environment = V1.Environment { timeInterval }
   pure environment
