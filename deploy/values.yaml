@@ -4,4 +4,4 @@ networks:
   - preview
 images:
   stagingTag: 3443caff
-  productionTag: 19f656a5
+  productionTag: 8babfa30
