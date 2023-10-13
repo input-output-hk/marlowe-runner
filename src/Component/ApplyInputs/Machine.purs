@@ -426,7 +426,7 @@ mkEnvironment contract = do
   n <- now
 -- <<<<<<< HEAD
   inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
-  twoMinutesAgo <- millisecondsFromNow (Milliseconds (Int.toNumber $ -2 * 60 * 1000))
+  twoMinutesAgo <- millisecondsFromNow (Milliseconds (Int.toNumber $ -10 * 60 * 1000))
   let
     timeInterval = case nextTimeout contract of
       Just timeout | n < timeout -> do
