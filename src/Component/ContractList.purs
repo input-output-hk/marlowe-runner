@@ -595,7 +595,7 @@ mkContractList = do
                                   transactionEndpoints = _runtime.transactions <#> \(_ /\ transactionEndpoint) -> transactionEndpoint
                                 tdContractId contractId Nothing transactionEndpoints
                             , tdCentered [ DOOM.text $ intercalate ", " tags ]
-                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "UC: Syncing" } ]
+                            , tdCentered [ buttonOutlinedInactive { label: DOOM.text "Syncing" } ]
                             ]
           ]
 
