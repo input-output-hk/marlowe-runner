@@ -424,6 +424,7 @@ nextTimeout = case _ of
 mkEnvironment :: V1.Contract -> Effect V1.Environment
 mkEnvironment contract = do
   n <- now
+-- <<<<<<< HEAD
   inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
   twoMinutesAgo <- millisecondsFromNow (Milliseconds (Int.toNumber $ -2 * 60 * 1000))
   let
@@ -433,6 +434,13 @@ mkEnvironment contract = do
           timeout' = unsafeInstant $ unInstant timeout <> (Milliseconds (-1.0))
         V1.TimeInterval twoMinutesAgo (min inTenMinutes timeout')
       _ -> V1.TimeInterval twoMinutesAgo inTenMinutes
+-- =======
+--   inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
+--   let
+--     timeInterval = case nextTimeout contract of
+--       Just timeout | n < timeout -> V1.TimeInterval n (min inTenMinutes timeout)
+--       _ -> V1.TimeInterval n inTenMinutes
+-- >>>>>>> 19f656a (Introduce error message on config error. Fix time interval setup)
   let
     environment = V1.Environment { timeInterval }
   pure environment
