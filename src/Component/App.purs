@@ -357,7 +357,7 @@ mkApp = do
                 [ DOM.div
                     { className: "col-3 pt-3 pb-3 background-color-primary-light", id: "marlowe-logo-container" } $
                     DOM.a { href: "#" } [ svgImg { src: marloweLogoUrl } ]
-                , DOM.div { className: "col-9 pt- pb-2 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end" } $
+                , DOM.div { className: "col-9 pt-3 pb-2 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end" } $
                     [ DOM.li {} $ ReactContext.consumer msgHubProps.ctx \msgs ->
                         [ linkWithIcon
                             { icon: unsafeIcon "h5"
