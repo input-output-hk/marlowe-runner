@@ -34,7 +34,7 @@ export default function(_env, argv) {
     devServer: {
       static: './',
       hot: true,
-      port: 8080
+      port: 8090
     },
     plugins: [
       new webpack.NormalModuleReplacementPlugin(

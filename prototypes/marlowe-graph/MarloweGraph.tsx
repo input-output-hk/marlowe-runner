@@ -26,6 +26,7 @@ const contractNodeStyle: React.CSSProperties = {
   display: "flex",
   flexFlow: "column",
   justifyContent: "center",
+  fontSize: "14px",
   padding: "0px",
   alignItems: "center",
   height: `${NODE_HEIGHT}px`,
@@ -51,7 +52,6 @@ type ContractNodeData = {
 
 const nodeTypes: NodeTypes = {
   ContractNode({ data: { type, status } }: { data: ContractNodeData }): JSX.Element {
-    // const style_: React.CSSProperties = { ...contractNodeStyle, opacity: disabled ? "30%" : "100%" }
     const style_: React.CSSProperties = statusToNodeStyle(status, contractNodeStyle);
     if (type === "close")
       return <div style={style_}>
@@ -171,8 +171,11 @@ const contractPathHistoryToEdgeStatus = (index: number | null | undefined, histo
   if (history === 'skipped')
     return 'skipped';
   if (history.length === 0)
-    return 'still-possible';
-  return (index === undefined || index === history[0])? 'executed' : 'skipped';
+    if (index === undefined)
+      return 'executed';
+    else
+      return 'still-possible';
+  return (index === history[0])? 'executed' : 'skipped';
 }
 
 const contractPathHistoryContinuation = (index: number | null | undefined, history: ContractPathHistory): ContractPathHistory => {
@@ -205,11 +208,11 @@ const statusToEdgeStyle = (status: ContractEdgeStatus, defaultStyle: React.CSSPr
 const statusToNodeStyle = (status: ContractEdgeStatus, defaultStyle: React.CSSProperties): React.CSSProperties => {
   switch (status) {
     case 'executed':
-      return { ...defaultStyle, strokeOpacity: "100%" }
+      return { ...defaultStyle, strokeOpacity: "100%", border: "3px solid black" }
     case 'still-possible':
-      return { ...defaultStyle, opacity: "75%" }
+      return { ...defaultStyle }
     case 'skipped':
-      return { ...defaultStyle, opacity: "30%" }
+      return { ...defaultStyle, opacity: "40%" }
   }
 }
 
@@ -297,6 +300,7 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
 
   if ("assert" in contract) {
     const status = contractPathHistoryToEdgeStatus(undefined, path);
+
     const { then, ...type } = contract
     const then_id = `1-${id}`
     const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path)
@@ -314,9 +318,6 @@ const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: nu
   }
 
   if ("when" in contract) {
-    const index = path && path[0];
-    // const indices = path && path.slice(1);
-
     const { timeout_continuation, ...type } = contract
     const { nodes, edges, max_y } = type.when.reduce<{ nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number }>((acc, on:any, i:number) => {
       if ("then" in on) {

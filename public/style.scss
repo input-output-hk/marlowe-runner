@@ -14,6 +14,7 @@ $link-color: #511CF7;
 
 @import "bootstrap/scss/functions";
 @import "bootstrap/scss/variables";
+@import "bootstrap/scss/variables-dark";
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/utilities";
 
@@ -203,6 +204,10 @@ $link-color: #511CF7;
 
 .text-color-gray {
   color: #5A5A5A !important;
+}
+
+.background-color-gray-100-hover:hover {
+  background-color: $gray-100 !important;
 }
 
 .background-color-primary {

@@ -18,6 +18,8 @@ import Effect (Effect)
 import Effect.Uncurried (EffectFn1, mkEffectFn1)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import React.Basic (JSX, ReactComponent, element)
+import React.Basic.DOM as DOM
+import React.Basic.DOM.Simplified.Generated as S
 
 -- In order to use the component plus include 'reactflow/dist/style.css'
 

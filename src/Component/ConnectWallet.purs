@@ -63,13 +63,13 @@ formatName :: String -> String
 formatName "GeroWallet" = "GeroWallet"
 formatName name = String.upperCaseFirst name
 
-renderWallets :: Effect Unit -> WalletInfo Wallet -> JSX
-renderWallets onSubmit (WalletInfo { icon, name }) =
+renderWallet :: Effect Unit -> WalletInfo Wallet -> JSX
+renderWallet onSubmit (WalletInfo { icon, name }) =
   DOM.div { className: "row mt-2" } do
     let
       _aria = Object.fromHomogeneous { labelledBy: "button", label: name }
     [ DOM.div
-        { className: "col-12 d-flex rounded p-2 align-items-center border border-2 border-secondary justify-content-between cursor-pointer"
+        { className: "col-12 d-flex rounded p-2 align-items-center border border-2 border-secondary justify-content-between cursor-pointer background-color-gray-100-hover"
         , onClick: handler_ onSubmit
         , role: "button"
         , _aria
@@ -83,19 +83,25 @@ renderWallets onSubmit (WalletInfo { icon, name }) =
         ]
     ]
 
+data AvailableWallets
+  = FetchingWalletList
+  | WalletList (ArrayAL 1 (WalletInfo Wallet))
+  | NoWalletsAvailable
+
 mkConnectWallet :: MkComponentM (Props -> JSX)
 mkConnectWallet = do
   singleChoiceField <- liftEffect mkSingleChoiceField
   -- modal <- liftEffect mkModal
 
   liftEffect $ component "Wallet" \{ currentlyConnected, onWalletConnect, onDismiss, inModal } -> React.do
-    -- pure \{ currentlyConnected, onWalletConnect, onDismiss } -> coerceHook React.do
-    possibleWallets /\ setWallets <- useState' (Nothing :: Maybe (ArrayAL 1 (WalletInfo Wallet)))
+    possibleWallets /\ setWallets <- useState' FetchingWalletList
     selectedWallet /\ setSelectedWallet <- useState' $ Nothing
 
     useEffectOnce do
       liftEffect (Wallet.cardano =<< window) >>= case _ of
-        Nothing -> pure unit
+        Nothing -> do
+          setWallets NoWalletsAvailable
+          pure unit
         Just cardano -> launchAff_ do
           eternl <- liftEffect (Wallet.eternl cardano) >>= traverse walletInfo
           gerowallet <- liftEffect (Wallet.gerowallet cardano) >>= traverse walletInfo
@@ -103,9 +109,11 @@ mkConnectWallet = do
           nami <- liftEffect (Wallet.nami cardano) >>= traverse walletInfo
           yoroi <- liftEffect (Wallet.yoroi cardano) >>= traverse walletInfo
           case ArrayAL.fromArray (Proxy :: Proxy 1) (Array.catMaybes [ lace, nami, gerowallet, yoroi, eternl ]) of
-            Nothing -> liftEffect $ onWalletConnect NoWallets
+            Nothing -> liftEffect $ do
+              setWallets NoWalletsAvailable
+              onWalletConnect NoWallets
             Just wallets -> liftEffect $ do
-              setWallets (Just wallets)
+              setWallets $ WalletList wallets
               setSelectedWallet $ do
                 { name } <- un WalletInfo <$> currentlyConnected
                 Array.find (\(WalletInfo wallet) -> wallet.name == name) (ArrayAL.toArray wallets)
@@ -125,112 +133,110 @@ mkConnectWallet = do
                   selected' = Newtype.over WalletInfo (Record.set (Proxy :: Proxy "wallet") walletApi) selected
                 liftEffect $ onWalletConnect (Connected selected')
               Nothing -> do
-                traceM $ "Error connecting wallet - no api returned"
                 -- FIXME: Error handling
                 liftEffect $ onDismiss
         Nothing -> onDismiss
       onSubmit = submit selectedWallet
 
-    pure $ do
-      let
-        { formBody, formActions } = case possibleWallets of
-          Nothing ->
-            { formBody: DOM.div { className: "d-flex justify-content-center" } $ loadingSpinnerLogo {}
-            , formActions: mempty
-            }
-          Just wallets -> do
-            let
-              choices = wallets <#> \(WalletInfo { icon, name }) -> do
-                let
-                  label = DOM.span { className: "h5" }
-                    [ DOOM.img { src: icon, alt: name, className: "w-2rem me-2" }
-                    , DOOM.span_ [ DOOM.text name ]
+    pure
+      if inModal then do
+        let
+          { formBody, formActions } = case possibleWallets of
+            WalletList wallets -> do
+              let
+                choices = wallets <#> \(WalletInfo { icon, name }) -> do
+                  let
+                    label = DOM.span { className: "h5" }
+                      [ DOOM.img { src: icon, alt: name, className: "w-2rem me-2" }
+                      , DOOM.span_ [ DOOM.text name ]
+                      ]
+                  -- We know that only Nami is working - should we disable all the other wallets?
+                  name /\ label /\ false
+
+              { formBody: singleChoiceField
+                  { initialValue: fromMaybe "" (_.name <<< unwrap <$> selectedWallet)
+                  , onValueChange: \walletName -> do
+                      setSelectedWallet $ Array.find (\(WalletInfo wallet) -> wallet.name == walletName) (ArrayAL.toArray wallets)
+                  , type: Form.RadioButtonField choices
+                  }
+              , formActions: DOOM.fragment
+                  if inModal then
+                    [ link { label: DOOM.text "Cancel", onClick: onDismiss, showBorders: true }
+                    , DOOM.button do
+                        let
+                          _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
+                          _name = map $ (_.name <<< unwrap)
+                          selectedIsConnected = _name selectedWallet == _name currentlyConnected
+
+                        { type: "button"
+                        , className: "btn btn-primary"
+                        , onClick: handler_ onSubmit
+                        , disabled: selectedIsConnected
+                        , children: [ DOOM.text "Connect wallet" ]
+                        }
                     ]
-                -- We know that only Nami is working - should we disable all the other wallets?
-                name /\ label /\ false
+                  else
+                    [ DOOM.button do
+                        let
+                          _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
+                          _name = map $ (_.name <<< unwrap)
+                          selectedIsConnected = _name selectedWallet == _name currentlyConnected
 
-            { formBody: singleChoiceField
-                { initialValue: fromMaybe "" (_.name <<< unwrap <$> selectedWallet)
-                , onValueChange: \walletName -> do
-                    setSelectedWallet $ Array.find (\(WalletInfo wallet) -> wallet.name == walletName) (ArrayAL.toArray wallets)
-                , type: Form.RadioButtonField choices
-                }
-            , formActions: DOOM.fragment
-                if inModal then
-                  [ link { label: DOOM.text "Cancel", onClick: onDismiss, showBorders: true }
-                  , DOOM.button do
-                      let
-                        _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
-                        _name = map $ (_.name <<< unwrap)
-                        selectedIsConnected = _name selectedWallet == _name currentlyConnected
+                        { type: "button"
+                        , className: "btn btn-primary mt-3"
+                        , onClick: handler_ onSubmit
+                        , disabled: selectedIsConnected
+                        , children: [ DOM.p { className: "h4 font-weight-bold" } [ DOOM.text "Connect wallet" ] ]
+                        }
+                    ]
+              }
+            _ -> do
+              { formBody: DOM.div { className: "d-flex justify-content-center" } $ loadingSpinnerLogo {}
+              , formActions: mempty
+              }
 
-                      { type: "button"
-                      , className: "btn btn-primary"
-                      , onClick: handler_ onSubmit
-                      , disabled: selectedIsConnected
-                      , children: [ DOOM.text "Connect wallet" ]
-                      }
-                  ]
-                else
-                  [ DOOM.button do
-                      let
-                        _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
-                        _name = map $ (_.name <<< unwrap)
-                        selectedIsConnected = _name selectedWallet == _name currentlyConnected
-
-                      { type: "button"
-                      , className: "btn btn-primary mt-3"
-                      , onClick: handler_ onSubmit
-                      , disabled: selectedIsConnected
-                      , children: [ DOM.p { className: "h4 font-weight-bold" } [ DOOM.text "Connect wallet" ] ]
-                      }
-                  ]
-            }
-      if inModal then modal
-        { onHide: onDismiss -- : setConfiguringWallet false
-        -- , footer: formActions
-        -- , body: formBody
-        -- , title: DOOM.text "Connect wallet"
-        , show: true
-        }
-        [ modalHeader {} $ DOOM.text "Choose a wallet"
-        , modalBody {} formBody
-        , modalFooter {} formActions
-        ]
-
+        modal
+          { onHide: onDismiss -- : setConfiguringWallet false
+          -- , footer: formActions
+          -- , body: formBody
+          -- , title: DOOM.text "Connect wallet"
+          , show: true
+          }
+          [ modalHeader {} $ DOOM.text "Choose a wallet"
+          , modalBody {} formBody
+          , modalFooter {} formActions
+          ]
       else
         DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
-          [ DOM.div { className: "col-12" }
-              [ DOM.div { className: "shadow-sm rounded p-4" }
-                  case possibleWallets of
-                    Just wallets ->
-                      [ DOM.div { className: "container" }
-                          [ DOM.div { className: "row" }
-                              [ DOM.div { className: "col-12" }
-                                  [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
-                                  , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please select a wallet to deploy a contract." ]
-                                  ]
-                              ]
-                          , case possibleWallets of
-                              Just wallets -> fragment $ (ArrayAL.toArray wallets) <#> \wallet -> do
-                                renderWallets (submit $ Just wallet) wallet
-                              Nothing -> mempty
-                          , DOM.div { className: "row mt-4 d-none" }
-                              [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#" } [ DOOM.text "Learn more" ] ]
-                              , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none" } [ DOOM.text "I don't have a wallet" ] ]
-                              ]
-                          ]
-                      ]
+          [ DOM.div { className: "col-12 shadow-sm rounded p-5" } do
+              let
+                renderWallets maybeWallets = do
+                  [ DOM.div { className: "row" } $
+                      DOM.div { className: "col-12" }
+                        [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
+                        , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please select a wallet to deploy a contract." ]
+                        ]
+                  ] <> case maybeWallets of
+                    Just wallets -> (ArrayAL.toArray wallets) <#> \wallet -> do
+                      renderWallet (submit $ Just wallet) wallet
                     Nothing ->
-                      [ DOM.div { className: "container" }
-                          [ DOM.div { className: "row" }
-                              [ DOM.div { className: "col-12" }
-                                  [ DOM.h5 { className: "card-title font-weight-bold text-left mb-3" } [ DOOM.text "Looks like you don't have a wallet extension installed." ]
-                                  , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please install a cardano wallet extension, such as Lace, Nami or Eternl in order to proceed and start running Marlowe contracts." ]
-                                  ]
-                              ]
+                      [ DOM.div { className: "d-flex justify-content-center" } $ loadingSpinnerLogo {} ]
+              -- <>
+              --   [ DOM.div { className: "row mt-4" }
+              --     [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#" } [ DOOM.text "Learn more" ] ]
+              --     , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none" } [ DOOM.text "I don't have a wallet" ] ]
+              --     ]
+              --   ]
+              case possibleWallets of
+                NoWalletsAvailable ->
+                  [ DOM.div { className: "row" }
+                      [ DOM.div { className: "col-12" }
+                          [ DOM.h5 { className: "card-title font-weight-bold text-left mb-3" } [ DOOM.text "Looks like you don't have a wallet extension installed." ]
+                          , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please install a cardano wallet extension, such as Lace, Nami or Eternl in order to proceed and start running Marlowe contracts." ]
                           ]
                       ]
+                  ]
+                WalletList wallets -> renderWallets (Just wallets)
+                _ -> renderWallets Nothing
 
-              ]
           ]

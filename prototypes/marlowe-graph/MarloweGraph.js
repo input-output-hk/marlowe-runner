@@ -20,6 +20,7 @@ const contractNodeStyle = {
     display: "flex",
     flexFlow: "column",
     justifyContent: "center",
+    fontSize: "14px",
     padding: "0px",
     alignItems: "center",
     height: `${NODE_HEIGHT}px`,
@@ -30,8 +31,8 @@ const contractNodeStyle = {
     fontFamily: "monospace",
 };
 const nodeTypes = {
-    ContractNode({ data: { type, disabled } }) {
-        const style_ = Object.assign(Object.assign({}, contractNodeStyle), { opacity: disabled ? "30%" : "100%" });
+    ContractNode({ data: { type, status } }) {
+        const style_ = statusToNodeStyle(status, contractNodeStyle);
         if (type === "close")
             return _jsxs("div", { style: style_, children: ["Close", _jsx(Handle, { type: "target", position: Position.Left })] });
         if ("if" in type)
@@ -67,38 +68,81 @@ const nodeTypes = {
         return _jsx("div", { style: style_, children: "Not implemented!" });
     }
 };
-const statusToStyle = (status, defaultStyle) => {
+const contractPathHistoryToNodeStatus = (history) => {
+    if (history === 'still-possible')
+        return 'still-possible';
+    if (history === 'skipped')
+        return 'skipped';
+    // Array case means we are on the path or at the end of the path.
+    return 'executed';
+};
+// In both functions the value of `index` value has following semantics:
+// * `undefined` - we are inside the node which is not branching node (`Assert`, `Let`, `Pay`)
+// * `null` - we are in when and checking continuation for timeout
+// * `number` - we are in some branching node and picking the branch
+const contractPathHistoryToEdgeStatus = (index, history) => {
+    if (history === 'still-possible')
+        return 'still-possible';
+    if (history === 'skipped')
+        return 'skipped';
+    if (history.length === 0)
+        if (index === undefined)
+            return 'executed';
+        else
+            return 'still-possible';
+    return (index === history[0]) ? 'executed' : 'skipped';
+};
+const contractPathHistoryContinuation = (index, history) => {
+    if (history == 'still-possible')
+        return 'still-possible';
+    if (history == 'skipped')
+        return 'skipped';
+    if (index === undefined)
+        return history;
+    if (history.length === 0)
+        return 'still-possible';
+    return index === history[0] ? history.slice(1) : 'skipped';
+};
+const statusToEdgeStyle = (status, defaultStyle) => {
     switch (status) {
         case 'executed':
             return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", strokeWidth: 3, stroke: "black" });
         case 'skipped':
-            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "30%", strokeWidth: 1 });
+            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "50%", strokeWidth: 1 });
         case 'still-possible':
-            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", strokeWidth: 1 });
+            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", strokeWidth: 2 });
+    }
+};
+const statusToNodeStyle = (status, defaultStyle) => {
+    switch (status) {
+        case 'executed':
+            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", border: "3px solid black" });
+        case 'still-possible':
+            return Object.assign({}, defaultStyle);
+        case 'skipped':
+            return Object.assign(Object.assign({}, defaultStyle), { opacity: "40%" });
     }
 };
 const edgeTypes = {
     ContractEdge({ data, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, markerEnd, style = {} }) {
         const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
-        const style_ = data ? statusToStyle(data.status, style) : style;
+        const style_ = data ? statusToEdgeStyle(data.status, style) : style;
         return _jsx(BaseEdge, { path: edgePath, markerEnd: markerEnd, style: style_ });
     }
 };
 const contract2NodesAndEdges = (contract, id, x, y, path) => {
+    var nodeStatus = contractPathHistoryToNodeStatus(path);
     if (contract === "close")
         return {
-            nodes: [{ id, position: { x, y }, data: { type: "close", disabled: false }, type: "ContractNode" }],
+            nodes: [{ id, position: { x, y }, data: { type: "close", status: nodeStatus }, type: "ContractNode" }],
             edges: [],
             max_y: y,
         };
     if ("if" in contract) {
-        // const [index, ...indices] = path
-        const if_executed = path && path[0] === 0;
-        const else_executed = path && path[0] === 1;
-        const if_path = if_executed ? path.slice(1) : undefined;
-        const else_path = else_executed ? path.slice(1) : undefined;
-        const if_status = if_executed ? 'executed' : (path === undefined ? 'skipped' : 'still-possible');
-        const else_status = else_executed ? 'executed' : (path === undefined ? 'skipped' : 'still-possible');
+        const if_status = contractPathHistoryToEdgeStatus(0, path);
+        const else_status = contractPathHistoryToEdgeStatus(1, path);
+        const if_path = contractPathHistoryContinuation(0, path);
+        const else_path = contractPathHistoryContinuation(1, path);
         const { else: else_, then } = contract, type = __rest(contract, ["else", "then"]);
         const then_id = `1-${id}`;
         const else_id = `2-${id}`;
@@ -108,7 +152,7 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
             nodes: [
                 ...then_nodes,
                 ...else_nodes,
-                { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+                { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
             ],
             edges: [
                 ...then_edges,
@@ -120,14 +164,14 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
         };
     }
     if ("pay" in contract) {
-        const status = path === undefined ? 'skipped' : (path.length === 0 ? 'still-possible' : 'executed');
+        const status = contractPathHistoryToEdgeStatus(undefined, path);
         const { then } = contract, type = __rest(contract, ["then"]);
         const then_id = `1-${id}`;
         const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path);
         return {
             nodes: [
                 ...nodes,
-                { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+                { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
             ],
             edges: [
                 ...edges,
@@ -137,14 +181,14 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
         };
     }
     if ("let" in contract) {
-        const status = path === undefined ? 'skipped' : (path.length === 0 ? 'still-possible' : 'executed');
+        const status = contractPathHistoryToEdgeStatus(undefined, path);
         const { then } = contract, type = __rest(contract, ["then"]);
         const then_id = `1-${id}`;
         const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path);
         return {
             nodes: [
                 ...nodes,
-                { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+                { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
             ],
             edges: [
                 ...edges,
@@ -154,14 +198,14 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
         };
     }
     if ("assert" in contract) {
-        const status = path === undefined ? 'skipped' : (path.length === 0 ? 'still-possible' : 'executed');
+        const status = contractPathHistoryToEdgeStatus(undefined, path);
         const { then } = contract, type = __rest(contract, ["then"]);
         const then_id = `1-${id}`;
         const { max_y, nodes, edges } = contract2NodesAndEdges(then, then_id, x + X_OFFSET, y, path);
         return {
             nodes: [
                 ...nodes,
-                { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+                { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
             ],
             edges: [
                 ...edges,
@@ -171,14 +215,13 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
         };
     }
     if ("when" in contract) {
-        const index = path && path[0];
-        const indices = path && path.slice(1);
         const { timeout_continuation } = contract, type = __rest(contract, ["timeout_continuation"]);
         const { nodes, edges, max_y } = type.when.reduce((acc, on, i) => {
             if ("then" in on) {
-                const status = index === i ? 'executed' : (index === undefined ? 'skipped' : 'still-possible');
+                const edgeStatus = contractPathHistoryToEdgeStatus(i, path);
+                const pathContinuation = contractPathHistoryContinuation(i, path);
                 const then_id = `${i}-${id}`;
-                const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, indices);
+                const { nodes, edges, max_y } = contract2NodesAndEdges(on.then, then_id, x + X_OFFSET, acc.max_y + Y_OFFSET, pathContinuation);
                 return {
                     nodes: [
                         ...nodes,
@@ -187,7 +230,7 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
                     edges: [
                         ...edges,
                         ...acc.edges,
-                        { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { status } }
+                        { id: `then-${then_id}-${id}`, source: id, target: then_id, sourceHandle: `${i}`, type: "ContractEdge", data: { status: edgeStatus } }
                     ],
                     max_y
                 };
@@ -195,14 +238,14 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
             return acc;
         }, {
             nodes: [
-                { id, position: { x, y }, data: { type, disabled: false }, type: "ContractNode" },
+                { id, position: { x, y }, data: { type, status: nodeStatus }, type: "ContractNode" },
             ],
             edges: [],
             max_y: y - Y_OFFSET
         });
         const timeout_then_id = `${type.when.length}-${id}`;
-        const timeout_status = index == null ? 'executed' : (index === undefined ? 'skipped' : 'still-possible');
-        const timeout_indices = index == null ? indices : undefined;
+        const timeout_status = contractPathHistoryToEdgeStatus(null, path);
+        const timeout_indices = contractPathHistoryContinuation(null, path);
         const timeout_graph = contract2NodesAndEdges(timeout_continuation, timeout_then_id, x + X_OFFSET, max_y + Y_OFFSET, timeout_indices);
         return {
             nodes: [

@@ -1,4 +1,4 @@
-import { jsx as _jsx } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { _MarloweGraph } from './MarloweGraph';
 import { createRoot } from 'react-dom/client';
 const contract = {
@@ -16,6 +16,15 @@ const contract = {
             case: { notify_if: false },
             then: {
                 when: [
+                    {
+                        case: {
+                            deposits: 200,
+                            party: { role_token: "Party A" },
+                            of_token: { currency_symbol: "", token_name: "" },
+                            into_account: { role_token: "Party B" }
+                        },
+                        then: { if: true, then: { assert: true, then: "close" }, else: "close" }
+                    },
                     {
                         case: {
                             deposits: 200,
@@ -78,7 +87,20 @@ const noop = () => { return; };
 export const MarloweGraphView = ({ contract, path, onInit }) => {
     return (_jsx("div", { style: { width: "95vw", height: "95vh" }, children: _MarloweGraph({ contract, path, onInit }) }));
 };
-console.log("TES");
-console.log(document.getElementById("app"));
 const root = createRoot(document.getElementById("app"));
-root.render(_jsx(MarloweGraphView, { contract: contract, path: [1, 0], onInit: noop }));
+const contract2 = {
+    when: [
+        {
+            case: {
+                deposits: 500,
+                party: { role_token: "Party A" },
+                of_token: { currency_symbol: "", token_name: "" },
+                into_account: { role_token: "Party B" }
+            },
+            then: { if: true, then: "close", else: "close" }
+        },
+    ],
+    timeout: 1985,
+    timeout_continuation: "close"
+};
+root.render(_jsxs("div", { children: [_jsx(MarloweGraphView, { contract: contract2, path: [0, 0], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1, 0], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1, 0, 0], onInit: noop })] }));

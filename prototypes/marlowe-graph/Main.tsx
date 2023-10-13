@@ -98,11 +98,28 @@ export const MarloweGraphView = ({ contract, path, onInit }: { contract: Contrac
 
 const root = createRoot(document.getElementById("app") as HTMLElement);
 
+const contract2: Contract = {
+  when: [
+    {
+      case: {
+        deposits: 500,
+        party: { role_token: "Party A" },
+        of_token: { currency_symbol: "", token_name: "" },
+        into_account: { role_token: "Party B" }
+      },
+      then: { if: true, then: "close", else: "close" }
+    },
+  ],
+  timeout: 1985,
+  timeout_continuation: "close"
+}
+
 root.render(
   <div>
-    <MarloweGraphView contract={contract} path={[1]} onInit={noop} />)
-    <MarloweGraphView contract={contract} path={[1, 0]} onInit={noop} />)
-    <MarloweGraphView contract={contract} path={[1, 0, 0]} onInit={noop} />)
+    <MarloweGraphView contract={contract2} path={[0, 0]} onInit={noop} />
+    <MarloweGraphView contract={contract} path={[1]} onInit={noop} />
+    <MarloweGraphView contract={contract} path={[1, 0]} onInit={noop} />
+    <MarloweGraphView contract={contract} path={[1, 0, 0]} onInit={noop} />
   </div>
 );
 

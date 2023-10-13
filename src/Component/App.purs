@@ -27,7 +27,7 @@ import Data.Foldable (for_)
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
 import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Newtype as Newtype
@@ -254,6 +254,9 @@ mkApp = do
             action = do
               walletContext <- WalletContext.walletContext cardanoMultiplatformLib walletInfo.wallet
               liftEffect $ setWalletContext walletContext
+              -- FIXME: Another work around the rounting issue.
+              when (isNothing pwc) do
+                liftEffect $ props.setPage ContractListPage
           action `catchError` \_ -> do
             -- FIXME: Report back (to the reporting backend) a wallet problem?
             pure unit
@@ -348,27 +351,14 @@ mkApp = do
                               , extraClassNames: "nav-link"
                               , onClick: setConfiguringWallet true
                               }
-                            _, _ -> linkWithIcon
-                              { icon: Icons.wallet2
-                              , label: DOOM.text "Connect Wallet"
-                              , extraClassNames: "nav-link"
-                              , onClick: setConfiguringWallet true
-                              }
+                            _, _ -> mempty
                       ]
                 ]
             ]
         ]
 
-    pure $ case possibleWalletInfo of
-      Nothing -> DOM.div {} $
-        [ topNavbar
-        , landingPage
-            { setWalletInfo: \info -> do
-                setWalletInfo <<< Just $ info
-                props.setPage ContractListPage
-            }
-        ]
-      _ -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
+    pure $ case possibleWalletInfo, possibleWalletContext of
+      Just walletInfo, Just walletContext -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
         [ DOM.div { className: "container" } $ DOM.div { className: "row position-relative" } $ DOM.div { className: "col-6 mx-auto position-absolute top-10 start-50 translate-middle-x z-index-popover" }
             $ DOM.div { className: "container-xl" }
             $ DOM.div { className: "row" }
@@ -386,37 +376,39 @@ mkApp = do
               }
               [ DOM.div { className: "p-3 overflow-auto" } $ messageBox msgHub
               ]
-        , Monoid.guard configuringWallet do
-            let
-              jsx = subcomponents.connectWallet
-                { currentlyConnected: possibleWalletInfo
-                , onWalletConnect: \result -> do
-                    case result of
-                      ConnectWallet.Connected walletInfo -> do
-                        let
-                          WalletInfo { name } = walletInfo
-                        msgHubProps.add $ Success $ DOOM.text $ "Connected to " <> String.upperCaseFirst name
-                        setWalletInfo (Just walletInfo)
-                      ConnectWallet.ConnectionError _ -> pure unit
-                      ConnectWallet.NoWallets -> pure unit
-                    setConfiguringWallet false
-                , onDismiss: setConfiguringWallet false
-                , inModal: true
-                }
-            jsx
-        , case possibleWalletContext, possibleWalletInfo of
-            Just walletContext, Just walletInfo -> do
-              subcomponents.contractListComponent
-                { walletInfo
-                , walletContext
-                , possibleContracts
-                , contractMapInitialized
-                , notSyncedYetInserts
-                , submittedWithdrawalsInfo
-                , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
-                , setPage: props.setPage
-                }
-            _, _ -> DOOM.text "Wallet missing"
+        -- This section appeared on click
+        -- , Monoid.guard configuringWallet do
+        --     let
+        --       jsx = subcomponents.connectWallet
+        --         { currentlyConnected: possibleWalletInfo
+        --         , onWalletConnect: \result -> do
+        --             case result of
+        --               ConnectWallet.Connected walletInfo -> do
+        --                 let
+        --                   WalletInfo { name } = walletInfo
+        --                 msgHubProps.add $ Success $ DOOM.text $ "Connected to " <> String.upperCaseFirst name
+        --                 setWalletInfo (Just walletInfo)
+        --               ConnectWallet.ConnectionError _ -> pure unit
+        --               ConnectWallet.NoWallets -> pure unit
+        --             setConfiguringWallet false
+        --         , onDismiss: setConfiguringWallet false
+        --         , inModal: true
+        --         }
+        --     jsx
+        , subcomponents.contractListComponent
+            { walletInfo
+            , walletContext
+            , possibleContracts
+            , contractMapInitialized
+            , notSyncedYetInserts
+            , submittedWithdrawalsInfo
+            , possibleInitialModalAction: (NewContract <<< Just) <$> props.possibleInitialContract
+            , setPage: props.setPage
+            }
         , footer
+        ]
+      _, _ -> DOM.div {} $
+        [ topNavbar
+        , landingPage { setWalletInfo: setWalletInfo <<< Just }
         ]
 
