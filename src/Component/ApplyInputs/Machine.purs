@@ -431,8 +431,8 @@ mkEnvironment contract = do
     timeInterval = case nextTimeout contract of
       Just timeout | n < timeout -> do
         let
-          timeout' = unsafeInstant $ unInstant timeout <> (Milliseconds (-1.0))
-        V1.TimeInterval twoMinutesAgo (min inTenMinutes timeout')
+          timeout' = unsafeInstant $ unInstant timeout <> (Milliseconds 1.0)
+        V1.TimeInterval timeout' inTenMinutes
       _ -> V1.TimeInterval twoMinutesAgo inTenMinutes
 -- =======
 --   inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
