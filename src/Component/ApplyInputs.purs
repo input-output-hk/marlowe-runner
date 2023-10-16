@@ -330,7 +330,10 @@ mkNotifyFormComponent = do
               , backToContractListLink onDismiss
               ]
           ]
-      wrappedContentWithFooter body actions
+      fragment
+        [ DOM.div { className: "p-3" } body
+        , DOM.div { className: "p-3 mt-auto" } actions
+        ]
 
 type AdvanceFormComponentProps =
   { marloweContext :: Machine.MarloweContext
@@ -360,7 +363,10 @@ mkAdvanceFormComponent = do
             , backToContractListLink onDismiss
             ]
         ]
-    pure $ wrappedContentWithFooter body actions
+    pure $ fragment
+      [ DOM.div { className: "p-3" } body
+      , DOM.div { className: "p-3 mt-auto" } actions
+      ]
 
 data CreateInputStep
   = SelectingInputType

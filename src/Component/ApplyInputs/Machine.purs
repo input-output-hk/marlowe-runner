@@ -7,7 +7,7 @@ import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
 import Component.InputHelper (ChoiceInput, DepositInput, NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Types (WalletInfo(..))
-import Contrib.Data.DateTime.Instant (millisecondsFromNow, unsafeInstant)
+import Contrib.Data.DateTime.Instant (unsafeInstant)
 import Contrib.Fetch (FetchError)
 import Control.Alt ((<|>))
 import Control.Alternative as Alternative
@@ -18,7 +18,6 @@ import Data.Array.NonEmpty as NonEmpty
 import Data.DateTime.Instant (Instant, unInstant)
 import Data.Either (Either(..), isLeft)
 import Data.Foldable (foldMap)
-import Data.Int as Int
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Variant (Variant)
@@ -421,8 +420,8 @@ nextTimeout = case _ of
 
 -- This is pretty arbitrary choice - we should keep track which inputs are relevant
 -- during the further steps.
-mkEnvironment :: V1.Contract -> Effect V1.Environment
-mkEnvironment contract = do
+mkEnvironment :: Effect V1.Environment
+mkEnvironment = do
   n <- now
   let
     inOneSecond = unsafeInstant $ unInstant n <> (Milliseconds 1000.0)
@@ -442,9 +441,7 @@ requestToAffAction = case _ of
         Left err -> pure $ FetchRequiredWalletContextFailed $ show err
         Right Nothing -> pure $ FetchRequiredWalletContextFailed "Wallet does not have a change address"
         Right (Just (WalletContext { changeAddress, usedAddresses })) -> liftEffect $ do
-          -- TODO: investingate if this is good strategy. We should probably migrate to something similiar to the
-          -- next endpoint implementation.
-          environment <- mkEnvironment marloweContext.contract
+          environment <- mkEnvironment
           let
             { contract, state } = marloweContext
             allInputsChoices = case nextTimeoutAdvance environment state contract of
