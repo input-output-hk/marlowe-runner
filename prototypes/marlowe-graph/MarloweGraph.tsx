@@ -16,7 +16,7 @@ import {
 } from "reactflow"
 
 import 'reactflow/dist/style.css'
-import { Action, AccountId, Contract, ContractNodeEvents, ContractEdgeEvents, Observation, Payee, Timeout, Token, ValueId, Value } from "./MarloweGraph/Marlowe"
+import { Action, AccountId, Contract, Observation, Payee, Timeout, Token, ValueId, Value } from "./MarloweGraph/Marlowe"
 
 const X_OFFSET = 200
 const Y_OFFSET = 40
@@ -47,7 +47,7 @@ type ContractNodeType
 
 type ContractNodeData = {
   type: ContractNodeType,
-  status: ContractEdgeStatus
+  status: ContractNodeStatus,
 }
 
 const nodeTypes: NodeTypes = {
@@ -144,6 +144,8 @@ const nodeTypes: NodeTypes = {
 // skipped: opacity 30%, width 1px
 type ContractEdgeStatus = 'executed' | 'skipped' | 'still-possible';
 
+type ContractNodeStatus = 'executed' | 'awaiting-input' | 'skipped' | 'still-possible';
+
 // export type ContractPathHistory = ReadonlyArray<number | null>
 
 export type ContractPathHistory
@@ -152,11 +154,13 @@ export type ContractPathHistory
   | 'still-possible'               // No branch chosen yet or parent chosen already.
   | 'skipped';                     // Parent or edge skipped.
 
-const contractPathHistoryToNodeStatus = (history: ContractPathHistory): ContractEdgeStatus => {
+const contractPathHistoryToNodeStatus = (contract: Contract, history: ContractPathHistory): ContractNodeStatus => {
   if (history === 'still-possible')
     return 'still-possible';
   if (history === 'skipped')
     return 'skipped';
+  if (history.length === 0 && contract !== "close" && "when" in contract)
+    return 'awaiting-input';
   // Array case means we are on the path or at the end of the path.
   return 'executed';
 }
@@ -194,25 +198,38 @@ type ContractEdgeData = {
   status: ContractEdgeStatus,
 }
 
+const executedStrokeStyle = { strokeOpacity: "100%", strokeWidth: 3, stroke: "black" }
+const stillPossibleStrokeStyle = { strokeOpacity: "100%", strokeWidth: 1, stroke: "gray" }
+const skippedStrokeStyle = { strokeOpacity: "30%", strokeWidth: 1, stroke: "black" }
+
+
+const executedDivStyle = { border: "3px solid black"}
+const stillPossibleDivStyle = { border: "1px solid gray"}
+const awaitingDivStyle = { border: "2px solid gray"}
+const skippedDivStyle = { border: "1px solid black"}
+
+
 const statusToEdgeStyle = (status: ContractEdgeStatus, defaultStyle: React.CSSProperties): React.CSSProperties => {
   switch (status) {
     case 'executed':
-      return { ...defaultStyle, strokeOpacity: "100%", strokeWidth: 3, stroke: "black" }
+      return { ...defaultStyle, ...executedStrokeStyle }
     case 'skipped':
-      return { ...defaultStyle, strokeOpacity: "50%", strokeWidth: 1 }
+      return { ...defaultStyle, ...skippedStrokeStyle }
     case 'still-possible':
-      return { ...defaultStyle, strokeOpacity: "100%", strokeWidth: 2 }
+      return { ...defaultStyle, ...stillPossibleStrokeStyle }
   }
 }
 
-const statusToNodeStyle = (status: ContractEdgeStatus, defaultStyle: React.CSSProperties): React.CSSProperties => {
+const statusToNodeStyle = (status: ContractNodeStatus, defaultStyle: React.CSSProperties): React.CSSProperties => {
   switch (status) {
     case 'executed':
-      return { ...defaultStyle, strokeOpacity: "100%", border: "3px solid black" }
+      return { ...defaultStyle, ...executedDivStyle }
+    case 'awaiting-input':
+      return { ...defaultStyle, ...awaitingDivStyle }
     case 'still-possible':
-      return { ...defaultStyle }
+      return { ...defaultStyle, ...stillPossibleDivStyle }
     case 'skipped':
-      return { ...defaultStyle, opacity: "40%" }
+      return { ...defaultStyle, ...skippedDivStyle, opacity: "30%" }
   }
 }
 
@@ -226,7 +243,7 @@ const edgeTypes: EdgeTypes = {
 }
 
 const contract2NodesAndEdges = (contract: Contract, id: string, x: number, y: number, path: ContractPathHistory): { nodes: Node<ContractNodeData>[], edges: Edge<ContractEdgeData>[], max_y: number } => {
-  var nodeStatus:ContractEdgeStatus = contractPathHistoryToNodeStatus(path);
+  var nodeStatus:ContractNodeStatus = contractPathHistoryToNodeStatus(contract, path);
   if (contract === "close")
     return {
       nodes: [{ id, position: { x, y }, data: { type: "close", status: nodeStatus }, type: "ContractNode" }],

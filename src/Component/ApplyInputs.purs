@@ -855,16 +855,6 @@ mkComponent = do
 address :: String
 address = "addr_test1qz4y0hs2kwmlpvwc6xtyq6m27xcd3rx5v95vf89q24a57ux5hr7g3tkp68p0g099tpuf3kyd5g80wwtyhr8klrcgmhasu26qcn"
 
-defaultTimeInterval :: Effect V1.TimeInterval
-defaultTimeInterval = do
-  nowInstant <- now
-  let
-    nowMilliseconds = unInstant nowInstant
-    inTenMinutesInstant = case instant (nowMilliseconds <> Milliseconds (Int.toNumber $ 10 * 60 * 1000)) of
-      Just i -> i
-      Nothing -> unsafeCrashWith "Invalid instant"
-  pure $ V1.TimeInterval nowInstant inTenMinutesInstant
-
 mkInitialContract :: Effect V1.Contract
 mkInitialContract = do
   nowMilliseconds <- unInstant <$> now
@@ -907,13 +897,10 @@ applyInputs
 
 applyInputs (ApplyInputsContext ctx) serverURL transactionsEndpoint = do
   let
-    V1.TimeInterval ib iha = ctx.timeInterval
-    invalidBefore = toDateTime ib
-    invalidHereafter = toDateTime iha
     req = PostTransactionsRequest
       { inputs: ctx.inputs
-      , invalidBefore
-      , invalidHereafter
+      , invalidBefore: Nothing
+      , invalidHereafter: Nothing
       , metadata: mempty
       , tags: mempty
       , changeAddress: ctx.wallet.changeAddress
@@ -921,3 +908,4 @@ applyInputs (ApplyInputsContext ctx) serverURL transactionsEndpoint = do
       , collateralUTxOs: []
       }
   post' serverURL transactionsEndpoint req
+

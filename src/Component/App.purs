@@ -228,10 +228,15 @@ mkApp = do
           runtime.serverURL
 
         liftEffect $ React.writeRef updateStreamingQueryParamsRef $ contractStream.updateQueryParams
+        let
+          syncDelay = Milliseconds 1_000.0
 
         supervise do
           void $ forkAff do
             _ <- contractStream.getState
+            -- An ugly hack to set initialize map only after sync
+            delay syncDelay
+            delay syncDelay
             liftEffect $ updateContractInfoMap \(contractMap /\ _) -> (contractMap /\ true)
 
           void $ forkAff do
@@ -239,7 +244,7 @@ mkApp = do
               newSynced <- liftEffect $ contractStream.getLiveState
               liftEffect $ updateContractInfoMap \(contractMap /\ initialized) ->
                 ContractInfoMap.updateSynced (Just newSynced) contractMap /\ initialized
-              delay (Milliseconds 1_000.0)
+              delay syncDelay
               pure Nothing
 
           liftEffect $ setSyncFn (Just contractStream.sync)
@@ -352,7 +357,7 @@ mkApp = do
                 [ DOM.div
                     { className: "col-3 pt-3 pb-3 background-color-primary-light", id: "marlowe-logo-container" } $
                     DOM.a { href: "#" } [ svgImg { src: marloweLogoUrl } ]
-                , DOM.div { className: "col-9 pt-3 pb-2 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end" } $
+                , DOM.div { className: "col-9 pt- pb-2 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end" } $
                     [ DOM.li {} $ ReactContext.consumer msgHubProps.ctx \msgs ->
                         [ linkWithIcon
                             { icon: unsafeIcon "h5"

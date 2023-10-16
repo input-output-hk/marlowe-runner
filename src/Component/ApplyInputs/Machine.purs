@@ -15,7 +15,7 @@ import Control.Monad.Error.Class (catchError)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmpty
-import Data.DateTime.Instant (Instant, toDateTime, unInstant)
+import Data.DateTime.Instant (Instant, unInstant)
 import Data.Either (Either(..), isLeft)
 import Data.Foldable (foldMap)
 import Data.Int as Int
@@ -424,24 +424,26 @@ nextTimeout = case _ of
 mkEnvironment :: V1.Contract -> Effect V1.Environment
 mkEnvironment contract = do
   n <- now
--- <<<<<<< HEAD
-  inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
-  twoMinutesAgo <- millisecondsFromNow (Milliseconds (Int.toNumber $ -10 * 60 * 1000))
+  -- -- <<<<<<< HEAD
+  --   inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
+  --   twoMinutesAgo <- millisecondsFromNow (Milliseconds (Int.toNumber $ -10 * 60 * 1000))
+  --   let
+  --     timeInterval = case nextTimeout contract of
+  --       Just timeout | n < timeout -> do
+  --         let
+  --           timeout' = unsafeInstant $ unInstant timeout <> (Milliseconds 1.0)
+  --         V1.TimeInterval timeout' (max inTenMinutes
+  --       _ -> V1.TimeInterval twoMinutesAgo inTenMinutes
+  -- =======
+  --   inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
+  --   let
+  --     timeInterval = case nextTimeout contract of
+  --       Just timeout | n < timeout -> V1.TimeInterval n (min inTenMinutes timeout)
+  --       _ -> V1.TimeInterval n inTenMinutes
+  -- >>>>>>> 19f656a (Introduce error message on config error. Fix time interval setup)
   let
-    timeInterval = case nextTimeout contract of
-      Just timeout | n < timeout -> do
-        let
-          timeout' = unsafeInstant $ unInstant timeout <> (Milliseconds 1.0)
-        V1.TimeInterval timeout' inTenMinutes
-      _ -> V1.TimeInterval twoMinutesAgo inTenMinutes
--- =======
---   inTenMinutes <- millisecondsFromNow (Milliseconds (Int.toNumber $ 10 * 60 * 1000))
---   let
---     timeInterval = case nextTimeout contract of
---       Just timeout | n < timeout -> V1.TimeInterval n (min inTenMinutes timeout)
---       _ -> V1.TimeInterval n inTenMinutes
--- >>>>>>> 19f656a (Introduce error message on config error. Fix time interval setup)
-  let
+    inOneSecond = unsafeInstant $ unInstant n <> (Milliseconds 1000.0)
+    timeInterval = V1.TimeInterval n inOneSecond
     environment = V1.Environment { timeInterval }
   pure environment
 
@@ -485,10 +487,10 @@ requestToAffAction = case _ of
           Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
       action `catchError` (pure <<< SignTxFailed <<< show)
   RuntimeRequest runtimeRequest -> case runtimeRequest of
-    CreateTxRequest { input, environment, requiredWalletContext, serverURL, transactionsEndpoint } -> do
+    CreateTxRequest { input, requiredWalletContext, serverURL, transactionsEndpoint } -> do
       let
         inputs = foldMap Array.singleton input
-        action = create inputs environment requiredWalletContext serverURL transactionsEndpoint >>= case _ of
+        action = create inputs requiredWalletContext serverURL transactionsEndpoint >>= case _ of
           Right res -> pure $ CreateTxSucceeded res
           Left err -> pure $ CreateTxFailed $ show err
       action `catchError` (pure <<< CreateTxFailed <<< show)
@@ -509,21 +511,18 @@ driver env state = do
 -- Lower level helpers
 create
   :: Array V1.Input
-  -> V1.Environment
   -> WalletAddresses
   -> ServerURL
   -> TransactionsEndpoint
   -> Aff (Either ClientError' { resource :: PostTransactionsResponse, links :: { transaction :: TransactionEndpoint } })
-create inputs environment walletAddresses serverUrl transactionsEndpoint = do
+create inputs walletAddresses serverUrl transactionsEndpoint = do
   let
-    V1.Environment { timeInterval } = environment
-    V1.TimeInterval invalidBefore invalidHereafter = timeInterval
     { changeAddress, usedAddresses } = walletAddresses
 
     req = PostTransactionsRequest
       { metadata: mempty
-      , invalidBefore: toDateTime invalidBefore
-      , invalidHereafter: toDateTime invalidHereafter
+      , invalidBefore: Nothing
+      , invalidHereafter: Nothing
       -- , version :: MarloweVersion
       , inputs
       , tags: mempty -- TODO: use instead of metadata

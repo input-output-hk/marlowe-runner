@@ -68,11 +68,13 @@ const nodeTypes = {
         return _jsx("div", { style: style_, children: "Not implemented!" });
     }
 };
-const contractPathHistoryToNodeStatus = (history) => {
+const contractPathHistoryToNodeStatus = (contract, history) => {
     if (history === 'still-possible')
         return 'still-possible';
     if (history === 'skipped')
         return 'skipped';
+    if (history.length === 0 && contract !== "close" && "when" in contract)
+        return 'awaiting-input';
     // Array case means we are on the path or at the end of the path.
     return 'executed';
 };
@@ -103,24 +105,33 @@ const contractPathHistoryContinuation = (index, history) => {
         return 'still-possible';
     return index === history[0] ? history.slice(1) : 'skipped';
 };
+const executedStrokeStyle = { strokeOpacity: "100%", strokeWidth: 3, stroke: "black" };
+const stillPossibleStrokeStyle = { strokeOpacity: "100%", strokeWidth: 1, stroke: "gray" };
+const skippedStrokeStyle = { strokeOpacity: "30%", strokeWidth: 1, stroke: "black" };
+const executedDivStyle = { border: "3px solid black" };
+const stillPossibleDivStyle = { border: "1px solid gray" };
+const awaitingDivStyle = { border: "2px solid gray" };
+const skippedDivStyle = { border: "1px solid black" };
 const statusToEdgeStyle = (status, defaultStyle) => {
     switch (status) {
         case 'executed':
-            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", strokeWidth: 3, stroke: "black" });
+            return Object.assign(Object.assign({}, defaultStyle), executedStrokeStyle);
         case 'skipped':
-            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "50%", strokeWidth: 1 });
+            return Object.assign(Object.assign({}, defaultStyle), skippedStrokeStyle);
         case 'still-possible':
-            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", strokeWidth: 2 });
+            return Object.assign(Object.assign({}, defaultStyle), stillPossibleStrokeStyle);
     }
 };
 const statusToNodeStyle = (status, defaultStyle) => {
     switch (status) {
         case 'executed':
-            return Object.assign(Object.assign({}, defaultStyle), { strokeOpacity: "100%", border: "3px solid black" });
+            return Object.assign(Object.assign({}, defaultStyle), executedDivStyle);
+        case 'awaiting-input':
+            return Object.assign(Object.assign({}, defaultStyle), awaitingDivStyle);
         case 'still-possible':
-            return Object.assign({}, defaultStyle);
+            return Object.assign(Object.assign({}, defaultStyle), stillPossibleDivStyle);
         case 'skipped':
-            return Object.assign(Object.assign({}, defaultStyle), { opacity: "40%" });
+            return Object.assign(Object.assign(Object.assign({}, defaultStyle), skippedDivStyle), { opacity: "30%" });
     }
 };
 const edgeTypes = {
@@ -131,7 +142,7 @@ const edgeTypes = {
     }
 };
 const contract2NodesAndEdges = (contract, id, x, y, path) => {
-    var nodeStatus = contractPathHistoryToNodeStatus(path);
+    var nodeStatus = contractPathHistoryToNodeStatus(contract, path);
     if (contract === "close")
         return {
             nodes: [{ id, position: { x, y }, data: { type: "close", status: nodeStatus }, type: "ContractNode" }],
