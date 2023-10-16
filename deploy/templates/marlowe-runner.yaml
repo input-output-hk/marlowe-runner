@@ -40,7 +40,7 @@ spec:
                   cp -a $root/* /share/marlowe-runner/static
                   cat > /share/marlowe-runner/static/config.json <<EOF
                   {
-                    "marloweWebServerUrl": "https://marlowe-runtime-{{ $network }}-web.scdev.demo.aws.iohkdev.io",
+                    "marloweWebServerUrl": "https://marlowe-runtime-{{ $network }}-web.demo.scdev.aws.iohkdev.io",
                     "develMode": false
                   }
                   EOF
@@ -100,7 +100,7 @@ spec:
                         cp -a $root/* /share/marlowe-runner/static
                         cat > /share/marlowe-runner/static/config.json <<EOF
                         {
-                          "marloweWebServerUrl": "https://marlowe-runtime-{{ $network }}-web.scdev.aws.iohkdev.io",
+                          "marloweWebServerUrl": "https://marlowe-runtime-{{ $network }}-web.demo.scdev.aws.iohkdev.io",
                           "develMode": false
                         }
                         EOF
