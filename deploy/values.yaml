@@ -4,4 +4,4 @@ networks:
   - preview
 images:
   stagingTag: "4fc4c7aa"
-  productionTag: "4fc4c7aa"
+  productionTag: "119a3602"
