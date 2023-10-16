@@ -174,11 +174,10 @@ const contractPathHistoryToEdgeStatus = (index: number | null | undefined, histo
     return 'still-possible';
   if (history === 'skipped')
     return 'skipped';
-  if (history.length === 0)
-    if (index === undefined)
-      return 'executed';
-    else
-      return 'still-possible';
+  if (index === undefined)
+    return 'executed';
+  if (history.length === 0 && index !== undefined)
+    return 'still-possible';
   return (index === history[0])? 'executed' : 'skipped';
 }
 

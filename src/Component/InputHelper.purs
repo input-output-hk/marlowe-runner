@@ -254,10 +254,9 @@ inputExecutionPath (possibleInputContent /\ timeInterval) = do
     contract, state -> case V1.reduceContractStep (Environment { timeInterval }) state contract of
       V1.AmbiguousTimeIntervalReductionError -> throwError "AmbiguousTimeIntervalReductionError"
       V1.NotReduced -> throwError "Contract already reduced"
-      V1.Reduced _ _ state' contract' -> do
-        Array.NonEmpty.cons' (ifTrueBranch /\ contract' /\ state') <$> case possibleInputContent of
-          Just inputContent -> Array.NonEmpty.toArray <$> inputExecutionPath (Just inputContent /\ timeInterval) contract' state'
-          Nothing -> pure []
+      V1.Reduced _ _ state' contract' -> case possibleInputContent of
+        Just inputContent -> inputExecutionPath (Just inputContent /\ timeInterval) contract' state'
+        Nothing -> throwError "Should rather not happend - non branching contract directly reduced - expecting `When` or `If` steps on the way."
 
 type ExecutionPath = List ((Maybe V1.InputContent /\ V1.TimeInterval) /\ InputExecutionPath)
 

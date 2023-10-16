@@ -56,7 +56,8 @@ mkComponent = do
     React.useAff (transactionEndpoints /\ contract /\ state) do
       fetchAppliedInputs serverURL (Array.reverse transactionEndpoints) >>= case _ of
         V (Right inputs) -> liftEffect $ case InputHelper.executionPath inputs initialContract initialState of
-          Right executionPath -> setPossibleExecutionPath executionPath
+          Right executionPath -> do
+            setPossibleExecutionPath executionPath
           Left err -> do
             logger "ContractDetails: failed to compute execution path"
             logger $ unsafeStringify err
