@@ -88,7 +88,7 @@ const contract: Contract = {
 
 const noop = () => { return; }
 
-export const MarloweGraphView = ({ contract, path, onInit }: { contract: Contract, path?: ContractPathHistory, onInit: any }): JSX.Element => {
+export const MarloweGraphView = ({ contract, path, onInit }: { contract: Contract, path: ContractPathHistory, onInit: any }): JSX.Element => {
   return (
     <div style={{ width: "95vw", height: "95vh" }}>
       { _MarloweGraph({contract, path, onInit}) }

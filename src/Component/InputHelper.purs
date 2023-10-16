@@ -261,8 +261,9 @@ inputExecutionPath (possibleInputContent /\ timeInterval) = do
 
 type ExecutionPath = List ((Maybe V1.InputContent /\ V1.TimeInterval) /\ InputExecutionPath)
 
-executionPath :: Array ((Maybe V1.InputContent) /\ V1.TimeInterval) -> V1.Contract -> V1.State -> Either String ExecutionPath
-executionPath inputs contract state = do
+executionPath :: Array ((Maybe V1.InputContent) /\ V1.TimeInterval) -> V1.Contract -> V1.State -> Either String (Maybe ExecutionPath)
+executionPath [] _ _ = pure Nothing
+executionPath inputs contract state = map Just do
   let
     initialAcc :: { contract :: V1.Contract, state :: V1.State, executionPath :: ExecutionPath }
     initialAcc = { contract, state, executionPath: List.Nil }

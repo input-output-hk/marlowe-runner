@@ -15,6 +15,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Monoid as Monoid
 import Data.Tuple.Nested (type (/\))
+import Data.Undefined.NoProblem as NoProblem
 import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -55,7 +56,7 @@ mkComponent = do
     React.useAff (transactionEndpoints /\ contract /\ state) do
       fetchAppliedInputs serverURL (Array.reverse transactionEndpoints) >>= case _ of
         V (Right inputs) -> liftEffect $ case InputHelper.executionPath inputs initialContract initialState of
-          Right executionPath -> setPossibleExecutionPath $ Just executionPath
+          Right executionPath -> setPossibleExecutionPath executionPath
           Left err -> do
             logger "ContractDetails: failed to compute execution path"
             logger $ unsafeStringify err
@@ -95,21 +96,18 @@ mkComponent = do
                       ]
                   }
                   $ marlowePreview contract'
-          , case possibleExecutionPath of
-              Nothing -> mempty
-              Just executionPath ->
-                renderTab
-                  { eventKey: eventKey "graph"
-                  , title: DOOM.span_
-                      -- [ Icons.toJSX $ unsafeIcon "diagram-2"
-                      [ DOOM.text " Source graph"
-                      ]
+          , renderTab
+              { eventKey: eventKey "graph"
+              , title: DOOM.span_
+                  -- [ Icons.toJSX $ unsafeIcon "diagram-2"
+                  [ DOOM.text " Source graph"
+                  ]
+              }
+              $ marloweGraph
+                  { contract: initialContract
+                  , executionPath: NoProblem.fromMaybe possibleExecutionPath
+                  , onInit: (\_ -> setGraphLoaded true)
                   }
-                  $ marloweGraph
-                      { contract: initialContract
-                      , executionPath
-                      , onInit: (\_ -> setGraphLoaded true)
-                      }
           , case state of
               Nothing -> mempty
               Just st ->

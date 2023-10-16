@@ -267,6 +267,6 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
     };
 };
 export const _MarloweGraph = ({ contract, path, onInit }) => {
-    const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0, path || []);
+    const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0, path);
     return _jsx(ReactFlow, { onInit: onInit, nodes: nodes, edges: edges, nodeTypes: nodeTypes, edgeTypes: edgeTypes, children: _jsx(Background, { variant: BackgroundVariant.Dots, gap: 12, size: 1 }) });
 };
