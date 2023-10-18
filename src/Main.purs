@@ -11,6 +11,7 @@ import Contrib.Data.Argonaut (JsonParser)
 import Contrib.Effect as Effect
 import Contrib.Fetch (fetchEither)
 import Contrib.JsonBigInt as JsonBigInt
+import Contrib.LZString (decompressFromURI)
 import Control.Monad.Reader (runReaderT)
 import Data.Argonaut (Json, decodeJson, (.:), (.:?))
 import Data.Array as Array
@@ -93,7 +94,7 @@ processInitialURL = do
       let
         extractContractJson possibleOrigQuery = do
           URI.QueryPairs queryPairs <- possibleOrigQuery
-          contractJsonString <- join $ Foldable.lookup "contract" queryPairs
+          contractJsonString <- decompressFromURI <$> (join $ Foldable.lookup "contract" queryPairs)
           let
             queryPairs' = Array.filter ((/=) "contract" <<< fst) queryPairs
           pure (URI.QueryPairs queryPairs' /\ ContractJsonString contractJsonString)
