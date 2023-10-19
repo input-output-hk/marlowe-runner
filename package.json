@@ -49,7 +49,7 @@
     "node": "18.x"
   },
   "scripts": {
-    "bundle": "spago build --config prod.dhall && webpack-cli --mode=production -c webpack.js",
+    "bundle": "webpack-cli --mode=production -c webpack.js",
     "start": "spago build && webpack-cli serve --mode=development -c webpack.js",
     "test": "node --experimental-specifier-resolution=node -e \"import('./output/Test.Main/index.js').then(function(Main) { Main.main(); })\""
   },

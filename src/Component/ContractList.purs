@@ -276,7 +276,7 @@ mkContractList = do
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
         filtered <|> possibleContracts'
 
-    pure $ DOM.div { className: "min-height-100vh" } do
+    pure $ DOM.div { className: "min-height-100vh position-relative z-index-1" } do
       let
         onError error = do
           msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission: " <> error ]

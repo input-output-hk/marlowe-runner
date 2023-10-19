@@ -1,5 +1,9 @@
 import LZString from 'lz-string';
 
-export function decompressFromURI(uriComponent) {
+export function decompressFromURIImpl(uriComponent) {
+  try {
     return LZString.decompressFromEncodedURIComponent(uriComponent);
+  } catch (e) {
+    return null;
+  }
 }

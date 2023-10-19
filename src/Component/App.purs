@@ -50,6 +50,8 @@ import React.Basic (JSX)
 import React.Basic as ReactContext
 import React.Basic.DOM (img, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
+import React.Basic.Events (handler_)
+import React.Basic.Events as DOM
 import React.Basic.Hooks (component, provider, readRef, useEffect, useState, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
@@ -269,7 +271,7 @@ mkApp = do
             -- FIXME: Report back (to the reporting backend) a wallet problem?
             pure unit
 
-    configuringWallet /\ setConfiguringWallet <- useState' false
+    disconnectingWallet /\ setDisconnectingWallet <- useState' false
     checkingNotifications /\ setCheckingNotifications <- useState' false
 
     -- TODO: re-introduce notifications
@@ -352,7 +354,7 @@ mkApp = do
         Nothing -> mempty
       possibleContracts = Array.fromFoldable <$> ContractInfoMap.getContractsMap contractInfoMap
       topNavbar = provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-        [ DOM.div { className: "container" }
+        [ DOM.div { className: "container position-relative z-index-2" }
             [ DOM.div { className: "row" }
                 [ DOM.div
                     { className: "col-3 pt-3 pb-3 background-color-primary-light", id: "marlowe-logo-container" } $
@@ -369,17 +371,35 @@ mkApp = do
                             }
                         ]
                     ] <> Monoid.guard (isJust possibleWalletInfo) do
-                      [ DOM.li { className: "nav-item" } $
+                      [ DOM.li {} $
                           case possibleWalletInfo, possibleWalletContext of
-                            Just (WalletInfo wallet), Just (WalletContext ctx) -> link
-                              { label: DOM.span { className: "h6 d-flex align-items-center" }
-                                  [ DOOM.img { src: wallet.icon, alt: String.upperCaseFirst wallet.name, className: "w-1_2rem me-1" }
-                                  , DOM.span { className: "cursor-pointer fw-normal text-decoration-none text-decoration-underline-hover truncate-text text-color-gray w-10rem d-inline-block fw-bold" }
-                                      [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
-                                  ]
-                              , extraClassNames: "nav-link"
-                              , onClick: setConfiguringWallet true
-                              }
+                            Just (WalletInfo wallet), Just (WalletContext ctx) -> do
+                              let
+                                onMouseOver = DOM.handler_ $ setDisconnectingWallet true
+                                onMouseLeave = DOM.handler_ $ setDisconnectingWallet false
+                                disconnect = do
+                                  setWalletInfo Nothing
+                                  setWalletContext Nothing
+                                  setDisconnectingWallet false
+                                  props.setPage LoginPage
+                              DOM.div { className: "h6 position-relative", onMouseOver, onMouseLeave } $
+                                [ DOM.button
+                                    { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover nav-link"
+                                    --- , onClick: handler preventDefault (const $ onClick)
+                                    , type: "button"
+                                    } $ DOM.span { className: "h6 d-flex align-items-center" }
+                                    [ DOOM.img { src: wallet.icon, alt: String.upperCaseFirst wallet.name, className: "w-1_2rem me-1" }
+                                    , DOM.span { className: "cursor-pointer fw-normal text-decoration-none text-decoration-underline-hover truncate-text text-color-gray w-10rem d-inline-block fw-bold" }
+                                        [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+                                    ]
+                                ] <> Monoid.guard disconnectingWallet do
+                                  pure $ DOM.div
+                                    { onClick: handler_ disconnect
+                                    , className: "cursor-pointer rounded position-absolute top-1_7rem px-3 py-2 right-0 text-center bg-white bg-secondary-hover shadow-sm w-max-content"
+                                    }
+                                    [ DOOM.text "Disconnect Wallet"
+                                    , DOOM.img { src: "/images/disconnect.svg", className: "ms-1" }
+                                    ]
                             _, _ -> mempty
                       ]
                 ]

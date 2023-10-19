@@ -22,8 +22,16 @@ $link-color: #511CF7;
   flex-grow: 2;
 }
 
-.top-10 {
+.right-0 {
+  right: 0;
+}
+
+.top-10px {
   top: 10px;
+}
+
+.top-1_7rem {
+  top: 1.7rem;
 }
 
 .margin-top-minus-1 {
@@ -35,6 +43,14 @@ $link-color: #511CF7;
 }
 .border-bottom-white {
   border-bottom-color: white !important; /* Set the border color to white */
+}
+
+.height-37px {
+  height: 37px;
+}
+
+.bottom-minus-37px {
+  bottom: -37px;
 }
 
 // Replace with tilewind style!
@@ -96,6 +112,19 @@ $link-color: #511CF7;
   padding-bottom: 71px !important;
 }
 
+.opacity-0_6 {
+  opacity: 0.6 !important;
+}
+
+.opacity-1 {
+  opacity: 1 !important;
+}
+
+.box-shadow-0-0-2px-black {
+  box-shadow: 0 0 2px black !important;
+}
+
+
 .nav-pills .nav-item {
   @extend .me-2;
   button {
@@ -112,6 +141,7 @@ $link-color: #511CF7;
     gap: 0.625rem !important;
     display: flex !important;
   }
+
   button {
     opacity: 0.6 !important;
   }
@@ -198,7 +228,7 @@ $link-color: #511CF7;
 }
 
 .primary-color {
-  color: $primary;
+  color: $primary !important;
 }
 
 .text-color-dark {
@@ -214,7 +244,7 @@ $link-color: #511CF7;
 }
 
 .background-color-primary {
-  background-color: $primary;
+  background-color: $primary !important;
 }
 
 .color-withdrawal {
@@ -371,6 +401,13 @@ $link-color: #511CF7;
   font-weight: bold !important;
 }
 
+.z-index-1 {
+  z-index: 1;
+}
+
+.z-index-2 {
+  z-index: 2;
+}
 
 .z-index-sticky {
   z-index: $zindex-sticky;
@@ -493,8 +530,10 @@ $utilities: map-merge(
         10rem: 10rem,
         11rem: 11rem,
         16rem: 16rem,
+        18rem: 18rem,
         32rem: 32rem,
         100: 100%,
+        max-content: max-content,
       )
     ),
     "margin-top": (

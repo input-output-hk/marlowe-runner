@@ -94,7 +94,8 @@ processInitialURL = do
       let
         extractContractJson possibleOrigQuery = do
           URI.QueryPairs queryPairs <- possibleOrigQuery
-          contractJsonString <- decompressFromURI <$> (join $ Foldable.lookup "contract" queryPairs)
+          compressedContractJsonString <- (join $ Foldable.lookup "contract" queryPairs)
+          contractJsonString <- decompressFromURI compressedContractJsonString
           let
             queryPairs' = Array.filter ((/=) "contract" <<< fst) queryPairs
           pure (URI.QueryPairs queryPairs' /\ ContractJsonString contractJsonString)
