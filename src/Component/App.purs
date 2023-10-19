@@ -357,7 +357,7 @@ mkApp = do
         [ DOM.div { className: "container position-relative z-index-2" }
             [ DOM.div { className: "row" }
                 [ DOM.div
-                    { className: "col-3 pt-3 pb-3 background-color-primary-light", id: "marlowe-logo-container" } $
+                    { className: "col-3 pt-2 pb-4 background-color-primary-light", id: "marlowe-logo-container" } $
                     DOM.a { href: "#" } [ svgImg { src: marloweLogoUrl } ]
                 , DOM.div { className: "col-9 pt-3 bg-white" } $ DOM.ul { className: "list-unstyled d-flex justify-content-end align-items-center" } $
                     [ DOM.li {} $ ReactContext.consumer msgHubProps.ctx \msgs ->
@@ -382,14 +382,13 @@ mkApp = do
                                   setWalletContext Nothing
                                   setDisconnectingWallet false
                                   props.setPage LoginPage
-                              DOM.div { className: "h6 position-relative", onMouseOver, onMouseLeave } $
-                                [ DOM.button
-                                    { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover nav-link"
-                                    --- , onClick: handler preventDefault (const $ onClick)
-                                    , type: "button"
-                                    } $ DOM.span { className: "h6 d-flex align-items-center" }
+                              DOM.div { className: "position-relative", onMouseOver, onMouseLeave } $
+                                [ -- DOM.
+                                  --   { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover nav-link"
+                                  --- , onClick: handler preventDefault (const $ onClick)
+                                  DOM.div { className: "h7 d-flex align-items-center mb-0 pb-3" }
                                     [ DOOM.img { src: wallet.icon, alt: String.upperCaseFirst wallet.name, className: "w-1_2rem me-1" }
-                                    , DOM.span { className: "cursor-pointer fw-normal text-decoration-none text-decoration-underline-hover truncate-text text-color-gray w-10rem d-inline-block fw-bold" }
+                                    , DOM.span { className: "cursor-pointer fw-normal truncate-text text-color-gray w-10rem d-inline-block fw-bold" }
                                         [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
                                     ]
                                 ] <> Monoid.guard disconnectingWallet do
