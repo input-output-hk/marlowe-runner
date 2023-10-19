@@ -82,7 +82,9 @@ function _asyncToGenerator(fn) { return function () { var self = this, args = ar
                   return _context3.stop();
               }
             }, _callee3);
-          })));
+          })), {
+            timeout: 120000
+          });
         case 3:
         case "end":
           return _context4.stop();

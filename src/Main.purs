@@ -220,9 +220,7 @@ main configJson = launchAff_ do
       let
         { setPage, setPageClass } = mkSetPage origClasses appContainer
 
-      liftEffect $ setPageClass $ case possibleInitialContract of
-        Nothing -> LoginPage
-        Just contractJson -> CreateContractPage (Just contractJson)
+      liftEffect $ setPageClass LoginPage
 
       app <- liftEffect $ runReaderT mkApp mkAppCtx
       liftEffect $ renderRoot reactRoot $ msgHubComponent [ app { possibleConfigurationError, possibleInitialContract, setPage } ]

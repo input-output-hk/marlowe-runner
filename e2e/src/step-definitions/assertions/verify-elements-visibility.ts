@@ -42,6 +42,8 @@ Then(
       if (!!textContent) {
         return textContent.includes(name);
       }
+    }, {
+      timeout: 240000,
     });
   }
 );

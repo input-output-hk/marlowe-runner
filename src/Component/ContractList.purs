@@ -39,7 +39,7 @@ import Data.Array.NonEmpty as NonEmptyArray
 import Data.DateTime.Instant (Instant, instant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either, hush)
-import Data.Foldable (fold, or)
+import Data.Foldable (fold, for_, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
 import Data.Int as Int
@@ -74,7 +74,7 @@ import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.DOM.Simplified.ToJSX (class ToJSX)
 import React.Basic.Events (EventHandler, handler, handler_)
-import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useState, useState', (/\))
+import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useEffectOnce, useState, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import ReactBootstrap (overlayTrigger, tooltip)
@@ -231,6 +231,9 @@ mkContractList = do
         reset' = do
           props.setPage ContractListPage
           reset
+      useEffectOnce do
+        for_ possibleInitialModalAction set'
+        pure $ pure unit
       pure (p /\ set' /\ reset')
 
     possibleModalActionRef <- useStateRef' possibleModalAction
