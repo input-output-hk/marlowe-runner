@@ -22,7 +22,6 @@
     "@marlowe.io/adapter": "^0.2.0-alpha-5",
     "@marlowe.io/language-core-v1": "^0.2.0-alpha-5",
     "@playwright/test": "^1.33.0",
-    "cucumber": "^6.0.7",
     "cucumber-html-reporter": "^6.0.0",
     "dotenv": "^16.0.3",
     "fs-extra": "^11.1.1",
