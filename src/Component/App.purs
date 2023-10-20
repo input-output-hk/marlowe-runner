@@ -11,6 +11,7 @@ import Component.ContractList (ModalAction(..), NotSyncedYetInserts(..), mkContr
 import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
+import Component.Testing (mkDataTestAttrs)
 import Component.Types (ConfigurationError(..), ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
 import Component.Types.ContractInfo (ContractCreated(..), ContractUpdated(..)) as ContractInfo
 import Component.Types.ContractInfo (SomeContractInfo)
@@ -42,6 +43,7 @@ import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Foreign.Internal.Stringify (unsafeStringify)
+import Foreign.Object as Object
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsStream(..), PollingInterval(..), RequestInterval(..))
 import Marlowe.Runtime.Web.Streaming as Streaming
 import Marlowe.Runtime.Web.Types (Runtime(..))
@@ -382,14 +384,20 @@ mkApp = do
                                   setWalletContext Nothing
                                   setDisconnectingWallet false
                                   props.setPage LoginPage
-                              DOM.div { className: "position-relative", onMouseOver, onMouseLeave } $
+                                address' = bech32ToString $ ctx.changeAddress
+                              DOM.div
+                                { _data: mkDataTestAttrs "wallet-info" { "wallet-address": address' }
+                                , className: "position-relative"
+                                , onMouseOver
+                                , onMouseLeave
+                                } $
                                 [ -- DOM.
                                   --   { className: "btn btn-link text-decoration-none text-reset text-decoration-underline-hover nav-link"
                                   --- , onClick: handler preventDefault (const $ onClick)
                                   DOM.div { className: "h7 d-flex align-items-center mb-0 pb-3" }
                                     [ DOOM.img { src: wallet.icon, alt: String.upperCaseFirst wallet.name, className: "w-1_2rem me-1" }
                                     , DOM.span { className: "cursor-pointer fw-normal truncate-text text-color-gray w-10rem d-inline-block fw-bold" }
-                                        [ DOOM.text $ bech32ToString $ ctx.changeAddress ]
+                                        [ DOOM.text address' ]
                                     ]
                                 ] <> Monoid.guard disconnectingWallet do
                                   pure $ DOM.div

@@ -1,8 +1,8 @@
 import playwright from 'playwright';
 import { When } from '@cucumber/cucumber';
-import { ScenarioWorld } from '../setup/world';
-import { waitFor } from "../../support/wait-for-behavior";
-import { testWallet } from "../../support/walletConfiguration";
+import { ScenarioWorld } from '../setup/world.js';
+import { waitFor } from "../../support/wait-for-behavior.js";
+import { testWallet } from "../../support/walletConfiguration.js";
 
 function sleep(seconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, seconds * 1000));
@@ -55,6 +55,16 @@ When(
       const result = await locator.isVisible();
       if (result) {
         await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const locator = await page.getByTestId("wallet-info");
+      const result = await locator.isVisible();
+      if (result) {
+        const address = await locator.getAttribute("data-wallet-address");
+        globalStateManager.appendValue("wallet-address", address);
         return result;
       }
     });

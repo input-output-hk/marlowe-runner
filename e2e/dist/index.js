@@ -3,9 +3,9 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.wip = exports.smoke = exports.regression = exports.dev = void 0;
+exports["default"] = void 0;
 var _dotenv = _interopRequireDefault(require("dotenv"));
-var _parseEnv = require("./env/parseEnv");
+var _parseEnv = require("./env/parseEnv.js");
 var fs = _interopRequireWildcard(require("fs"));
 function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
 function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || _typeof(obj) !== "object" && typeof obj !== "function") { return { "default": obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj["default"] = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
@@ -37,10 +37,23 @@ var worldParameters = {
 };
 var common = "./src/features/**/*.feature                 --require-module ts-node/register                 --require ./src/step-definitions/**/**/*.ts                 --world-parameters ".concat(JSON.stringify(worldParameters), "                 -f json:./reports/reports.json                 --format progress-bar");
 var dev = "".concat(common, " --tags '@dev'");
-exports.dev = dev;
 var smoke = "".concat(common, " --tags '@smoke'");
-exports.smoke = smoke;
 var regression = "".concat(common, " --tags '@regression'");
-exports.regression = regression;
 var wip = "".concat(common, " --tags '@wip'");
-exports.wip = wip;
+var profileCommon = {
+  requireModule: ['ts-node/register'],
+  require: ['support/**/*.ts'],
+  worldParameters: {
+    appUrl: process.env.MY_APP_URL || 'http://localhost:3000/'
+  }
+};
+var _default = _objectSpread(_objectSpread({}, profileCommon), {}, {
+  format: ['progress-bar', 'html:cucumber-report.html']
+}); // export const ci = {
+//   ...common,
+//   format: ['html:cucumber-report.html'],
+//   publish: true
+// }
+// 
+// export { dev, smoke, regression , wip }
+exports["default"] = _default;

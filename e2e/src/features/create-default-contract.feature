@@ -1,6 +1,5 @@
 @smoke
 @regression
-@dev
 
 Feature: As a user, I would like to create a default contract with my lace wallet
 

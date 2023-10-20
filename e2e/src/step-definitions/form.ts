@@ -1,14 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import { When } from "@cucumber/cucumber";
-import { ScenarioWorld } from './setup/world';
-import { getElementLocator } from '../support/web-element-helper';
-import { ElementKey } from '../env/global';
-import { ValidAccessibilityRoles } from '../env/global';
-import { waitFor } from "../support/wait-for-behavior";
+import { ScenarioWorld } from './setup/world.js';
+import { getElementLocator } from '../support/web-element-helper.js';
+import { ElementKey } from '../env/global.js';
+import { ValidAccessibilityRoles } from '../env/global.js';
+import { waitFor } from "../support/wait-for-behavior.js";
 import {
   inputValue,
-} from '../support/html-behavior';
+} from '../support/html-behavior.js';
 
 function sleep(seconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, seconds * 1000));

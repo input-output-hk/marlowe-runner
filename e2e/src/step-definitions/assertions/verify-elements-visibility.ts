@@ -1,7 +1,7 @@
 import { Then } from '@cucumber/cucumber';
-import { ValidAccessibilityRoles } from '../../env/global';
-import { ScenarioWorld } from '../setup/world'
-import { waitFor } from '../../support/wait-for-behavior';
+import { ValidAccessibilityRoles } from '../../env/global.js';
+import { ScenarioWorld } from '../setup/world.js'
+import { waitFor } from '../../support/wait-for-behavior.js';
 import { expect } from '@playwright/test';
 
 

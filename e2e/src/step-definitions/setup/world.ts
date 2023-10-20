@@ -6,10 +6,10 @@ import playwright, {
   BrowserContext,
   BrowserType
 } from 'playwright';
-import { env } from '../../env/parseEnv'
+import { env } from '../../env/parseEnv.js'
 import { World, IWorldOptions, setWorldConstructor } from "@cucumber/cucumber";
-import { GlobalConfig } from '../../env/global';
-import GlobalStateManager from "../../support/globalStateManager";
+import { GlobalConfig } from '../../env/global.js';
+import GlobalStateManager from "../../support/globalStateManager.js";
 
 export type Screen = {
   context: BrowserContext;

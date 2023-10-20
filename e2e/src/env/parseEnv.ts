@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+
 export const env = (key: string): string => {
   const value = process.env[key];
 
@@ -9,7 +11,11 @@ export const env = (key: string): string => {
 }
 
 export const getJsonFromFile = <T = Record<string, string>>(path: string): T => {
-  return require(`${process.cwd()}${path}`)
+  const buff = fs.readFileSync(`${process.cwd()}${path}`);
+  const json = buff.toString();
+  console.log("JSOOOOOOOOOOOOOOOOOOON");
+  console.log(json);
+  return JSON.parse(json);
 }
 
 export const envNumber = (key: string): number => {

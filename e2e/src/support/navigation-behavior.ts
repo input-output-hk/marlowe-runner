@@ -1,5 +1,5 @@
 import { Page } from 'playwright';
-import { GlobalConfig, PageId } from '../env/global';
+import { GlobalConfig, PageId } from '../env/global.js';
 
 export const navigateToPage = async (
   page: Page,

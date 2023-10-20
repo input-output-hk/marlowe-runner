@@ -1,11 +1,11 @@
 import playwright from 'playwright';
 import { When } from '@cucumber/cucumber';
-import { ScenarioWorld } from './setup/world';
-import { ValidAccessibilityRoles } from '../env/global';
-import { waitFor } from "../support/wait-for-behavior";
+import { ScenarioWorld } from './setup/world.js';
+import { ValidAccessibilityRoles } from '../env/global.js';
+import { waitFor } from "../support/wait-for-behavior.js";
 import {
   inputValue,
-} from '../support/html-behavior';
+} from '../support/html-behavior.js';
 
 When(
   /^I click the "([^"]*)" with "([^"]*)" text$/,
