@@ -88,22 +88,19 @@ When('I press {string} on the keyboard {string} times', async function (this: Sc
 });
 
 When('I enter the contents of {string} into the {string} field',
-  async function (this: ScenarioWorld, fileNameAndPath: string, name: string) {
+  async function (this: ScenarioWorld, fileName: string, name: string) {
     const {
       screen: { page },
-      globalConfig
+      globalConfig,
+      globalStateManager
     } = this;
-
-    const filePath = path.join(__dirname, fileNameAndPath);
-    const input = fs.readFileSync(filePath, 'utf-8');
-
-    console.log("INPUT", input);
 
     const role = "textbox";
 
     await waitFor(async() => {
       const locator = await page.getByRole(role as ValidAccessibilityRoles, { name })
       const result = await locator.isVisible();
+      const input = globalStateManager.getValue(fileName)
 
       if (result) {
         await inputValue(locator, input);

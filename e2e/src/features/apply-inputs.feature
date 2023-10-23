@@ -18,12 +18,11 @@ Feature: As a user, I would like to apply an input on a current contract
       When I click the "button" with "Create a contract" text
       And I generate the contract "SimpleDeposit" and write it to "/tmp/deposit.json"
       And I enter the contents of "/tmp/deposit.json" into the "contract-input" field
-      # # And I enter the contents of "../support/contracts/lace-10-2024/deposit.json" into the "contract-input" field
-      # Then I pause the page
 
-      # When I click the "button" with "Submit contract" text And sign the transaction
-      # Then I should see a "button" with "Syncing" text
-      # And I should see "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain." text
+      When I click the "button" with "Submit contract" text And sign the transaction
+      Then I should see the first "button" showing "Syncing" text
+      And I should see the first "button" showing "Advance" text
+      And I should see "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain." text
 
     Scenario: Creating a choice with a Lace wallet
       Given I am on the "home" page
