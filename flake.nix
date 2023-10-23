@@ -2,7 +2,7 @@
   description = "Marlowe Runner";
 
   inputs = {
-    iogx.url = "github:input-output-hk/iogx?ref=v4";
+    iogx.url = "github:input-output-hk/iogx";
 
     spago2nix = {
       url = "github:justinwoo/spago2nix";
