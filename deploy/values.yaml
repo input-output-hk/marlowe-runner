@@ -3,5 +3,5 @@ networks:
   - preprod
   - preview
 images:
-  stagingTag: "9324d7d0"
+  stagingTag: "06c39499"
   productionTag: "0de96812"
