@@ -256,6 +256,9 @@ renderTextInput
      , max :: Opt Number
      , min :: Opt Number
      , step :: Opt Number
+     , role :: Opt String
+     , "aria-label" :: Opt String
+     , "aria-labelledby" :: Opt String
      }
   -> InputState String
   -> JSX
@@ -292,6 +295,9 @@ renderTextInput
           , step: props.step
           , min: props.min
           , max: props.max
+          , role: props.role
+          , "aria-label": props."aria-label"
+          , "aria-labelledby": props."aria-labelledby"
           }
       case layout of
         Inline -> case possibleHelpText of
@@ -342,6 +348,9 @@ textInput props = formSpecBuilderT do
           , min: props'.min
           , sizing: props'.sizing
           , step: props'.step
+          , role: props'.role
+          , "aria-label": props'."aria-label"
+          , "aria-labelledby": props'."aria-labelledby"
           }
       )
       props'.touched

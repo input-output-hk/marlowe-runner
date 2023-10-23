@@ -1,20 +1,12 @@
-import playwright from 'playwright';
-import * as fs from 'fs';
 import { When } from '@cucumber/cucumber';
 import { ScenarioWorld } from './setup/world.js';
-import { ValidAccessibilityRoles } from '../env/global.js';
-import { waitFor } from "../support/wait-for-behavior.js";
 import {
-  inputValue,
-} from '../support/html-behavior.js';
-import {
-  Address,
   Contract,
   datetoTimeout,
 } from "@marlowe.io/language-core-v1";
 import { MarloweJSON } from "@marlowe.io/adapter/codec";
 
-type ContractName = "SimpleDeposit";
+type ContractName = "SimpleDeposit" | "SimpleChoice" | "TimedOutSimpleChoice";
 
 const mkSimpleDeposit = (address: string): Contract => {
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
@@ -35,6 +27,55 @@ const mkSimpleDeposit = (address: string): Contract => {
   };
 }
 
+const mkSimpleChoice = (address: string): Contract => {
+  const twentyMinutesInMilliseconds = 20 * 60 * 1000;
+  const inTwentyMinutes = datetoTimeout(new Date(Date.now() + twentyMinutesInMilliseconds));
+  return {
+    timeout: inTwentyMinutes,
+    timeout_continuation: "close",
+    when: [
+      { case: {
+          choose_between:
+            [{
+              from: 1n,
+              to: 2n
+            }],
+          for_choice: {
+            choice_owner: {address: address},
+            choice_name: "simpleChoice",
+          }
+        },
+        then: "close",
+      },
+    ]
+  };
+}
+
+const mkTimedOutSimpleChoice = (address: string): Contract => {
+  const twentyMinutesInMilliseconds = 20 * 60 * 1000;
+  const inTwentyMinutes = datetoTimeout(new Date(Date.now() - twentyMinutesInMilliseconds));
+  return {
+    timeout: inTwentyMinutes,
+    timeout_continuation: "close",
+    when: [
+      { case: {
+          choose_between:
+            [{
+              from: 1n,
+              to: 2n
+            }],
+          for_choice: {
+            choice_owner: {address: address},
+            choice_name: "simpleChoice",
+          }
+        },
+        then: "close",
+      },
+    ]
+  };
+}
+
+
 // // And I generate the contract "SimpleDeposit" and write it to "/tmp/deposit.json"
 When(
   /^I generate the contract "([^"]*)" and write it to "([^"]*)"/,
@@ -45,8 +86,16 @@ When(
     const walletAddress = globalStateManager.getValue("wallet-address");
     switch (contractName) {
       case "SimpleDeposit":
-        const contract = mkSimpleDeposit(walletAddress);
-        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract, null, 4))
+        const contract1 = mkSimpleDeposit(walletAddress);
+        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract1, null, 4))
+        break;
+      case "SimpleChoice":
+        const contract2 = mkSimpleChoice(walletAddress);
+        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract2, null, 4))
+        break;
+      case "TimedOutSimpleChoice":
+        const contract3 = mkTimedOutSimpleChoice(walletAddress);
+        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract3, null, 4))
         break;
     }
   }

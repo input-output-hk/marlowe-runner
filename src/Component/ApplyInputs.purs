@@ -41,6 +41,7 @@ import Data.Maybe (Maybe(..))
 import Data.Monoid as Monoid
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
+import Data.Undefined.NoProblem as NoProblem
 import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Aff (Aff)
@@ -254,7 +255,7 @@ mkChoiceFormComponent = do
 
       formSpec = evalBuilder' $ ado
         choice <- choiceField { choices, validator, touched: true, initial: "0" }
-        value <- intInput {}
+        value <- intInput { role: NoProblem.opt "textarea", "aria-label": NoProblem.opt "choice-input" }
         in
           { choice, value }
 
