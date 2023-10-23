@@ -13,8 +13,6 @@ export const env = (key: string): string => {
 export const getJsonFromFile = <T = Record<string, string>>(path: string): T => {
   const buff = fs.readFileSync(`${process.cwd()}${path}`);
   const json = buff.toString();
-  console.log("JSOOOOOOOOOOOOOOOOOOON");
-  console.log(json);
   return JSON.parse(json);
 }
 
