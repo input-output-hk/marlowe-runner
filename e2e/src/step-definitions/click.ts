@@ -26,6 +26,26 @@ When(
   }
 );
 
+When(
+  /^I click the first "([^"]*)" with "([^"]*)" text$/,
+  async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string) {
+    const {
+      screen: { page },
+      globalStateManager
+    } = this;
+    await waitFor(async () => {
+      const tableLocator = page.locator('table');
+
+      const locator = await tableLocator.locator(`${role}:nth-of-type(1)`).nth(0);
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+  }
+);
+
 
 When(
   /^I click the "([^"]*)" with "([^"]*)" text And sign the transaction$/,
@@ -98,11 +118,8 @@ When(
         return result;
       }
     });
-
-
   }
 );
-
 
 When(
   /^I click the new tab "link" with "([^"]*)" text$/,
