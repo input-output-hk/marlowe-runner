@@ -24,6 +24,14 @@ Feature: As a user, I would like to apply an input on a current contract
       And I should see the first "button" showing "Advance" text
       And I should see "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain." text
 
+      When I click the first "button" with "Advance" text
+      Then I should see a "button" with "Make deposit" text
+
+      When I click the "checkbox" with "Deposit 0.000001 ₳" text
+      And I click the "button" with "Make deposit" text And sign the transaction
+      And I should see "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." text
+      And I pause the page
+
     Scenario: Creating a choice with a Lace wallet
       Given I am on the "home" page
       When I authorize my "lace" wallet

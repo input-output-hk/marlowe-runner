@@ -45,7 +45,8 @@ export class ScenarioWorld extends World {
     const automationBrowsers = ['chromium', 'firefox', 'webkit']
     type AutomationBrowser = typeof automationBrowsers[number]
     const automationBrowser = env('UI_AUTOMATION_BROWSER') as AutomationBrowser
-    const pathToExtension = env('LACE_WALLET_EXTENSION_PATH') as AutomationBrowser
+    const pathToLaceExtension = env('LACE_WALLET_EXTENSION_PATH') as AutomationBrowser
+    const pathToNamiExtension = env('NAMI_WALLET_EXTENSION_PATH') as AutomationBrowser
 
     const browserType: BrowserType = playwright[automationBrowser];
     const context = await browserType.launchPersistentContext('', {
@@ -58,8 +59,7 @@ export class ScenarioWorld extends World {
           '--enable-automation',
           '--no-first-run',
           '--no-default-browser-check',
-          `--disable-extensions-except=${pathToExtension}`,
-          `--load-extension=${pathToExtension}`,
+          `--disable-extensions-except=${pathToLaceExtension},${pathToNamiExtension}`,
           '--disable-web-security',
           '--allow-insecure-localhost',
           '--window-size=1920,1080',
