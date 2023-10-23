@@ -44,7 +44,7 @@ const nodeTypes = {
         if ("assert" in type)
             return _jsxs("div", { style: style_, children: ["Assert (...)", _jsx(Handle, { type: "target", position: Position.Left, id: "continuation" }), _jsx(Handle, { type: "source", position: Position.Right, id: "then" })] });
         if ("when" in type) {
-            const height = (type.when.length + 1) * Y_OFFSET - (Y_OFFSET - NODE_HEIGHT);
+            const height = ((type.when.length === 0) ? 1.5 : (type.when.length + 1)) * Y_OFFSET - (Y_OFFSET - NODE_HEIGHT);
             const _a = Object.assign(Object.assign({}, style_), { height: `${height}px`, justifyContent: "space-around", paddingLeft: "5px" }), { alignItems: _ } = _a, style = __rest(_a, ["alignItems"]);
             return _jsxs("div", { style: style, children: [_jsx("div", { children: "When" }), type.when.map((x, i) => {
                         if ("merkleized_then" in x) {

@@ -89,7 +89,8 @@ const nodeTypes: NodeTypes = {
       </div>
 
     if ("when" in type) {
-      const height = (type.when.length + 1) * Y_OFFSET - (Y_OFFSET - NODE_HEIGHT)
+      // FIXME: an ugly workaround to fix the styling of empty `When` node
+      const height = ((type.when.length === 0)?1.5:(type.when.length + 1)) * Y_OFFSET - (Y_OFFSET - NODE_HEIGHT)
       const { alignItems: _, ...style } = {
         ...style_,
         height: `${height}px`,

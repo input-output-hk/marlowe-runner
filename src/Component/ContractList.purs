@@ -7,6 +7,7 @@ import Cardano as Cardano
 import CardanoMultiplatformLib (CborHex, bech32ToString)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs as ApplyInputs
+import Component.ApplyInputs.Machine (mkEnvironment)
 import Component.ApplyInputs.Machine as ApplyInputs.Machine
 import Component.ContractDetails as ContractDetails
 import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle
@@ -21,7 +22,6 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonOutlinedInactive, buttonOutlinedPrimary, buttonOutlinedWithdraw)
 import Component.Withdrawals as Withdrawals
-import Contrib.Data.DateTime.Instant (millisecondsFromNow)
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
@@ -42,19 +42,18 @@ import Data.Either (Either, hush)
 import Data.Foldable (fold, for_, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
-import Data.Int as Int
 import Data.JSDate (fromDateTime) as JSDate
 import Data.List (intercalate)
 import Data.List as List
 import Data.Map (Map, lookup)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid as Monoid
 import Data.Set as Set
 import Data.String (contains, length)
 import Data.String as String
 import Data.String.Pattern (Pattern(..))
-import Data.Time.Duration (negateDuration)
+import Data.Time.Duration (Milliseconds(..), negateDuration)
 import Data.Time.Duration as Duration
 import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
@@ -66,7 +65,7 @@ import Foreign.Object as Object
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Payout(..), PutTransactionRequest(..), Runtime(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString)
+import Marlowe.Runtime.Web.Types (ContractHeader(ContractHeader), Payout(..), PutTransactionRequest(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import Promise.Aff as Promise
@@ -209,16 +208,13 @@ mkContractList = do
   swapComponent <- Swap.mkComponent
   contractForDifferencesWithOracleComponent <- ContractForDifferencesWithOracle.mkComponent
 
-  invalidBefore <- liftEffect $ millisecondsFromNow (Duration.Milliseconds (Int.toNumber $ (-10) * 60 * 1000))
-  invalidHereafter <- liftEffect $ millisecondsFromNow (Duration.Milliseconds (Int.toNumber $ 5 * 60 * 1000))
-
-  let
-    timeInterval = V1.TimeInterval invalidBefore invalidHereafter
-    environment = V1.Environment { timeInterval }
+  initialEnvironment <- liftEffect $ mkEnvironment
 
   liftEffect $ component "ContractList" \props@{ walletInfo, walletContext, possibleInitialModalAction, possibleContracts, contractMapInitialized, submittedWithdrawalsInfo } -> React.do
     let
       NotSyncedYetInserts notSyncedYetInserts = props.notSyncedYetInserts
+
+    environment /\ setEnvironment <- useState' initialEnvironment
 
     possibleModalAction /\ setModalAction /\ resetModalAction <- React.do
       p /\ set /\ reset <- useMaybeValue possibleInitialModalAction
@@ -287,10 +283,14 @@ mkContractList = do
     -- Trigger auto refresh on timeouts so we can advance through the contract
     setCurrTimeout <- snd <$> useState' Nothing
     useAff nextTimeouts do
+      now <- liftEffect Now.now
       for_ nextTimeouts \timeout -> do
-        now <- liftEffect Now.now
-        delay (unInstant timeout <> negateDuration (unInstant now))
-        liftEffect $ setCurrTimeout $ Just timeout
+        let
+          nextTimeoutDelay = (unInstant timeout <> negateDuration (unInstant now))
+        when (nextTimeoutDelay > Milliseconds 0.0) do
+          delay (nextTimeoutDelay <> Milliseconds 1000.0)
+          liftEffect $ mkEnvironment >>= setEnvironment
+          liftEffect $ setCurrTimeout $ Just timeout
 
     pure $ DOM.div { className: "min-height-100vh position-relative z-index-1" } do
       let
@@ -327,7 +327,7 @@ mkContractList = do
             , onSuccess
             , onDismiss: resetModalAction
             }
-        Just (Withdrawal walletContext roles contractId unclaimedPayouts), _ /\ updateSubmitted -> do
+        Just (Withdrawal _ roles contractId unclaimedPayouts), _ /\ updateSubmitted -> do
           let
             onSuccess = \_ -> do
               msgHubProps.add $ Success $ DOOM.text $ fold
