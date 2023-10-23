@@ -238,7 +238,7 @@ mkApp = do
         supervise do
           void $ forkAff do
             _ <- contractStream.getState
-            -- An ugly hack to set initialize map only after sync
+            -- An ugly hack to set initialize map only after the sync
             delay syncDelay
             delay syncDelay
             liftEffect $ updateContractInfoMap \(contractMap /\ _) -> (contractMap /\ true)

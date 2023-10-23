@@ -36,7 +36,7 @@ import Data.Argonaut (decodeJson, encodeJson, stringify)
 import Data.Array (catMaybes, elem, filter, null, union)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
-import Data.DateTime.Instant (Instant, instant)
+import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either, hush)
 import Data.Foldable (fold, for_, or)
@@ -54,11 +54,14 @@ import Data.Set as Set
 import Data.String (contains, length)
 import Data.String as String
 import Data.String.Pattern (Pattern(..))
+import Data.Time.Duration (negateDuration)
 import Data.Time.Duration as Duration
+import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
-import Effect.Aff (Aff, launchAff_)
+import Effect.Aff (Aff, delay, launchAff_)
 import Effect.Class (liftEffect)
+import Effect.Now as Now
 import Foreign.Object as Object
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
@@ -76,6 +79,7 @@ import React.Basic.DOM.Simplified.ToJSX (class ToJSX)
 import React.Basic.Events (EventHandler, handler, handler_)
 import React.Basic.Hooks (Hook, JSX, UseState, component, readRef, useEffectOnce, useState, useState', (/\))
 import React.Basic.Hooks as React
+import React.Basic.Hooks.Aff (useAff)
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import ReactBootstrap (overlayTrigger, tooltip)
 import ReactBootstrap.Icons (unsafeIcon)
@@ -216,8 +220,6 @@ mkContractList = do
     let
       NotSyncedYetInserts notSyncedYetInserts = props.notSyncedYetInserts
 
-    -- possibleWalletContext <- useContext walletInfoCtx <#> map snd
-
     possibleModalAction /\ setModalAction /\ resetModalAction <- React.do
       p /\ set /\ reset <- useMaybeValue possibleInitialModalAction
       let
@@ -256,15 +258,13 @@ mkContractList = do
       possibleContracts' = do
         contracts <- possibleContracts
         let
-          -- FIXME: Quick and dirty hack to display just submited contracts as first - `Nothing ` is lower than `Just`
-          -- someFutureBlockNumber = Runtime.BlockNumber 129058430
           sortedContracts = case ordering.orderBy of
             OrderByCreationDate -> Array.sortBy (compare `on` ContractInfo.createdAt) contracts
             OrderByLastUpdateDate -> Array.sortBy (compare `on` ContractInfo.updatedAt) contracts
-        -- OrderByLastUpdateDate -> Array.sortBy (compare `on` (fromMaybe someFutureBlockNumber <<< map (_.blockNo <<< un Runtime.BlockHeader) <<< ContractInfo.updatedAt)) contracts
         pure $
           if ordering.orderAsc then sortedContracts
           else Array.reverse sortedContracts
+
       possibleContracts'' = do
         let
           filtered = do
@@ -278,6 +278,19 @@ mkContractList = do
                 pattern = Pattern queryValue
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
         filtered <|> possibleContracts'
+      nextTimeouts = fromMaybe [] do
+        contracts <- possibleContracts''
+        pure $ Array.sort $ catMaybes $ flip map contracts $ ContractInfo.someContractCurrentContract >=> case _ of
+          V1.When _ timeout _ -> pure timeout
+          _ -> Nothing
+
+    -- Trigger auto refresh on timeouts so we can advance through the contract
+    setCurrTimeout <- snd <$> useState' Nothing
+    useAff nextTimeouts do
+      for_ nextTimeouts \timeout -> do
+        now <- liftEffect Now.now
+        delay (unInstant timeout <> negateDuration (unInstant now))
+        liftEffect $ setCurrTimeout $ Just timeout
 
     pure $ DOM.div { className: "min-height-100vh position-relative z-index-1" } do
       let
