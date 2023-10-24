@@ -22,7 +22,7 @@ When(
 
     newPagePromise = new Promise(resolve => page.context().once('page', resolve));
 
-    const name = "nami";
+    const name = "Nami";
     await waitFor(async() => {
       const locator = await page.getByRole("button", { name, exact: true });
       const result = await locator.isVisible();
@@ -39,20 +39,8 @@ When(
       return true;
     });
 
-    await sleep(200)
     await waitFor(async() => {
-      const buttonName = "Authorize"
-      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
-      const result = await locator.isVisible();
-      if (result) {
-        await locator.click();
-        return result;
-      }
-    });
-
-    await waitFor(async() => {
-      const buttonName = "Always"
-      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const locator = await newPage.getByText("Access")
       const result = await locator.isVisible();
       if (result) {
         await locator.click();
@@ -114,7 +102,7 @@ When(
       }
     });
 
-    await newPage.waitForTimeout(2000);
+    await newPage.waitForTimeout(200);
 
     await waitFor(async() => {
       const buttonName = "Close"
@@ -126,5 +114,49 @@ When(
       }
     });
 
+    const mainPage = await page.context().newPage();
+    await mainPage.goto(`${EXTENSION_URL}/mainPopup.html`);
+
+    await waitFor(async() => {
+      const buttonName = ""
+      const locator = await mainPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Settings"
+      const locator = await mainPage.getByRole("menuitem", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Network"
+      const locator = await mainPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const network = "Preview"
+      const locator = await mainPage.getByRole("combobox");
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.selectOption(network);
+        return result;
+      }
+    });
+
+    await mainPage.close();
     await page.reload();
 });
