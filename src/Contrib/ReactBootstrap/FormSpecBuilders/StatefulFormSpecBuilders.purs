@@ -20,7 +20,7 @@ import React.Basic (JSX)
 
 type StatefulBootstrapFormSpec validatorM st = StatefulFormSpec validatorM st (Array JSX) String
 
-fromStatlessFormSpec = FormSpecBuilder.hoistFormSpec liftStatelessFormSpec
+fromStatelessFormSpec = FormSpecBuilder.hoistFormSpec liftStatelessFormSpec
 
 textInput
   :: forall a builderM props validatorM st
@@ -38,7 +38,10 @@ textInput props = formSpecBuilderT do
       name
       props'.initial
       ( Array.singleton <<< renderTextInput
-          { layout: props'.layout
+          { "aria-label": props'."aria-label"
+          , "aria-labelledby": props'."aria-labelledby"
+          , role: props'.role
+          , layout: props'.layout
           , possibleLabel: props'.label
           , possibleHelpText: props'.helpText
           , name
