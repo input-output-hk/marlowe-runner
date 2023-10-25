@@ -56,7 +56,6 @@ Feature: As a user, I would like to apply an input on a current contract
       And I should see the first "button" showing "Advance" text
       And I should see "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." text
 
-    @dev
     Scenario: Creating a timed-out contract with a Lace wallet
       Given I configure my lace wallet
       Given I am on the "home" page

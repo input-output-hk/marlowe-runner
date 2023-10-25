@@ -3,6 +3,10 @@ import { When } from '@cucumber/cucumber';
 import { ScenarioWorld } from '../setup/world.js';
 import { waitFor } from "../../support/wait-for-behavior.js";
 import { testWallet } from "../../support/walletConfiguration.js";
+import { ValidAccessibilityRoles } from '../../env/global.js';
+import {
+  inputValue,
+} from '../../support/html-behavior.js';
 
 function sleep(seconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, seconds * 1000));
@@ -103,3 +107,78 @@ When(
     await page.waitForTimeout(5000);
     await page.reload();
 });
+
+
+When(
+  /^I click the "([^"]*)" with "([^"]*)" text And sign the transaction with lace wallet$/,
+  async function(this: ScenarioWorld, role: ValidAccessibilityRoles,  name: string) {
+    const {
+      screen: { page },
+      globalStateManager
+    } = this;
+
+    let newPagePromise;
+
+    newPagePromise = new Promise(resolve => page.context().once('page', resolve));
+
+    await waitFor(async() => {
+      const locator = await page.getByRole(role, { name, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    // Await for new page to popup
+    const newPage = await newPagePromise as playwright.Page;
+
+    await waitFor(async() => {
+      await newPage.reload();
+      return true;
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Confirm"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      // const locator = await page.getByRole(role as ValidAccessibilityRoles, { name })
+      // const locator = await newPage.getByRole("textbox", { name: "Password" })  
+      const locator = await newPage.getByTestId("password-input")
+      const result = await locator.isVisible();
+
+      if (result) {
+        const password = process.env.LACE_WALLET_PASSWORD as string
+        await inputValue(locator, password);
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Confirm"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Close"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+  }
+);
