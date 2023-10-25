@@ -76,6 +76,11 @@ Feature: As a user, I would like to apply an input on a current contract
 
       When I click the first "button" with "Advance" text
       Then I should see a "button" with "Advance contract" text
+
+      When I click the "button" with "Advance contract" text And sign the transaction
+      Then I should see the first "button" showing "Syncing" text
+      And I should see the first "button" showing "Advance" text
+      And I should see "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." text
       And I pause the page
 
 
