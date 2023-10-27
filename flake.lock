@@ -518,15 +518,16 @@
           "haskell-nix",
           "nixpkgs"
         ],
+        "nixpkgs-with-working-prefetch-npm-deps": "nixpkgs-with-working-prefetch-npm-deps",
         "pre-commit-hooks-nix": "pre-commit-hooks-nix",
         "sphinxcontrib-haddock": "sphinxcontrib-haddock"
       },
       "locked": {
-        "lastModified": 1697628614,
-        "narHash": "sha256-9T8zPc1cwf9xsfZ9XWn8pQaN+pmp5sabzm8iRNEESUQ=",
+        "lastModified": 1698409584,
+        "narHash": "sha256-zqY9WIjs6ELYbyRwDx2w0hAgsV27b6TiAlMkCAQzSJ4=",
         "owner": "input-output-hk",
         "repo": "iogx",
-        "rev": "274cf3e3b33ac151e0cae54848f7c2ea9232f1e2",
+        "rev": "da8ab3dc6d1500d4fe0aefe8fb7331edb3d49231",
         "type": "github"
       },
       "original": {
@@ -770,6 +771,22 @@
         "owner": "NixOS",
         "ref": "nixpkgs-unstable",
         "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs-with-working-prefetch-npm-deps": {
+      "locked": {
+        "lastModified": 1690680713,
+        "narHash": "sha256-NXCWA8N+GfSQyoN7ZNiOgq/nDJKOp5/BHEpiZP8sUZw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "b81af66deb21f73a70c67e5ea189568af53b1e8c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "b81af66deb21f73a70c67e5ea189568af53b1e8c",
         "type": "github"
       }
     },
