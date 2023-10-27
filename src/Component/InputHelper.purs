@@ -2,23 +2,27 @@ module Component.InputHelper where
 
 import Prelude
 
+import Contrib.Data.DateTime.Instant (unsafeInstant)
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Control.Monad.Except (throwError)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as Array.NonEmpty
 import Data.BigInt.Argonaut as BigInt
+import Data.DateTime.Instant (unInstant)
 import Data.Either (Either(..))
 import Data.Foldable (foldM)
 import Data.List (List)
 import Data.List as List
 import Data.Maybe (Maybe(..))
+import Data.Time.Duration (Milliseconds(..), negateDuration)
 import Data.Tuple.Nested (type (/\), (/\))
+import Debug (traceM)
 import Language.Marlowe.Core.V1.Folds (MapStep(..), foldMapContract)
 import Language.Marlowe.Core.V1.Semantics (applyCases, evalObservation, reduceContractStep) as V1
 import Language.Marlowe.Core.V1.Semantics (evalObservation, evalValue, reduceContractUntilQuiescent)
 import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId(..), Contract(..), Environment(..), Observation(..), Party(..), Payee(..), State, TimeInterval(..), Token, TokenName, Value(..), Address)
-import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State, TimeInterval) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State, TimeInterval(..)) as V1
 
 data DepositInput = DepositInput AccountId Party Token BigInt.BigInt (Maybe Contract)
 data ChoiceInput = ChoiceInput ChoiceId (Array Bound) (Maybe Contract)
@@ -218,8 +222,15 @@ inputExecutionPath (possibleInputContent /\ timeInterval) = do
   let
     env = V1.Environment { timeInterval }
   case _, _ of
-    contract@(When cases _ _), state -> do
-      case V1.reduceContractStep env state contract of
+    contract@(When cases timeout _), state -> do
+      let
+        V1.TimeInterval timeIntervalStart timeIntervalEnd = timeInterval
+        timeIntervalEnd' =
+          if timeIntervalEnd == timeout then unsafeInstant (unInstant timeIntervalEnd <> negateDuration (Milliseconds 1.0))
+          else timeIntervalEnd
+        timeInterval' = V1.TimeInterval timeIntervalStart timeIntervalEnd'
+        env' = V1.Environment { timeInterval: timeInterval' }
+      case V1.reduceContractStep env' state contract of
         V1.AmbiguousTimeIntervalReductionError -> throwError "AmbiguousTimeIntervalReductionError"
         V1.NotReduced -> case possibleInputContent of
           Just inputContent -> do

@@ -242,6 +242,8 @@ mkChoiceFormComponent = do
             selectFieldChoice name (show idx)
         ArrayAL.fromNonEmptyArray $ mapWithIndex toChoice choiceInputs
 
+      -- valueInputs = choices <#> \(ChoiceInput (V1.ChoiceId name _) _ _) = do
+
       validator :: Batteries.Validator Effect _ _ _
       validator = do
         let
