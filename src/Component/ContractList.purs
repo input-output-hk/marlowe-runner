@@ -13,7 +13,7 @@ import Component.ContractDetails as ContractDetails
 import Component.ContractTemplates.ContractForDifferencesWithOracle as ContractForDifferencesWithOracle
 import Component.ContractTemplates.Escrow as Escrow
 import Component.ContractTemplates.Swap as Swap
-import Component.CreateContract (runLiteTag)
+import Component.CreateContract (runnerTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (canInput)
 import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(..), MessageHub(..), MkComponentM, Page(..), WalletInfo)
@@ -180,8 +180,8 @@ mkForm onFieldValueChange = evalBuilder' ado
 actionIconSizing :: String
 actionIconSizing = " h4"
 
-runLiteTags :: Tags -> Array String
-runLiteTags (Tags metadata) = case Map.lookup runLiteTag metadata >>= decodeJson >>> hush of
+runnerTags :: Tags -> Array String
+runnerTags (Tags metadata) = case Map.lookup runnerTag metadata >>= decodeJson >>> hush of
   Just arr ->
     Array.filter ((_ > 2) <<< length) -- ignoring short tags
 
@@ -189,12 +189,12 @@ runLiteTags (Tags metadata) = case Map.lookup runLiteTag metadata >>= decodeJson
   Nothing -> []
 
 someContractTags :: SomeContractInfo -> Array String
-someContractTags (SyncedConractInfo (ContractInfo { tags })) = runLiteTags tags
+someContractTags (SyncedConractInfo (ContractInfo { tags })) = runnerTags tags
 someContractTags (NotSyncedUpdatedContract { contractInfo }) = do
   let
     ContractInfo { tags } = contractInfo
-  runLiteTags tags
-someContractTags (NotSyncedCreatedContract { tags }) = runLiteTags tags
+  runnerTags tags
+someContractTags (NotSyncedCreatedContract { tags }) = runnerTags tags
 
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
@@ -269,7 +269,7 @@ mkContractList = do
             pure $ contracts # Array.filter \someContract -> do
               let
                 contractTags = ContractInfo.someContractTags someContract
-                tagList = runLiteTags (contractTags :: Tags)
+                tagList = runnerTags (contractTags :: Tags)
                 contractId = ContractInfo.someContractContractId someContract
                 pattern = Pattern queryValue
               contains pattern (txOutRefToString contractId) || or (map (contains pattern) tagList)
@@ -300,6 +300,7 @@ mkContractList = do
       case possibleModalAction, submittedWithdrawalsInfo of
         Just (NewContract possibleInitialContract), _ -> createContractComponent
           { connectedWallet: walletInfo
+          , walletContext
           , onDismiss: resetModalAction
           , onSuccess: \contractCreated -> do
               msgHubProps.add $ Success $ DOOM.text $ String.joinWith " "
@@ -530,7 +531,7 @@ mkContractList = do
                         let
                           createdAt = ContractInfo.createdAt someContract
                           updatedAt = ContractInfo.updatedAt someContract
-                          tags = runLiteTags $ ContractInfo.someContractTags someContract
+                          tags = runnerTags $ ContractInfo.someContractTags someContract
                           contractId = ContractInfo.someContractContractId someContract
                           possibleContract = ContractInfo.someContractCurrentContract someContract
                           isClosed = isContractComplete possibleContract

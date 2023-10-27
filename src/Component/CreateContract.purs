@@ -11,8 +11,8 @@ import Component.CreateContract.Machine as Machine
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (OutlineColoring(..), SpinnerOverlayHeight(..), backToContractListLink, buttonOutlinedClassNames, link, spinnerOverlay)
-import Component.Widgets as DOM
+import Component.Widgets (OutlineColoring(..), SpinnerOverlayHeight(..), backToContractListLink, buttonOutlinedClassNames, spinnerOverlay)
+import Component.Widgets (submitButton) as DOM
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
@@ -30,7 +30,7 @@ import Control.Monad.Reader.Class (asks)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.Argonaut (decodeJson, encodeJson, jsonParser, parseJson, stringifyWithIndent)
-import Data.Array as Array
+import Data.Argonaut as A
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Bifunctor (lmap)
@@ -70,7 +70,7 @@ import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_, hr, img, input, span_, text) as DOOM
 import React.Basic.DOM as R
-import React.Basic.DOM.Simplified.Generated as DOM
+import React.Basic.DOM.Simplified.Generated (button, div, h3, label, p, span) as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, Ref, component, fragment, readRef, useRef, (/\))
 import React.Basic.Hooks as React
@@ -93,6 +93,7 @@ type Props =
   , onError :: String -> Effect Unit
   , onSuccess :: ContractInfo.ContractCreated -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
+  , walletContext :: WalletContext
   , possibleInitialContract :: Maybe ContractJsonString
   }
 
@@ -139,8 +140,8 @@ contractSection contract _ =
         [ marloweYaml contract ]
     ]
 
-mkContractFormSpec :: (Maybe ContractJsonString /\ AutoRun) -> LabeledFormSpec Effect Query Result
-mkContractFormSpec (possibleInitialContract /\ (AutoRun _)) = FormSpecBuilder.evalBuilder Nothing $ do
+mkContractFormSpec :: (Bech32 /\ Maybe ContractJsonString /\ AutoRun) -> LabeledFormSpec Effect Query Result
+mkContractFormSpec (changeAddress /\ possibleInitialContract /\ (AutoRun _)) = FormSpecBuilder.evalBuilder Nothing $ do
   let
     -- We put subforms JSX into a Map so we can control rendering order etc.
     labelSubform
@@ -183,8 +184,10 @@ mkContractFormSpec (possibleInitialContract /\ (AutoRun _)) = FormSpecBuilder.ev
       , validator: liftFn case _ of
           Nothing -> Tags Map.empty
           Just tags ->
-            ( Tags $ Map.singleton runLiteTag
-                (encodeJson $ map (encodeJson <<< trim) $ split (Pattern ",") tags)
+            ( Tags $ Map.fromFoldable
+                [ runnerTag /\ (encodeJson $ map (encodeJson <<< trim) $ split (Pattern ",") tags)
+                , runnerCreatorTag changeAddress /\ A.jsonNull
+                ]
             )
       , name: Just tagFieldId
       }
@@ -317,8 +320,11 @@ mkRoleTokensComponent = do
           ]
       wrappedContentWithFooter formBody formActions
 
-runLiteTag :: String
-runLiteTag = "run-lite"
+runnerTag :: String
+runnerTag = "run-lite"
+
+runnerCreatorTag :: Bech32 -> String
+runnerCreatorTag creator = runnerTag <> "-" <> bech32ToString creator
 
 -- We want to construct `ContractInfo.ContractCreated` and call `onSuccess` only
 mkOnStateTransition
@@ -357,7 +363,7 @@ mkComponent = do
   roleTokenComponent <- mkRoleTokensComponent
   loadFileHiddenInputComponent <- mkLoadFileHiddenInputComponent
 
-  liftEffect $ component "CreateContract" \{ connectedWallet, onSuccess, onError, onDismiss, possibleInitialContract } -> React.do
+  liftEffect $ component "CreateContract" \{ walletContext, connectedWallet, onSuccess, onError, onDismiss, possibleInitialContract } -> React.do
     let
       onStateTransition = mkOnStateTransition onSuccess onError
 
@@ -367,7 +373,10 @@ mkComponent = do
         props = machineProps initialAutoRun connectedWallet cardanoMultiplatformLib onStateTransition runtime
       useMooreMachine props
 
-    formSpec <- React.useMemo unit \_ -> mkContractFormSpec (possibleInitialContract /\ initialAutoRun)
+    let
+      WalletContext { changeAddress } = walletContext
+
+    formSpec <- React.useMemo unit \_ -> mkContractFormSpec (changeAddress /\ possibleInitialContract /\ initialAutoRun)
 
     let
       onSubmit :: _ -> Effect Unit

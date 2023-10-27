@@ -6,17 +6,17 @@ import Cardano as C
 import CardanoMultiplatformLib (bech32ToString)
 import Component.Assets.Svgs (marloweLogoUrl)
 import Component.ConnectWallet (mkConnectWallet, walletInfo)
-import Component.ConnectWallet as ConnectWallet
 import Component.ContractList (ModalAction(..), NotSyncedYetInserts(..), mkContractList)
+import Component.CreateContract (runnerCreatorTag)
 import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Testing (mkDataTestAttrs)
-import Component.Types (ConfigurationError(..), ContractInfo(..), ContractJsonString, MessageContent(Success), MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
+import Component.Types (ConfigurationError(..), ContractInfo(..), ContractJsonString, MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
 import Component.Types.ContractInfo (ContractCreated(..), ContractUpdated(..)) as ContractInfo
 import Component.Types.ContractInfo (SomeContractInfo)
 import Component.Types.ContractInfoMap as ContractInfoMap
-import Component.Widgets (link, linkWithIcon)
+import Component.Widgets (linkWithIcon)
 import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Loops (untilJust)
@@ -28,37 +28,34 @@ import Data.Foldable (for_)
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
+import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Monoid as Monoid
 import Data.Newtype (un)
 import Data.Newtype as Newtype
-import Data.String as String
-import Data.String.Extra as String
+import Data.String (joinWith) as String
+import Data.String.Extra (upperCaseFirst) as String
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
-import Data.Tuple.Nested ((/\))
-import Debug (traceM)
+import Data.Tuple.Nested (type (/\), (/\))
 import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Foreign.Internal.Stringify (unsafeStringify)
-import Foreign.Object as Object
 import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsStream(..), PollingInterval(..), RequestInterval(..))
 import Marlowe.Runtime.Web.Streaming as Streaming
-import Marlowe.Runtime.Web.Types (Runtime(..))
+import Marlowe.Runtime.Web.Types (Runtime(..), ContractsQueryParams)
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX)
 import React.Basic as ReactContext
 import React.Basic.DOM (img, text) as DOOM
-import React.Basic.DOM.Simplified.Generated as DOM
+import React.Basic.DOM.Simplified.Generated (a, div, li, span, ul) as DOM
 import React.Basic.Events (handler_)
-import React.Basic.Events as DOM
+import React.Basic.Events (handler_) as DOM
 import React.Basic.Hooks (component, provider, readRef, useEffect, useState, useState')
 import React.Basic.Hooks as React
 import React.Basic.Hooks.Aff (useAff)
 import ReactBootstrap.Icons (unsafeIcon)
-import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Modal (modal, modalBody, modalHeader)
 import ReactBootstrap.Offcanvas (offcanvas)
 import ReactBootstrap.Offcanvas as Offcanvas
@@ -122,6 +119,25 @@ type Props =
   , setPage :: Page -> Effect Unit
   , possibleConfigurationError :: Maybe ConfigurationError
   }
+
+walletContextToParams :: WalletContext -> ContractsQueryParams /\ ContractsQueryParams
+walletContextToParams (WalletContext walletCtx) = do
+  let
+    changeAddress = walletCtx.changeAddress
+
+    tokens = do
+      let
+        C.Value valueMap = walletCtx.balance
+      Array.filter (not <<< eq C.AdaAssetId) $ Array.fromFoldable $ Map.keys valueMap
+
+    partyParams = { partyAddresses: walletCtx.usedAddresses, partyRoles: tokens, tags: [] }
+    -- This is a partial workaround to the current limitation of the Runtime. Runtime currently
+    -- ignores the creator address (which is part of the state) when we query for contracts by
+    -- party.
+    -- In order to be able to discover contracts created by the current wallet, we tag the contracts
+    -- by the creator address (overlaps are not problematic).
+    tagsParams = { partyAddresses: [], partyRoles: [], tags: [ runnerCreatorTag changeAddress ] }
+  partyParams /\ tagsParams
 
 mkApp :: MkComponentMBase () (Props -> JSX)
 mkApp = do
@@ -191,37 +207,24 @@ mkApp = do
               ContractInfoMap.insertContractUpdated cu contractMap /\ initialized
         { add, update }
 
-      walletCtx = un WalletContext <$> possibleWalletContext
-      changeAddress = _.changeAddress <$> walletCtx
-
-      usedAddresses = fromMaybe [] $ _.usedAddresses <$> walletCtx
-      tokens = fromMaybe [] do
-        { balance } <- walletCtx
-        let
-          C.Value valueMap = balance
-        pure $ Array.filter (not <<< eq C.AdaAssetId) $ Array.fromFoldable $ Map.keys valueMap
+      possibleChangeAddress = (_.changeAddress <<< un WalletContext) <$> possibleWalletContext
+      possibleParams = walletContextToParams <$> possibleWalletContext
 
     -- Whenever we get a new token in the wallet or new address we update the query params
     -- which are used to filter the contracts in the streaming thread.
     updateStreamingQueryParamsRef <- React.useRef (const $ pure unit)
-    useEffect (usedAddresses /\ tokens) do
-      let
-        params = { partyAddresses: usedAddresses, partyRoles: tokens, tags: [] }
-      updateQueryParams <- React.readRef updateStreamingQueryParamsRef
-      updateQueryParams params
+    useEffect possibleParams do
+      for_ possibleParams \(partyParams /\ tagParams) -> do
+        updateQueryParams <- React.readRef updateStreamingQueryParamsRef
+        updateQueryParams [ partyParams, tagParams ]
       pure $ pure unit
 
-    useAff changeAddress $ case usedAddresses, tokens of
-      [], [] -> do
-        liftEffect $ React.writeRef updateStreamingQueryParamsRef (const $ pure unit)
-        let
-          initialized = isJust possibleWalletContext
-        liftEffect $ updateContractInfoMap (const (ContractInfoMap.uninitialized slotting /\ initialized))
-      _, _ -> do
+    useAff possibleChangeAddress $ case possibleParams of
+      Just (partyParams /\ tagParams) | partyParams.partyAddresses /= [] || partyParams.partyRoles /= [] || tagParams.tags /= [] -> do
         let
           reqInterval = RequestInterval (Milliseconds 50.0)
           pollInterval = PollingInterval (Milliseconds 60_000.0)
-          params = { partyAddresses: usedAddresses, partyRoles: tokens, tags: [] }
+          params = [ partyParams, tagParams ]
 
         ContractWithTransactionsStream contractStream <- Streaming.mkContractsWithTransactions
           pollInterval
@@ -253,6 +256,11 @@ mkApp = do
 
           liftEffect $ setSyncFn (Just contractStream.sync)
           contractStream.start
+      _ -> do
+        liftEffect $ React.writeRef updateStreamingQueryParamsRef (const $ pure unit)
+        let
+          initialized = isJust possibleWalletContext
+        liftEffect $ updateContractInfoMap (const (ContractInfoMap.uninitialized slotting /\ initialized))
 
     useLoopAff walletInfoName (Milliseconds 20_000.0) do
       pwi <- liftEffect $ readRef possibleWalletInfoRef
