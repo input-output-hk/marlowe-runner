@@ -423,7 +423,7 @@ mkApp = do
 
     pure $ case possibleWalletInfo, possibleWalletContext of
       Just walletInfo, Just walletContext -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-        [ DOM.div { className: "container" } $ DOM.div { className: "row position-relative" } $ DOM.div { className: "col-6 mx-auto position-absolute top-10 start-50 translate-middle-x z-index-popover" }
+        [ DOM.div { className: "container" } $ DOM.div { className: "row position-relative" } $ DOM.div { className: "col-6 mx-auto position-absolute top-10px start-50 translate-middle-x z-index-popover" }
             $ DOM.div { className: "container-xl" }
             $ DOM.div { className: "row" }
             $ messagePreview msgHub
