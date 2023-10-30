@@ -6,7 +6,6 @@ Feature: As a user, I would like to create a default contract with my lace walle
     As a user I would like to log into runner with my lace wallet
     And create a default contract
 
-    @dev
     Scenario Outline: Creating default escrow contract with Lace wallet
       Given I configure my <wallet_name> wallet
       And I am on the "home" page

@@ -48,6 +48,17 @@ When(
         return result;
       }
     });
+
+    await waitFor(async() => {
+      const locator = await page.getByTestId("wallet-info");
+      const result = await locator.isVisible();
+      if (result) {
+        const address = await locator.getAttribute("data-wallet-address");
+        globalStateManager.appendValue("wallet-address", address);
+        return result;
+      }
+    });
+
   }
 );
 
@@ -150,7 +161,7 @@ When(
     });
 
     await waitFor(async() => {
-      const network = "Preview"
+      const network = "Preprod"
       const locator = await mainPage.getByRole("combobox");
       const result = await locator.isVisible();
       if (result) {
@@ -191,7 +202,7 @@ When(
       await newPage.reload();
       return true;
     });
-    await newPage.pause();
+
     await waitFor(async() => {
       const buttonName = "Sign"
       const locator = await newPage.getByRole("button", { name: buttonName, exact: true });

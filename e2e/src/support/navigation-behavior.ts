@@ -31,8 +31,6 @@ const pathMatchesPageId = (
   const pagesConfigItem = pagesConfig[pageId]
   const pageRegexString = pagesConfigItem.regex;
   const pageRegex = new RegExp(pageRegexString);
-  console.log("PAGE REGEX: ", pageRegex)
-  console.log("CURRENT PATH: ", currentPath)
   return pageRegex.test(currentPath);
 }
 

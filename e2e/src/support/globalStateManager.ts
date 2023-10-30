@@ -11,7 +11,9 @@ class GlobalStateManager {
   }
 
   popValue(key: string): any {
-    return this.state[key].pop();
+    if (this.state && this.state[key] && this.state[key].length > 0) {
+      return this.state[key].pop();
+    }
   }
 
   getValue(key: string): any {
