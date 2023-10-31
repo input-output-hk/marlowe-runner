@@ -4,6 +4,7 @@ import { ScenarioWorld } from '../setup/world.js';
 import { waitFor } from "../../support/wait-for-behavior.js";
 import { testWallet } from "../../support/walletConfiguration.js";
 import { ValidAccessibilityRoles } from '../../env/global.js';
+import * as fs from 'fs';
 import {
   inputValue,
 } from '../../support/html-behavior.js';
@@ -86,26 +87,241 @@ When(
 
     const EXTENSION_URL = 'chrome-extension://gafhhkghbfjjkeiendhlofajokpaflmk';
 
-    await page.goto(`${EXTENSION_URL}/app.html`);
-    await page.addInitScript((testWallet) => {
-      window.localStorage.setItem('lock', testWallet.lock);
-      window.localStorage.setItem('analyticsAccepted', testWallet.analyticsAccepted);
-      window.localStorage.setItem('showDappBetaModal', testWallet.showDappBetaModal);
-      window.localStorage.setItem('wallet', testWallet.wallet);
-      const keyAgentData = JSON.parse(testWallet?.backgroundStorage?.keyAgentsByChain);
-      const mnemonicData = JSON.parse(testWallet?.backgroundStorage?.mnemonic);
-      const backgroundStorage = {
-        mnemonic: mnemonicData,
-        keyAgentsByChain: keyAgentData,
-        MIGRATION_STATE: { state: 'up-to-date' }
-      };
-      window.localStorage.setItem('BACKGROUND_STORAGE', JSON.stringify(backgroundStorage));
-      window.localStorage.setItem('appSettings', testWallet.appSettings);
-      window.localStorage.setItem('keyAgentData', testWallet.keyAgentData);
-    }, testWallet);
-    await page.goto(`${EXTENSION_URL}/app.html`);
-    await page.waitForTimeout(5000);
+    const mnemonic = fs.readFileSync('artifacts/mnemonic.txt', 'utf-8');
+    const words = mnemonic.trim().split(' ');
+    const newPage = await page.context().newPage();
+    await newPage.goto(`${EXTENSION_URL}/app.html`);
+
+    await waitFor(async() => {
+      const buttonName = "Restore"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "OK"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "I accept the Terms of Use"
+      const locator = await newPage.getByRole("checkbox", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Next"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Agree"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const locator = await newPage.getByTestId("wallet-setup-register-name-input")
+      const result = await locator.isVisible();
+
+      if (result) {
+        await inputValue(locator, "Runner test");
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Next"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const locator = await newPage.getByTestId("wallet-setup-password-step-password")
+      const result = await locator.isVisible();
+
+      if (result) {
+        await inputValue(locator, "RunnerE2ETest");
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const locator = await newPage.getByTestId("wallet-setup-password-step-confirm-password")
+      const result = await locator.isVisible();
+
+      if (result) {
+        await inputValue(locator, "RunnerE2ETest");
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Next"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Next"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    for (let i = 0; i < 8; i++) {
+      await waitFor(async() => {
+        const locator = await newPage.locator(`#mnemonic-word-${i+1}`)
+        const result = await locator.isVisible();
+
+        if (result) {
+          await inputValue(locator, words[i]);
+          return result;
+        }
+      });
+    }
+
+    await waitFor(async() => {
+      const buttonName = "Next"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    for (let i = 8; i < 16; i++) {
+      await waitFor(async() => {
+        const locator = await newPage.locator(`#mnemonic-word-${i+1}`)
+        const result = await locator.isVisible();
+
+        if (result) {
+          await inputValue(locator, words[i]);
+          return result;
+        }
+      });
+    }
+
+    await waitFor(async() => {
+      const buttonName = "Next"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    for (let i = 16; i < 24; i++) {
+      await waitFor(async() => {
+        const locator = await newPage.locator(`#mnemonic-word-${i+1}`)
+        const result = await locator.isVisible();
+
+        if (result) {
+          await inputValue(locator, words[i]);
+          return result;
+        }
+      });
+    }
+
+    await waitFor(async() => {
+      const buttonName = "Next"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Go to my wallet"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const buttonName = "Got it"
+      const locator = await newPage.getByRole("button", { name: buttonName, exact: true });
+      const result = await locator.isVisible();
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const locator = await newPage.getByTestId("user-avatar")
+      const result = await locator.isVisible();
+
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const locator = await newPage.getByTestId('header-menu').getByTestId('header-menu-network-choice-label')
+      const result = await locator.isVisible();
+
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const locator = await newPage.getByTestId('header-menu').getByTestId("network-preprod-radio-button")
+      const result = await locator.isVisible();
+
+      if (result) {
+        await locator.click();
+        return result;
+      }
+    });
+
+    await newPage.waitForTimeout(200);
+    await newPage.close();
     await page.reload();
+
 });
 
 
@@ -149,8 +365,6 @@ When(
     });
 
     await waitFor(async() => {
-      // const locator = await page.getByRole(role as ValidAccessibilityRoles, { name })
-      // const locator = await newPage.getByRole("textbox", { name: "Password" })  
       const locator = await newPage.getByTestId("password-input")
       const result = await locator.isVisible();
 

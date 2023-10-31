@@ -73,22 +73,32 @@ When(
     const words = mnemonic.trim().split(' ');
 
     const EXTENSION_URL = 'chrome-extension://nkdhfgepnkiilghfdmpfnlnhckniegoc';
-                                              
+
     const newPage = await page.context().newPage();
     await newPage.goto(`${EXTENSION_URL}/createWalletTab.html?type=import&length=24`);
 
 
-    const inputField = async (name, value) => {
-      const locator = await newPage.getByRole("textbox", { name: name, exact: true });
-      const result = await locator.isVisible();
-      if (result) {
-        await inputValue(locator, value);
-        return result;
-      }
-    }
+    // const inputField = async (name, value) => {
+    //   const locator = await newPage.getByRole("textbox", { name: name, exact: true });
+    //   const result = await locator.isVisible();
+    //   if (result) {
+    //     await inputValue(locator, value);
+    //     return result;
+    //   }
+    // }
 
     for (let i = 0; i < 24; i++) {
-      await inputField(`Word ${i+1}`, words[i]);
+      const name = `Word ${i+1}`;
+      await waitFor(async() => {
+      const locator = await newPage.getByRole("textbox", { name: name, exact: true });
+        const result = await locator.isVisible();
+
+        if (result) {
+          await inputValue(locator, words[i]);
+          return result;
+        }
+      });
+
     }
 
     await waitFor(async() => {
@@ -101,9 +111,38 @@ When(
       }
     });
 
-    await inputField("Enter account name", "Runner test");
-    await inputField("Enter password", "Runner test");
-    await inputField("Confirm password", "Runner test");
+    await waitFor(async() => {
+      const name = "Enter account name";
+      const locator = await newPage.getByRole("textbox", { name: name, exact: true });
+      const result = await locator.isVisible();
+
+      if (result) {
+        await inputValue(locator, "Runner test");
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const name = "Enter password";
+      const locator = await newPage.getByRole("textbox", { name: name, exact: true });
+      const result = await locator.isVisible();
+
+      if (result) {
+        await inputValue(locator, "Runner test");
+        return result;
+      }
+    });
+
+    await waitFor(async() => {
+      const name = "Confirm password";
+      const locator = await newPage.getByRole("textbox", { name: name, exact: true });
+      const result = await locator.isVisible();
+
+      if (result) {
+        await inputValue(locator, "Runner test");
+        return result;
+      }
+    });
 
     await waitFor(async() => {
       const buttonName = "Create"

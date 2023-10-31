@@ -6,7 +6,6 @@ Feature: As a user, I would like to apply an input on a current contract
     As a user I would like to apply an input on a current contract
     So that I can proceed through the contract
 
-    @dev
     Scenario Outline: Creating a deposit with a wallet
       Given I configure my <wallet_name> wallet
       And I am on the "home" page
@@ -33,7 +32,7 @@ Feature: As a user, I would like to apply an input on a current contract
 
     Examples:
       | wallet_name |
-      # | lace        |
+      | lace        |
       | nami        |
 
     Scenario Outline: Creating a choice with a wallet
@@ -64,7 +63,7 @@ Feature: As a user, I would like to apply an input on a current contract
 
     Examples:
       | wallet_name |
-      # | lace        |
+      | lace        |
       | nami        |
 
 
@@ -95,7 +94,7 @@ Feature: As a user, I would like to apply an input on a current contract
 
     Examples:
       | wallet_name |
-      # | lace        |
+      | lace        |
       | nami        |
 
 
