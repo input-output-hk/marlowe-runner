@@ -318,6 +318,7 @@ When(
       }
     });
 
+    await newPage.waitForTimeout(200);
     await newPage.close();
     await page.reload();
 

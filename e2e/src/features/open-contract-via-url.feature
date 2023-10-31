@@ -7,7 +7,6 @@ Feature: As a user, I would like open a contract via url for services like marlo
     I would like to open this contract via url
     So that I can quickly run a contract that I created on Marlowe Playground
 
-    @dev
     Scenario Outline: As a user I expect to be able to choose the <wallet_name> wallet
       Given I configure my <wallet_name> wallet
       And I am on the "close contract" page
@@ -22,5 +21,5 @@ Feature: As a user, I would like open a contract via url for services like marlo
     Examples:
       | wallet_name |
       | lace        |
-      # | nami        |
+      | nami        |
 

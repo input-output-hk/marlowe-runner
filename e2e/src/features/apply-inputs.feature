@@ -32,7 +32,7 @@ Feature: As a user, I would like to apply an input on a current contract
 
     Examples:
       | wallet_name |
-      # | lace        |
+      | lace        |
       | nami        |
 
     Scenario Outline: Creating a choice with a wallet
@@ -63,7 +63,7 @@ Feature: As a user, I would like to apply an input on a current contract
 
     Examples:
       | wallet_name |
-      # | lace        |
+      | lace        |
       | nami        |
 
 
@@ -94,7 +94,7 @@ Feature: As a user, I would like to apply an input on a current contract
 
     Examples:
       | wallet_name |
-      # | lace        |
+      | lace        |
       | nami        |
 
 
