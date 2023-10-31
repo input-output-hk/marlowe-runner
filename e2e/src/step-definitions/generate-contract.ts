@@ -6,7 +6,7 @@ import {
 } from "@marlowe.io/language-core-v1";
 import { MarloweJSON } from "@marlowe.io/adapter/codec";
 
-type ContractName = "SimpleDeposit" | "SimpleChoice" | "TimedOutSimpleChoice";
+type ContractName = "SimpleDeposit" | "SimpleChoice" | "TimedOutSimpleChoice" | "SimpleNotify";
 
 const mkSimpleDeposit = (address: string): Contract => {
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
@@ -74,6 +74,21 @@ const mkTimedOutSimpleChoice = (address: string): Contract => {
     ]
   };
 }
+const mkSimpleNotify = (address: string): Contract => {
+  const twentyMinutesInMilliseconds = 20 * 60 * 1000;
+  const inTwentyMinutes = datetoTimeout(new Date(Date.now() - twentyMinutesInMilliseconds));
+  return {
+    timeout: inTwentyMinutes,
+    timeout_continuation: "close",
+    when: [
+      { case: {
+          notify_if: true,
+        },
+        then: "close",
+      },
+    ]
+  };
+}
 
 
 // // And I generate the contract "SimpleDeposit" and write it to "/tmp/deposit.json"
@@ -96,6 +111,10 @@ When(
       case "TimedOutSimpleChoice":
         const contract3 = mkTimedOutSimpleChoice(walletAddress);
         globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract3, null, 4))
+        break;
+      case "SimpleNotify":
+        const contract4 = mkSimpleNotify(walletAddress);
+        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract4, null, 4))
         break;
     }
   }
