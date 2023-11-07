@@ -7,3 +7,7 @@ export function decompressFromURIImpl(uriComponent) {
     return null;
   }
 }
+
+export function compressToURI(str) {
+  return LZString.compressToEncodedURIComponent(str);
+}

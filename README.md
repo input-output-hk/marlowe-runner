@@ -8,10 +8,10 @@ The application itself is a fully static JS app which requires Marlowe Runtime f
 
 ### Configuration
 
-In order to configure the application your HTTP server should serve `/config.json`. An `example.config.json` could be found as a part of the release which you can link and use:
+In order to configure the application your HTTP server should serve a `config.json`. To do so, create the file `public/config.json` with the following structure:
 
-```
-{ "marloweWebServerUrl": 'https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io', "develMode": false }
+```json
+{ "marloweWebServerUrl": 'https://link-to-runner-instance', "develMode": false }
 ```
 
 
