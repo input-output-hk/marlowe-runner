@@ -14,16 +14,22 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Monoid as Monoid
+import Data.Newtype (unwrap)
+import Data.String (Pattern(..), Replacement(..))
+import Data.String as String
 import Data.Tuple.Nested (type (/\))
 import Data.Undefined.NoProblem as NoProblem
 import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Fetch.Core.Response (url)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
+import Marlowe.Runtime.Web.Types (NetworkId(..), NetworkMagic(..))
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (img, span_, text) as DOOM
+import React.Basic.DOM (img, span_, text, i, a) as DOOM
+import React.Basic.DOM as BDOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (JSX, component, useState', (/\))
 import React.Basic.Hooks (bind, discard, useState') as React
@@ -38,6 +44,7 @@ type AppliedInputs = Array (V1.InputContent /\ V1.TimeInterval)
 type Props =
   { contract :: Maybe V1.Contract
   , initialContract :: V1.Contract
+  , contractId :: Runtime.ContractId
   , initialState :: V1.State
   , onClose :: Effect Unit
   , state :: Maybe V1.State
@@ -49,8 +56,9 @@ data ContractView = SourceCode | Graph { compressed :: Boolean }
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   logger <- asks _.logger
+  networkId <- asks _.networkId
   Runtime.Runtime { serverURL } <- asks _.runtime
-  liftEffect $ component "ContractDetails" \{ contract, state, initialState, initialContract, transactionEndpoints, onClose } -> React.do
+  liftEffect $ component "ContractDetails" \{ contractId, contract, state, initialState, initialContract, transactionEndpoints, onClose } -> React.do
     possibleExecutionPath /\ setPossibleExecutionPath <- React.useState' Nothing
 
     React.useAff (transactionEndpoints /\ contract /\ state) do
@@ -130,15 +138,19 @@ mkComponent = do
                 , showBorders: false
                 , extraClassNames: "mt-3"
                 }
-
             ]
         ]
-
       content = DOOM.fragment
         [ wrappedContentWithFooter body footer
         , Monoid.guard (not graphLoaded) (spinnerOverlay Spinner100VH)
         ]
-
+      -- FIXME
+      urlEncode = String.replaceAll (Pattern "#") (Replacement "%23")
+      runnerUrl = case networkId of
+        Mainnet -> "https://mainnet.marlowescan.com/"
+        Testnet (NetworkMagic 1) -> "https://preprod.marlowescan.com/"
+        Testnet (NetworkMagic 2) -> "https://preview.marlowescan.com/"
+        _ -> ""
     pure $ BodyLayout.component
       { title: DOM.div {}
           [ DOM.div { className: "mb-3" } $ DOOM.img { src: "/images/magnifying_glass.svg" }
@@ -146,6 +158,16 @@ mkComponent = do
           ]
       , description: DOM.div { className: "pe-3 mb-3" }
           [ DOM.p {} $ DOOM.text "This page displays the details and current status of the contract that is on chain."
+          , DOM.p { className: "text-truncate" } $ [ DOOM.text $ "Contract id: " <> Runtime.txOutRefToString contractId ]
+          , DOOM.a
+              { className: "btn-link text-muted text-primary-hover text-decoration-none"
+              , href: runnerUrl <> "/contractView?tab=info&contractId=" <> urlEncode (Runtime.txOutRefToString contractId)
+              , target: "_blank"
+              , children:
+                  [ DOOM.i { className: "h5 bi-globe2" }
+                  , DOOM.text $ "  View on Marlowe Scan "
+                  ]
+              }
           ]
       , content
       }
