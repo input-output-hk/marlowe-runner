@@ -6,7 +6,87 @@ import {
 } from "@marlowe.io/language-core-v1";
 import { MarloweJSON } from "@marlowe.io/adapter/codec";
 
-type ContractName = "SimpleDeposit" | "SimpleChoice" | "TimedOutSimpleChoice" | "SimpleNotify";
+type ContractName = "SimpleDeposit" | "SimpleChoice" | "TimedOutSimpleChoice" | "SimpleNotify" | "Escrow";
+
+const mkEscrow = (address1: string, address2: string): Contract => {  
+  const twentyMinutesInMilliseconds = 20 * 60 * 1000;
+  const inTwentyMinutes = datetoTimeout(new Date(Date.now() + twentyMinutesInMilliseconds));
+ 
+  return {
+    timeout: inTwentyMinutes,
+    timeout_continuation: "close",
+    when: [
+      {
+        then: "close",
+        case: {
+          for_choice: {
+            choice_owner: {
+              address: address1
+            },
+            choice_name: "Everything is alright"
+          },
+          choose_between: [
+            {
+              to: 0n,
+              from: 0n
+            }
+          ]
+        }
+      },
+      {
+        then: "close",
+        case: {
+          for_choice: {
+            choice_owner: {
+              address: address1 
+            },
+            choice_name: "Report problem"
+          },
+          choose_between: [
+            {
+              to: 1n,
+              from: 1n
+            }
+          ]
+        }
+      },
+      {
+        then: "close",
+        case: {
+          for_choice: {
+            choice_owner: {
+              address: address2
+            },
+            choice_name: "Choice between 1-6"
+          },
+          choose_between: [
+            {
+              to: 3n,
+              from: 1n
+            }
+          ]
+        }
+      },
+      {
+        then: "close",
+        case: {
+          for_choice: {
+            choice_owner: {
+              address: address2
+            },
+            choice_name: "Choice between 1-5"
+          },
+          choose_between: [
+            {
+              to: 4n,
+              from: 1n
+            }
+          ]
+        }
+      }
+    ],
+  }
+}
 
 const mkSimpleDeposit = (address: string): Contract => {
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
@@ -98,7 +178,7 @@ When(
     const {
       globalStateManager
     } = this;
-    const walletAddress = globalStateManager.getValue("wallet-address");
+    const walletAddress = globalStateManager.popValue("wallet-address");
     switch (contractName) {
       case "SimpleDeposit":
         const contract1 = mkSimpleDeposit(walletAddress);
@@ -115,6 +195,11 @@ When(
       case "SimpleNotify":
         const contract4 = mkSimpleNotify(walletAddress);
         globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract4, null, 4))
+        break;
+      case "Escrow": 
+        const walletAddress2 = globalStateManager.getValue("wallet-address");
+        const contract5 = mkEscrow(walletAddress, walletAddress2);
+        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract5, null, 4))
         break;
     }
   }
