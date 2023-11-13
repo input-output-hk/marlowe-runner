@@ -87,7 +87,7 @@ When(
 
     const EXTENSION_URL = 'chrome-extension://gafhhkghbfjjkeiendhlofajokpaflmk';
 
-    const mnemonic = fs.readFileSync('artifacts/mnemonic.txt', 'utf-8');
+    const mnemonic = fs.readFileSync('artifacts/lace-mnemonic.txt', 'utf-8');
     const words = mnemonic.trim().split(' ');
     const newPage = await page.context().newPage();
     await newPage.goto(`${EXTENSION_URL}/app.html`);
