@@ -1339,6 +1339,24 @@
   "resolved" "https://registry.npmjs.org/acorn/-/acorn-8.8.2.tgz"
   "version" "8.8.2"
 
+"allure-commandline@^2.24.1":
+  "integrity" "sha512-eNto3ipBq+O2B/f8/OwiS3E8R7jYENs3qv8jT7wMZmziYLANsISC9tX/FfEqR3FDiQlEOjkP7iyTEZ3ph53FPg=="
+  "resolved" "https://registry.npmjs.org/allure-commandline/-/allure-commandline-2.24.1.tgz"
+  "version" "2.24.1"
+
+"allure-cucumberjs@^2.9.2":
+  "integrity" "sha512-Q01bMfWIHet1mw8HwReil9cMMLvGBz7WVvUwss/PIYnnq91kRvoAOR0SPmnwRc/INPeAHaLwK4riU8LUT9q1SQ=="
+  "resolved" "https://registry.npmjs.org/allure-cucumberjs/-/allure-cucumberjs-2.9.2.tgz"
+  "version" "2.9.2"
+  dependencies:
+    "@cucumber/cucumber" "^9.5.1"
+    "@cucumber/gherkin" "^27.0.0"
+    "@cucumber/gherkin-streams" "^5.0.1"
+    "@cucumber/gherkin-utils" "^8.0.5"
+    "@cucumber/message-streams" "^4.0.1"
+    "@cucumber/messages" "^22.0.0"
+    "allure-js-commons" "2.9.2"
+
 "allure-js-commons@2.9.2":
   "integrity" "sha512-Qvi+zMZQruklqcnqG/zHCnE209v1YiWGhO3H2aPW2aXC8Ockqd01a+w2lP4Qqp3SfC+WQDeAK2+pp+v+eNl8xQ=="
   "resolved" "https://registry.npmjs.org/allure-js-commons/-/allure-js-commons-2.9.2.tgz"

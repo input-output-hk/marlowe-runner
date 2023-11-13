@@ -1,0 +1,5 @@
+"Status","Start Time","Stop Time","Duration in ms","Parent Suite","Suite","Sub Suite","Test Class","Test Method","Name","Description"
+"passed","Mon Nov 13 13:10:29 EST 2023","Mon Nov 13 13:12:33 EST 2023","124329","","Creating a notify contract with a <wallet_name> wallet","","","","Creating a notify contract with a lace wallet","As a user I would like to apply an input on a current contract
+    So that I can proceed through the contract"
+"passed","Mon Nov 13 13:12:33 EST 2023","Mon Nov 13 13:13:28 EST 2023","55099","","Creating a notify contract with a <wallet_name> wallet","","","","Creating a notify contract with a nami wallet","As a user I would like to apply an input on a current contract
+    So that I can proceed through the contract"

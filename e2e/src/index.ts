@@ -10,6 +10,10 @@ import {
   PageElementMappings,
   DateTimeFormat,
 } from './env/global.js';
+// import { CucumberJSAllureFormatter, AllureRuntime } from "allure-cucumberjs";
+import path from "path";
+import { fileURLToPath } from 'url';
+
 import * as fs from 'fs';
 
 dotenv.config({path: './env/common.env'});
@@ -35,9 +39,25 @@ const worldParameters: GlobalConfig = {
   simulatorDateFormat,
 };
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// class Reporter extends CucumberJSAllureFormatter {
+//   constructor(options) {
+//     super(
+//       options,
+//       new AllureRuntime({
+//         resultsDir: path.resolve(__dirname, "allure-results"),
+//       }),
+//       {},
+//     );
+//   }
+// }
+
+
 export const common = {
   import: ['./src/step-definitions/**/**/*.js'],
   paths: ['./src/features/**/*.feature'],
+  format: [path.resolve(__dirname, "reporter.js")],
   worldParameters
 }
 
