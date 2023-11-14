@@ -1,5 +1,21 @@
 "Status","Start Time","Stop Time","Duration in ms","Parent Suite","Suite","Sub Suite","Test Class","Test Method","Name","Description"
-"passed","Mon Nov 13 13:10:29 EST 2023","Mon Nov 13 13:12:33 EST 2023","124329","","Creating a notify contract with a <wallet_name> wallet","","","","Creating a notify contract with a lace wallet","As a user I would like to apply an input on a current contract
+"passed","Mon Nov 13 14:31:10 EST 2023","Mon Nov 13 14:32:19 EST 2023","68510","","Creating a timed-out contract with a <wallet_name> wallet","","","","Creating a timed-out contract with a nami wallet","As a user I would like to apply an input on a current contract
     So that I can proceed through the contract"
-"passed","Mon Nov 13 13:12:33 EST 2023","Mon Nov 13 13:13:28 EST 2023","55099","","Creating a notify contract with a <wallet_name> wallet","","","","Creating a notify contract with a nami wallet","As a user I would like to apply an input on a current contract
+"passed","Mon Nov 13 14:33:16 EST 2023","Mon Nov 13 14:34:03 EST 2023","47695","","Creating a notify contract with a <wallet_name> wallet","","","","Creating a notify contract with a nami wallet","As a user I would like to apply an input on a current contract
     So that I can proceed through the contract"
+"failed","Mon Nov 13 14:30:40 EST 2023","Mon Nov 13 14:31:10 EST 2023","30141","","Creating a timed-out contract with a <wallet_name> wallet","","","","Creating a timed-out contract with a lace wallet","As a user I would like to apply an input on a current contract
+    So that I can proceed through the contract"
+"failed","Mon Nov 13 14:23:36 EST 2023","Mon Nov 13 14:27:59 EST 2023","262178","","Creating a deposit with a wallet","","","","Creating a deposit with a wallet","As a user I would like to apply an input on a current contract
+    So that I can proceed through the contract"
+"passed","Mon Nov 13 14:35:12 EST 2023","Mon Nov 13 14:36:04 EST 2023","52358","","Creating default escrow contract with Lace wallet","","","","Creating default escrow contract with Lace wallet","As a user I would like to log into runner with my lace wallet
+    And create a default contract"
+"passed","Mon Nov 13 14:29:26 EST 2023","Mon Nov 13 14:30:40 EST 2023","74256","","Creating a choice with a wallet","","","","Creating a choice with a wallet","As a user I would like to apply an input on a current contract
+    So that I can proceed through the contract"
+"passed","Mon Nov 13 14:36:28 EST 2023","Mon Nov 13 14:36:41 EST 2023","12432","","As a user I expect to be able to choose the <wallet_name> wallet","","","","As a user I expect to be able to choose the nami wallet","As a user who created a contract in marlowe playground
+    I would like to open this contract via url
+    So that I can quickly run a contract that I created on Marlowe Playground"
+"passed","Mon Nov 13 14:32:19 EST 2023","Mon Nov 13 14:33:16 EST 2023","56931","","Creating a notify contract with a <wallet_name> wallet","","","","Creating a notify contract with a lace wallet","As a user I would like to apply an input on a current contract
+    So that I can proceed through the contract"
+"passed","Mon Nov 13 14:36:04 EST 2023","Mon Nov 13 14:36:28 EST 2023","23969","","As a user I expect to be able to choose the <wallet_name> wallet","","","","As a user I expect to be able to choose the lace wallet","As a user who created a contract in marlowe playground
+    I would like to open this contract via url
+    So that I can quickly run a contract that I created on Marlowe Playground"

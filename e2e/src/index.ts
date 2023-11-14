@@ -41,18 +41,6 @@ const worldParameters: GlobalConfig = {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// class Reporter extends CucumberJSAllureFormatter {
-//   constructor(options) {
-//     super(
-//       options,
-//       new AllureRuntime({
-//         resultsDir: path.resolve(__dirname, "allure-results"),
-//       }),
-//       {},
-//     );
-//   }
-// }
-
 
 export const common = {
   import: ['./src/step-definitions/**/**/*.js'],
