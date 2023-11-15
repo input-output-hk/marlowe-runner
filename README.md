@@ -8,10 +8,10 @@ The application itself is a fully static JS app which requires Marlowe Runtime f
 
 ### Configuration
 
-In order to configure the application your HTTP server should serve `/config.json`. An `example.config.json` could be found as a part of the release which you can link and use:
+In order to configure the application your HTTP server should serve a `config.json`. To do so, create the file `public/config.json` with the following structure:
 
-```
-{ "marloweWebServerUrl": 'https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io', "develMode": false }
+```json
+{ "marloweWebServerUrl": 'https://link-to-runner-instance', "develMode": false }
 ```
 
 
@@ -67,12 +67,12 @@ For instructions on how to install and configure nix (including how to enable ac
 If you already have nix installed and configured, you may enter the development shell by running `nix develop`.
 
 You can build the static site with Nix using:
-```nix 
+```nix
 nix build .#marlowe-runner
 ```
 
-Whenever you make changes to `package-json.lock` or `packages.dhall` packages, you must run the 
-`gen-nix-lockfiles` script (available inside the `nix develop` shell) to 
+Whenever you make changes to `package-json.lock` or `packages.dhall` packages, you must run the
+`gen-nix-lockfiles` script (available inside the `nix develop` shell) to
 recreate `nix/spago-packages.nix` and `nix/npm-deps-hash.nix`.
 
 ### Troubleshooting
@@ -88,5 +88,5 @@ If you get a blank page when opening Marlowe Runner in your browser, it may be n
 Before contributing, please format the source code using the following command from within the `nix` development shell:
 
 ```bash
-purs-tidy --format-in-place 'src/**/*.purs'
+purs-tidy format-in-place 'src/**/*.purs'
 ```

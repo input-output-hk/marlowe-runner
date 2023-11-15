@@ -214,6 +214,7 @@ main configJson = launchAff_ do
           , msgHub
           , runtime
           , slotting
+          , networkId
           }
 
       origClasses <- liftEffect $ fromMaybe "" <$> getAttribute "class" appContainer

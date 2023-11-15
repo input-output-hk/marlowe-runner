@@ -26,6 +26,7 @@ import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Marlowe.Runtime.Web (Runtime)
 import Marlowe.Runtime.Web.Types (ServerURL)
+import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX, ReactContext)
 import Wallet as Wallet
 import WalletContext (WalletContext)
@@ -68,6 +69,8 @@ type MkContextBase r =
   , msgHub :: MessageHub
   , slotting :: Slotting
   , develMode :: Boolean
+  , networkId :: Runtime.NetworkId
+
   | r
   }
 

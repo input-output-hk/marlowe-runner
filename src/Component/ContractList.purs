@@ -155,6 +155,7 @@ data ModalAction
       , initialContract :: V1.Contract
       , initialState :: V1.State
       , transactionEndpoints :: Array Runtime.TransactionEndpoint
+      , contractId :: Runtime.ContractId
       }
   | ApplyInputs ContractInfo TransactionsEndpoint ApplyInputs.Machine.MarloweContext
   | Withdrawal WalletContext (NonEmptyArray.NonEmptyArray String) TxOutRef (Array Payout)
@@ -344,10 +345,10 @@ mkContractList = do
             , updateSubmitted: updateSubmitted contractId
             , walletContext
             }
-        Just (ContractDetails { contract, state, initialContract, initialState, transactionEndpoints }), _ -> do
+        Just (ContractDetails { contractId, contract, state, initialContract, initialState, transactionEndpoints }), _ -> do
           let
             onClose = resetModalAction
-          contractDetails { contract, onClose, state, transactionEndpoints, initialContract, initialState }
+          contractDetails { contractId, contract, onClose, state, transactionEndpoints, initialContract, initialState }
 
         -- This should be fixed later on - for now we put some stubs
         Just (ContractTemplate Escrow), _ -> escrowComponent
@@ -506,7 +507,8 @@ mkContractList = do
                                 do
                                   let
                                     onClick = setModalAction $ ContractDetails
-                                      { contract: currentContract
+                                      { contractId
+                                      , contract: currentContract
                                       , state
                                       , initialState: initialState
                                       , initialContract: initialContract
