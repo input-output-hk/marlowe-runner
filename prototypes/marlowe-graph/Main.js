@@ -103,4 +103,4 @@ const contract2 = {
     timeout: 1985,
     timeout_continuation: "close"
 };
-root.render(_jsxs("div", { children: [_jsx(MarloweGraphView, { contract: contract2, path: [0, 0], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1, 0], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1, 0, 0], onInit: noop })] }));
+root.render(_jsxs("div", { children: [_jsx(MarloweGraphView, { contract: contract, path: [1, 'start-selection', 0, 0], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1, 0, 'start-selection', 0], onInit: noop }), _jsx(MarloweGraphView, { contract: contract2, path: [0, 0], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1, 0], onInit: noop }), _jsx(MarloweGraphView, { contract: contract, path: [1, 0, 0], onInit: noop })] }));

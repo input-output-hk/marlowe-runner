@@ -44,6 +44,7 @@ const nodeTypes = {
         if ("assert" in type)
             return _jsxs("div", { style: style_, children: ["Assert (...)", _jsx(Handle, { type: "target", position: Position.Left, id: "continuation" }), _jsx(Handle, { type: "source", position: Position.Right, id: "then" })] });
         if ("when" in type) {
+            // FIXME: an ugly workaround to fix the styling of empty `When` node
             const height = ((type.when.length === 0) ? 1.5 : (type.when.length + 1)) * Y_OFFSET - (Y_OFFSET - NODE_HEIGHT);
             const _a = Object.assign(Object.assign({}, style_), { height: `${height}px`, justifyContent: "space-around", paddingLeft: "5px" }), { alignItems: _ } = _a, style = __rest(_a, ["alignItems"]);
             return _jsxs("div", { style: style, children: [_jsx("div", { children: "When" }), type.when.map((x, i) => {
@@ -73,9 +74,11 @@ const contractPathHistoryToNodeStatus = (contract, history) => {
         return 'still-possible';
     if (history === 'skipped')
         return 'skipped';
-    if (history.length === 0 && contract !== "close" && "when" in contract)
+    if (history.indices.length === 0 && contract !== "close" && "when" in contract)
         return 'awaiting-input';
-    // Array case means we are on the path or at the end of the path.
+    const selecting = history.selecting || history.indices[0] === 'start-selection';
+    if (selecting)
+        return 'selected';
     return 'executed';
 };
 // In both functions the value of `index` value has following semantics:
@@ -87,11 +90,16 @@ const contractPathHistoryToEdgeStatus = (index, history) => {
         return 'still-possible';
     if (history === 'skipped')
         return 'skipped';
-    if (index === undefined)
-        return 'executed';
-    if (history.length === 0 && index !== undefined)
+    if (history.indices.length === 0 && index !== undefined)
         return 'still-possible';
-    return (index === history[0]) ? 'executed' : 'skipped';
+    const indices = history.indices[0] === 'start-selection' ? history.indices.slice(1) : history.indices;
+    const selecting = history.selecting || history.indices[0] === 'start-selection';
+    if (index === indices[0] || index === undefined)
+        if (selecting)
+            return 'selected';
+        else
+            return 'executed';
+    return 'skipped';
 };
 const contractPathHistoryContinuation = (index, history) => {
     if (history == 'still-possible')
@@ -100,14 +108,20 @@ const contractPathHistoryContinuation = (index, history) => {
         return 'skipped';
     if (index === undefined)
         return history;
-    if (history.length === 0)
+    if (history.indices.length === 0)
         return 'still-possible';
-    return index === history[0] ? history.slice(1) : 'skipped';
+    if (history.indices[0] === 'start-selection')
+        return contractPathHistoryContinuation(index, { indices: history.indices.slice(1), selecting: true });
+    if (index === history.indices[0])
+        return { indices: history.indices.slice(1), selecting: history.selecting };
+    return 'skipped';
 };
 const executedStrokeStyle = { strokeOpacity: "100%", strokeWidth: 3, stroke: "black" };
+const selectedStrokeStyle = { strokeOpacity: "100%", strokeWidth: 3, stroke: "#aaa" };
 const stillPossibleStrokeStyle = { strokeOpacity: "100%", strokeWidth: 1, stroke: "gray" };
 const skippedStrokeStyle = { strokeOpacity: "30%", strokeWidth: 1, stroke: "black" };
 const executedDivStyle = { border: "3px solid black" };
+const selectedDivStyle = { border: "3px solid #aaa" };
 const stillPossibleDivStyle = { border: "1px solid gray" };
 const awaitingDivStyle = { border: "2px solid gray" };
 const skippedDivStyle = { border: "1px solid black" };
@@ -115,6 +129,8 @@ const statusToEdgeStyle = (status, defaultStyle) => {
     switch (status) {
         case 'executed':
             return Object.assign(Object.assign({}, defaultStyle), executedStrokeStyle);
+        case 'selected':
+            return Object.assign(Object.assign({}, defaultStyle), selectedStrokeStyle);
         case 'skipped':
             return Object.assign(Object.assign({}, defaultStyle), skippedStrokeStyle);
         case 'still-possible':
@@ -125,6 +141,8 @@ const statusToNodeStyle = (status, defaultStyle) => {
     switch (status) {
         case 'executed':
             return Object.assign(Object.assign({}, defaultStyle), executedDivStyle);
+        case 'selected':
+            return Object.assign(Object.assign({}, defaultStyle), selectedDivStyle);
         case 'awaiting-input':
             return Object.assign(Object.assign({}, defaultStyle), awaitingDivStyle);
         case 'still-possible':
@@ -277,6 +295,7 @@ const contract2NodesAndEdges = (contract, id, x, y, path) => {
     };
 };
 export const _MarloweGraph = ({ contract, path, onInit }) => {
-    const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0, path);
+    const contractPath = { indices: path, selecting: false };
+    const { nodes, edges } = contract2NodesAndEdges(contract, "1", 0, 0, contractPath);
     return _jsx(ReactFlow, { onInit: onInit, nodes: nodes, edges: edges, nodeTypes: nodeTypes, edgeTypes: edgeTypes, children: _jsx(Background, { variant: BackgroundVariant.Dots, gap: 12, size: 1 }) });
 };
