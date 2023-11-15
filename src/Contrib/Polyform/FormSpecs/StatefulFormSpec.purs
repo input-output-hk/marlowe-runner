@@ -18,7 +18,6 @@ import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Polyform.Batteries as Batteries
 import Polyform.Batteries.UrlEncoded as UrlEncoded
-import Polyform.Batteries.UrlEncoded as UrleEncoded
 import Polyform.Batteries.UrlEncoded.Validators as Validators
 import Polyform.Validator as Validator
 import Type.Row (type (+))
@@ -28,19 +27,18 @@ type FieldStateRow err r =
   , onChange :: Array String -> Effect Unit
   , touched :: Disj Boolean
   , value :: Array String
-  | FieldInitialsRow
-      + r
+  | FieldInitialsRow + r
   )
 
 type FieldState err = { | FieldStateRow err () }
 
-type RenderFieldFn err doc = FieldState err -> doc
+type RenderFieldFn st err doc = st -> FieldState err -> doc
 
 type FieldsState err = Map FieldId (FieldState err)
 
 type FormState st err =
   { fields :: FieldsState err
-  , errors :: Maybe (UrleEncoded.Errors err /\ Query)
+  , errors :: Maybe (UrlEncoded.Errors err /\ Query)
   , query :: Query
   | st
   }
@@ -121,7 +119,8 @@ type InputFieldStateRow err r =
 
 type InputState err = { | InputFieldStateRow err () }
 
-type RenderInputFn err doc = InputState err -> doc
+-- `st` - "custom" form state (e.g. a record with some extra fields)
+type RenderInputFn err st doc = st -> InputState err -> doc
 
 toInputState :: forall err. FieldState err -> InputState err
 toInputState fieldState =
@@ -146,23 +145,31 @@ toFormValidator name fieldValidator = do
       Array.head value
   UrlEncoded.fromValidator name validator'
 
+toFormRender
+  :: forall doc err st
+   . Monoid doc
+  => FieldId
+  -> RenderInputFn err st doc
+  -> RenderFn (state :: st) err doc
+toFormRender name renderInput = \{ fields, state } -> do
+  let
+    doc = Map.lookup name fields <#> renderInput state <<< toInputState
+  fromMaybe mempty doc
+
 input
   :: forall a doc err m st
    . Monad m
   => Monoid doc
   => FieldId
   -> String
-  -> RenderInputFn err doc
+  -> RenderInputFn err st doc
   -> Boolean
   -> Batteries.Validator (StateT st m) err (Maybe String) a
   -> StatefulFormSpec m st doc err Query a
 input name initial render touched validator = StatefulFormSpec
   { fields: [ { name, initial: [ initial ], touched } ]
   , validator: toFormValidator name validator
-  , render: \state -> do
-      let
-        doc = Map.lookup name state.fields <#> render <<< toInputState
-      fromMaybe mempty doc
+  , render: toFormRender name render
   }
 
 optInput
@@ -171,16 +178,16 @@ optInput
   => Monoid doc
   => FieldId
   -> String
-  -> RenderInputFn err doc
+  -> RenderInputFn err st doc
   -> Boolean
   -> Validators.SingleValueFieldValidator (StateT st m) err a
   -> StatefulFormSpec m st doc err Query (Maybe a)
-optInput name initial render touched validator = StatefulFormSpec
+optInput name initial renderInput touched validator = StatefulFormSpec
   { fields: [ { name, initial: [ initial ], touched } ]
   , validator: Validators.optional name $ validator
   , render: \state -> do
       let
-        doc = Map.lookup name state.fields <#> render <<< toInputState
+        doc = Map.lookup name state.fields <#> renderInput state.state <<< toInputState
       fromMaybe mempty doc
   }
 
@@ -199,4 +206,7 @@ multiSelect name initial err render touched validator = StatefulFormSpec
   , validator: Validators.requiredMulti name err $ validator
   , render
   }
+
+renderFormSpec :: forall doc err i o m st. StatefulFormSpec m st doc err i o -> FormState (state :: st) err -> doc
+renderFormSpec (StatefulFormSpec { render }) = render
 

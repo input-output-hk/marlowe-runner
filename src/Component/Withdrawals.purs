@@ -6,8 +6,6 @@ import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
 import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
-import Component.Modal (mkModal)
-import Component.Modal as Modal
 import Component.Types (MkComponentM, WalletInfo(..))
 import Component.Widgets (SpinnerOverlayHeight(..), backToContractListLink, spinnerOverlay)
 import Contrib.Fetch (FetchError)
@@ -17,7 +15,7 @@ import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (Choice
 import Control.Monad.Reader.Class (asks)
 import Data.Array (filter)
 import Data.Array.ArrayAL as ArrayAL
-import Data.Array.NonEmpty (NonEmptyArray, (:))
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.BigInt.Argonaut as BigInt
 import Data.Either (Either(..))
@@ -31,7 +29,6 @@ import Data.Time.Duration (Seconds(..))
 import Data.Traversable (for_)
 import Data.Validation.Semigroup (V(..))
 import Data.Variant (Variant)
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
@@ -121,6 +118,19 @@ mkComponent = do
           onError' :: forall err. err -> Aff Unit
           onError' err = liftEffect $ onError $ unsafeStringify err
         launchAff_ $ do
+          let
+            withdraw (WithdrawalContext ctx) serverURL withdrawalsEndpoint = do
+              let
+                req = PostWithdrawalsRequest
+                  { payouts: map (\(Payout { payoutId }) -> payoutId) ctx.payouts
+                  , changeAddress: ctx.wallet.changeAddress
+                  , addresses: ctx.wallet.usedAddresses
+                  , minUTxODeposit: V1.Lovelace (BigInt.fromInt 2_000_000)
+                  , collateralUTxOs: []
+                  }
+
+              post' @String serverURL (withdrawalsEndpoint :: WithdrawalsEndpoint) req
+
           withdraw withdrawalContext runtime.serverURL runtime.withdrawalsEndpoint >>= case _ of
             Right { resource: PostWithdrawalsResponseContent res, links: { withdrawal: withdrawalEndpoint } } -> do
               let
@@ -176,18 +186,6 @@ newtype WithdrawalContext = WithdrawalContext
   { wallet :: { changeAddress :: Bech32, usedAddresses :: Array Bech32 }
   , payouts :: Array Payout
   }
-
-withdraw (WithdrawalContext ctx) serverURL withdrawalsEndpoint = do
-  let
-    req = PostWithdrawalsRequest
-      { payouts: map (\(Payout { payoutId }) -> payoutId) ctx.payouts
-      , changeAddress: ctx.wallet.changeAddress
-      , addresses: ctx.wallet.usedAddresses
-      , minUTxODeposit: V1.Lovelace (BigInt.fromInt 2_000_000)
-      , collateralUTxOs: []
-      }
-
-  post' @String serverURL (withdrawalsEndpoint :: WithdrawalsEndpoint) req
 
 submit
   :: CborHex TransactionWitnessSetObject

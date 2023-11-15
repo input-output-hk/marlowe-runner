@@ -2,17 +2,21 @@ module Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders where
 
 import Prelude
 
-import Contrib.Polyform.FormSpecBuilder (FieldIdPrefix(..), FormSpecBuilderM, FormSpecBuilderT, _fullPrefix, formSpecBuilderT, genId, unFormSpecBuilder)
+import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
+import Contrib.Polyform.Batteries.BigInt as Batteries.BigInt
+import Contrib.Polyform.FormSpecBuilder (FieldIdPrefix(..), FormSpecBuilderM, FormSpecBuilderT, _fullPrefix, formSpecBuilder, genId, unFormSpecBuilder)
 import Contrib.Polyform.FormSpecs.StatefulFormSpec (InputState)
 import Contrib.Polyform.FormSpecs.StatelessFormSpec (StatelessFormSpec(..))
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Control.Alternative as Alternative
+import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader (withReaderT)
 import ConvertableOptions (class Defaults, defaults)
 import Data.Array as Array
 import Data.Array.ArrayAL (ArrayAL)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Bifunctor (bimap, lmap)
+import Data.BigInt.Argonaut (BigInt)
 import Data.Date (Date)
 import Data.DateTime (DateTime(..), Hour, Minute, Time(..))
 import Data.DateTime.ISO (parseISODate)
@@ -24,6 +28,7 @@ import Data.FoldableWithIndex (foldMapWithIndex)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.FormURLEncoded.Query as FormURLEncoded
 import Data.Formatter.Parser.Number (parseDigit)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
@@ -34,10 +39,11 @@ import Data.Profunctor (class Profunctor, dimap)
 import Data.Profunctor.Choice (class Choice, right)
 import Data.String as String
 import Data.Tuple (fst)
-import Data.Undefined.NoProblem (Opt, fromOpt)
+import Data.Undefined.NoProblem (Opt, fromOpt, opt, undefined)
 import Data.Undefined.NoProblem (toMaybe, undefined) as NoProblem
 import Data.Undefined.NoProblem as NoProblems
 import Data.Undefined.NoProblem.Closed (class Coerce, coerce) as NoProblem
+import Data.Validation.Semigroup (V(..))
 import Parsing (Parser, runParser) as Parsing
 import Parsing (fail)
 import Parsing.Combinators (optional, try) as Parsing
@@ -52,7 +58,7 @@ import Polyform.Batteries.UrlEncoded as UrleEncoded
 import Polyform.Batteries.UrlEncoded.Duals as UrlEncoded.Duals
 import Polyform.Batteries.UrlEncoded.Types.Errors (ErrorId(..), Errors(..))
 import Polyform.Dual as Polyform.Dual
-import Polyform.Validator (liftFnEither)
+import Polyform.Validator (liftFnEither, liftFnMEither, liftFnMMaybe, runValidator)
 import Polyform.Validator as Validator
 import Polyform.Validator.Dual as Polyform.Validator.Dual
 import Prim.Row as Row
@@ -72,11 +78,18 @@ import Type.Prelude (Proxy(..))
 choiceOpt :: forall a b p. Choice p => Profunctor p => p a b -> p (Maybe a) (Maybe b)
 choiceOpt p = dimap (note unit) (either (const Nothing) Just) (right p)
 
-requiredV :: forall t c d m. Monad m => t -> Validator m (Array t) c d -> Validator m (Array t) (Maybe c) d
+requiredV :: forall e i o m. Monad m => e -> Validator m (Array e) i o -> Validator m (Array e) (Maybe i) o
 requiredV msg v = v <<< Validator.liftFnEither (note [ msg ])
 
-requiredV' :: forall c d m. Monad m => Validator m (Array String) c d -> Validator m (Array String) (Maybe c) d
+requiredV' :: forall i o m. Monad m => Validator m (Array String) i o -> Validator m (Array String) (Maybe i) o
 requiredV' v = requiredV "This field is required" v
+
+optV :: forall e i o m. Monad m => Validator m (Array e) i o -> Validator m (Array e) (Maybe i) (Maybe o)
+optV v = liftFnMEither case _ of
+  Nothing -> pure (pure Nothing)
+  Just i -> do
+    V res <- runValidator v i
+    pure (Just <$> res)
 
 -- TODO [optimization]: we can replace `Array` in here by the array-builder
 -- because we work with small arrays.
@@ -318,7 +331,7 @@ renderTextInput
                 Monoid.guard (not isInvalid) do
                   renderPossibleHelpText possibleHelpText
 
-  if isInline layout then DOM.div { className: "col-12 flex-fill" } [ label, body ]
+  if isInline layout then DOM.div { className: "flex-fill" } [ label, body ]
   else DOM.div { className: "row mb-2" } [ label, body ]
 
 textInput
@@ -328,7 +341,7 @@ textInput
   => Defaults TextInputOptionalProps { | props } (TextInputProps validatorM a)
   => { | props }
   -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query a
-textInput props = formSpecBuilderT do
+textInput props = formSpecBuilder do
   let
     props' = defaults defaultTextInputProps props
   name <- _genFieldId props'
@@ -367,7 +380,10 @@ _typedTextInput
   => Row.Lacks "validator" props
   => Row.Lacks "type" props
   => Defaults TextInputOptionalProps
-       { "type" :: String, validator :: Batteries.Validator validatorM String (Maybe String) a | props }
+       { "type" :: String
+       , validator :: Batteries.Validator validatorM String (Maybe String) a
+       | props
+       }
        (TextInputProps validatorM a)
   => { | props }
   -> String
@@ -414,6 +430,25 @@ intInput props = _typedTextInput props "number" $ requiredV' validator
   where
   validator :: Batteries.Validator validatorM String String Int
   validator = Batteries.stringifyValidator Batteries.Int.validator
+
+bigIntInput
+  :: forall builderM props validatorM
+   . Monad validatorM
+  => Monad builderM
+  => Row.Lacks "validator" props
+  => Row.Lacks "type" props
+  => Defaults TextInputOptionalProps
+       { "type" :: String
+       , validator :: Batteries.Validator validatorM String (Maybe String) BigInt
+       | props
+       }
+       (TextInputProps validatorM BigInt)
+  => { | props }
+  -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query BigInt
+bigIntInput props = _typedTextInput props "number" $ requiredV' validator
+  where
+  validator :: Batteries.Validator validatorM String String BigInt
+  validator = Batteries.stringifyValidator Batteries.BigInt.validator
 
 decimalInput
   :: forall a builderM props validatorM
@@ -517,7 +552,7 @@ multiField
   -> Maybe JSX
   -> (FieldId -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) i o)
   -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) i o
-multiField possibleLabel possibleHelpText fieldsFormBuilder = formSpecBuilderT do
+multiField possibleLabel possibleHelpText fieldsFormBuilder = formSpecBuilder do
   prefix <- FieldIdPrefix <$> genId
   form <- withReaderT (const $ Just $ prefix) do
     let
@@ -586,7 +621,7 @@ dateTimeField
   -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query a
 dateTimeField possibleLabel possibleHelpText dateTimeValidator = do
   let
-    dateTimeValidationStep errorId = formSpecBuilderT $ pure $ StatelessFormSpec.liftValidator
+    dateTimeValidationStep errorId = formSpecBuilder $ pure $ StatelessFormSpec.liftValidator
       (UrlEncoded.fromValidator errorId dateTimeValidator)
     fieldsFormBuilder multiFieldErrorId = dateTimeValidationStep multiFieldErrorId <<< ado
       di <- dateInput
@@ -709,7 +744,7 @@ textArea
   => Defaults TextAreaOptionalProps { | props } (TextAreaProps validatorM a)
   => { | props }
   -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query a
-textArea props = formSpecBuilderT do
+textArea props = formSpecBuilder do
   name <- _genFieldId props'
   let
     form :: StatelessBootstrapFormSpec validatorM Query a
@@ -769,6 +804,8 @@ type ChoiceFieldOptionalPropsRow r =
   , name :: Maybe FieldId
   , initial :: String
   , touched :: Boolean
+  , disabled :: Boolean
+  , showValidity :: Boolean
   | r
   )
 
@@ -783,6 +820,8 @@ defaultChoiceFieldProps =
   , initial: ""
   , inline: false
   , touched: false
+  , disabled: false
+  , showValidity: false
   }
 
 type ChoiceFieldProps validatorM a =
@@ -793,15 +832,17 @@ type ChoiceFieldProps validatorM a =
 
 renderChoiceField
   :: { choices :: ChoiceFieldChoices
+     , disabled :: Boolean
      , inline :: Boolean
      , possibleLabel :: Maybe JSX
      , name :: FieldId
      , possibleHelpText :: Maybe JSX
+     , showValidity :: Boolean
      }
   -> InputState String
   -> Array JSX
 renderChoiceField
-  { choices, inline, possibleHelpText, possibleLabel, name }
+  { choices, inline, possibleHelpText, possibleLabel, name, disabled, showValidity }
   { value: selectedValue, errors, onChange, touched } = do
   let
     nameStr = un FieldId name
@@ -814,14 +855,20 @@ renderChoiceField
     body = case choices of
       RadioButtonFieldChoices { switch, choices: choices' } -> do
         let
-          renderChoice { disabled, helpText, label: label', value } = do
+          renderChoice { disabled: d, helpText, label: label', value } = do
             let
               checked = value == selectedValue
               label'' = label' <> renderPossibleHelpText helpText
-              { isValid, isInvalid } = fieldValidity touched value errors
+              { isValid, isInvalid } =
+                if showValidity then do
+                  let
+                    { isValid, isInvalid } = fieldValidity touched value errors
+                  { isValid: opt isValid, isInvalid: opt isInvalid }
+                else
+                  { isValid: undefined, isInvalid: undefined }
 
             Form.check
-              { disabled
+              { disabled: d
               , id: nameStr <> "-" <> value
               , label: label''
               , isValid
@@ -844,17 +891,24 @@ renderChoiceField
 
       SelectFieldChoices choices' -> do
         let
-          renderOption { disabled, label: label', value } = do
-            DOM.option { value, disabled } [ DOOM.text label' ]
+          renderOption { disabled: d, label: label', value } = do
+            DOM.option { value, disabled: d } [ DOOM.text label' ]
 
           onChangeHandler = handler targetValue \val -> do
             (traverse_ onChange val)
 
-          { isValid, isInvalid } = fieldValidity touched selectedValue errors
+          { isValid, isInvalid } =
+            if showValidity then do
+              let
+                { isValid, isInvalid } = fieldValidity touched selectedValue errors
+              { isValid: opt isValid, isInvalid: opt isInvalid }
+            else
+              { isValid: undefined, isInvalid: undefined }
 
           select =
             Bootstrap.Form.select
               { onChange: onChangeHandler
+              , disabled
               , className: if inline then "mb-md-1" else ""
               , value: selectedValue
               , id: idStr
@@ -883,7 +937,7 @@ choiceField
   => Defaults ChoiceFieldOptionalProps { | props } (ChoiceFieldProps validatorM a)
   => { | props }
   -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query a
-choiceField props = formSpecBuilderT do
+choiceField props = formSpecBuilder do
   name <- _genFieldId props'
   let
     -- input name initial render touched validator = Form
@@ -893,10 +947,12 @@ choiceField props = formSpecBuilderT do
       -- props'.missingError
       ( renderChoiceField
           { inline: props'.inline
+          , disabled: props'.disabled
           , possibleLabel: props'.label
           , name
           , choices: props'.choices
           , possibleHelpText: props'.helpText
+          , showValidity: props'.showValidity
           }
       )
       props'.touched
@@ -984,6 +1040,73 @@ choiceField' useElement possibleArr props = do
       props
   choiceField props'
 
+choiceFieldFromCustomRange
+  :: forall a builderM props props' validatorM
+   . Monad validatorM
+  => Monad builderM
+  => Defaults ChoiceFieldOptionalProps { | props' } (ChoiceFieldProps validatorM a)
+  => Row.Nub
+       ( choices :: ChoiceFieldChoices
+       , initial :: String
+       , validator :: Batteries.Validator validatorM String (Maybe String) a
+       | props
+       )
+       props'
+  => UseChoiceField a
+  -> (ArrayAL 1 a)
+  -> { | props }
+  -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query a
+choiceFieldFromCustomRange useElement arr props = do
+  let
+    validator :: Batteries.Validator validatorM String (Maybe String) a
+    validator = do
+      let
+        value2Choice = Map.fromFoldable $ mapWithIndexFlipped arr \idx choice -> show idx /\ choice
+      liftFnMMaybe (\v -> pure [ "Invalid choice: " <> show v ]) \possibleIdx -> runMaybeT do
+        choice <- MaybeT $ pure do
+          idx <- possibleIdx
+          Map.lookup idx value2Choice
+        -- liftEffect $ setPartialFormResult $ Just choice
+        pure choice
+
+    asChoice :: forall doc. (a -> ChoiceConfig doc) -> Int -> a -> FieldChoice doc
+    asChoice mkCfg idx a = do
+      let
+        value = show idx
+
+        cfg :: ChoiceConfig doc
+        cfg = mkCfg a
+
+      { label: cfg.label
+      , value
+      , disabled: cfg.disabled
+      , helpText: cfg.helpText
+      }
+
+    initial = "0"
+
+    choices = case useElement of
+      UseRadioButtonField mkCfg -> RadioButtonFieldChoices
+        { switch: true
+        , choices: do
+            let
+              asChoice' = asChoice mkCfg
+            mapWithIndex asChoice' arr
+        }
+      UseSelectField mkCfg -> SelectFieldChoices do
+        let
+          asChoice' = asChoice mkCfg
+        mapWithIndex asChoice' arr
+
+    props' :: { | props' }
+    props' = Record.merge
+      { choices
+      , validator
+      , initial
+      }
+      props
+  choiceField props'
+
 type BooleanFieldPropsRow r =
   ( switch :: Opt Boolean
   , label :: Opt JSX
@@ -1006,7 +1129,7 @@ booleanField props = do
   let
     props' :: { | BooleanFieldPropsRow () }
     props' = NoProblem.coerce props
-  formSpecBuilderT do
+  formSpecBuilder do
     name <- case NoProblem.toMaybe props'.name of
       Just name' -> pure name'
       Nothing -> FieldId <$> genId
@@ -1080,8 +1203,8 @@ renderBooleanField { disabled, label: possibleLabel, layout, possibleHelpText, n
             { className: "min-h-1_2rem"
             , disabled
             , id: nameStr
-            , isValid
-            , isInvalid
+            , isValid: opt isValid
+            , isInvalid: opt isInvalid
             , name: nameStr
             , "type":
                 if switch then Check.checkType.switch

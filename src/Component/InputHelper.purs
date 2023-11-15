@@ -17,7 +17,6 @@ import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..), negateDuration)
 import Data.Tuple.Nested (type (/\), (/\))
-import Debug (traceM)
 import Language.Marlowe.Core.V1.Folds (MapStep(..), foldMapContract)
 import Language.Marlowe.Core.V1.Semantics (applyCases, evalObservation, reduceContractStep) as V1
 import Language.Marlowe.Core.V1.Semantics (evalObservation, evalValue, reduceContractUntilQuiescent)
@@ -25,8 +24,14 @@ import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, C
 import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State, TimeInterval(..)) as V1
 
 data DepositInput = DepositInput AccountId Party Token BigInt.BigInt (Maybe Contract)
+
+derive instance Eq DepositInput
 data ChoiceInput = ChoiceInput ChoiceId (Array Bound) (Maybe Contract)
+
+derive instance Eq ChoiceInput
 data NotifyInput = NotifyInput (Maybe Contract)
+
+derive instance Eq NotifyInput
 
 toIDeposit :: DepositInput -> Maybe V1.InputContent
 toIDeposit (DepositInput accId p tok val (Just _)) = Just $ V1.IDeposit accId p tok val
@@ -213,12 +218,49 @@ ifTrueBranch = IfBranch true
 ifFalseBranch :: ExecutionBranch
 ifFalseBranch = IfBranch false
 
-type InputExecutionPath = NonEmptyArray (ExecutionBranch /\ Contract /\ State)
+type StepExecutionPath = NonEmptyArray (ExecutionBranch /\ Contract /\ State)
+
+type ReductionPath = Array (ExecutionBranch /\ Contract /\ State)
+
+-- Helper quickly build to find tail after the application step. Should we somehow
+-- coordinate this function with `stepExecutionPath`?
+reductionPath :: V1.Environment -> Contract -> State -> Either String ReductionPath
+reductionPath env = case _, _ of
+  contract@(When _ timeout _), state -> do
+    let
+      V1.Environment { timeInterval } = env
+      V1.TimeInterval timeIntervalStart timeIntervalEnd = timeInterval
+      timeIntervalEnd' =
+        if timeIntervalEnd == timeout then unsafeInstant (unInstant timeIntervalEnd <> negateDuration (Milliseconds 1.0))
+        else timeIntervalEnd
+      timeInterval' = V1.TimeInterval timeIntervalStart timeIntervalEnd'
+      env' = V1.Environment { timeInterval: timeInterval' }
+    case V1.reduceContractStep env' state contract of
+      V1.AmbiguousTimeIntervalReductionError -> throwError "AmbiguousTimeIntervalReductionError"
+      V1.NotReduced -> pure []
+      V1.Reduced _ _ state' contract' -> do
+        Array.cons (whenTimeoutBranch /\ contract' /\ state') <$> reductionPath env contract' state'
+  contract@(If observation _ _), state -> do
+    let
+      idx =
+        if V1.evalObservation env state observation then ifTrueBranch
+        else ifFalseBranch
+    case V1.reduceContractStep env state contract of
+      V1.AmbiguousTimeIntervalReductionError -> throwError "AmbiguousTimeIntervalReductionError"
+      V1.NotReduced -> throwError "Contract already reduced"
+      V1.Reduced _ _ state' contract' -> do
+        Array.cons (idx /\ contract' /\ state') <$> reductionPath env contract' state'
+
+  contract, state -> case V1.reduceContractStep env state contract of
+    V1.AmbiguousTimeIntervalReductionError -> throwError "AmbiguousTimeIntervalReductionError"
+    V1.NotReduced -> pure []
+    V1.Reduced _ _ state' contract' ->
+      reductionPath env contract' state'
 
 -- Given an input and contract compute the branching execution path.
 -- This is a substep of the `executionPath` computation.
-inputExecutionPath :: (Maybe V1.InputContent /\ V1.TimeInterval) -> Contract -> State -> Either String InputExecutionPath
-inputExecutionPath (possibleInputContent /\ timeInterval) = do
+stepExecutionPath :: (Maybe V1.InputContent /\ V1.TimeInterval) -> Contract -> State -> Either String StepExecutionPath
+stepExecutionPath (possibleInputContent /\ timeInterval) = do
   let
     env = V1.Environment { timeInterval }
   case _, _ of
@@ -239,15 +281,18 @@ inputExecutionPath (possibleInputContent /\ timeInterval) = do
                 let
                   cases' = c List.: List.Nil
                 case V1.applyCases env state (V1.NormalInput inputContent) cases' of
-                  V1.Applied _ state' contract' -> Just (whenCaseBranch idx /\ contract' /\ state')
+                  V1.Applied _ state' contract' ->
+                    Just (whenCaseBranch idx /\ contract' /\ state')
                   _ -> Nothing
             case Array.head applied of
-              Just res -> pure $ Array.NonEmpty.singleton res
+              Just res@(_ /\ c /\ s) -> do
+                tail <- reductionPath env c s
+                pure $ Array.NonEmpty.cons' res tail
               Nothing -> throwError $ "No match found for input " <> show inputContent <> " in when with cases " <> show cases
           Nothing -> throwError "Expecting an input"
         V1.Reduced _ _ state' contract' -> do
           Array.NonEmpty.cons' (whenTimeoutBranch /\ contract' /\ state') <$> case possibleInputContent of
-            Just inputContent -> Array.NonEmpty.toArray <$> inputExecutionPath (Just inputContent /\ timeInterval) contract' state'
+            Just inputContent -> Array.NonEmpty.toArray <$> stepExecutionPath (Just inputContent /\ timeInterval) contract' state'
             Nothing -> pure []
     contract@(If observation _ _), state -> do
       let
@@ -259,27 +304,31 @@ inputExecutionPath (possibleInputContent /\ timeInterval) = do
         V1.NotReduced -> throwError "Contract already reduced"
         V1.Reduced _ _ state' contract' -> do
           Array.NonEmpty.cons' (idx /\ contract' /\ state') <$> case possibleInputContent of
-            Just inputContent -> Array.NonEmpty.toArray <$> inputExecutionPath (Just inputContent /\ timeInterval) contract' state'
+            Just inputContent -> Array.NonEmpty.toArray <$> stepExecutionPath (Just inputContent /\ timeInterval) contract' state'
             Nothing -> pure []
 
     contract, state -> case V1.reduceContractStep (Environment { timeInterval }) state contract of
       V1.AmbiguousTimeIntervalReductionError -> throwError "AmbiguousTimeIntervalReductionError"
       V1.NotReduced -> throwError "Contract already reduced"
       V1.Reduced _ _ state' contract' -> case possibleInputContent of
-        Just inputContent -> inputExecutionPath (Just inputContent /\ timeInterval) contract' state'
+        Just inputContent -> stepExecutionPath (Just inputContent /\ timeInterval) contract' state'
         Nothing -> throwError "Should rather not happend - non branching contract directly reduced - expecting `When` or `If` steps on the way."
 
-type ExecutionPath = List ((Maybe V1.InputContent /\ V1.TimeInterval) /\ InputExecutionPath)
+newtype StartPathSelection = StartPathSelection Boolean
 
-executionPath :: Array ((Maybe V1.InputContent) /\ V1.TimeInterval) -> V1.Contract -> V1.State -> Either String (Maybe ExecutionPath)
+type ExecutionPathStepInput = (Maybe V1.InputContent) /\ V1.TimeInterval /\ StartPathSelection
+
+type ExecutionPath = List (ExecutionPathStepInput /\ StepExecutionPath)
+
+executionPath :: Array ExecutionPathStepInput -> V1.Contract -> V1.State -> Either String (Maybe ExecutionPath)
 executionPath [] _ _ = pure Nothing
 executionPath inputs contract state = map Just do
   let
     initialAcc :: { contract :: V1.Contract, state :: V1.State, executionPath :: ExecutionPath }
     initialAcc = { contract, state, executionPath: List.Nil }
 
-    step acc input = do
-      sub <- inputExecutionPath input acc.contract acc.state
+    step acc input@(i /\ t /\ _) = do
+      sub <- stepExecutionPath (i /\ t) acc.contract acc.state
       let
         (_ /\ contract' /\ state') = Array.NonEmpty.head sub
       pure { contract: contract', state: state', executionPath: List.Cons (input /\ sub) acc.executionPath }

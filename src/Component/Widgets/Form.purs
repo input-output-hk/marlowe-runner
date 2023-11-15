@@ -10,48 +10,27 @@ import ConvertableOptions (class Defaults)
 import Data.Array.ArrayAL (ArrayAL)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Either (Either(..))
-import Data.Foldable (length, null)
-import Data.FormURLEncoded.Query (FieldId(..), Query)
-import Data.FormURLEncoded.Query as Query
+import Data.Foldable (length)
+import Data.FormURLEncoded.Query (Query)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Map (Map)
-import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Monoid.Disj (Disj(..))
-import Data.Newtype (class Newtype)
-import Data.Set (Set)
-import Data.Set as Set
-import Data.Time.Duration (Seconds)
+import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Random (random)
 import Effect.Ref as Ref
-import Effect.Uncurried (EffectFn1)
-import Polyform.Batteries as Batteries
-import Polyform.Batteries.UrlEncoded as UrlEncoded
-import Polyform.Batteries.UrlEncoded as UrleEncoded
-import Polyform.Batteries.UrlEncoded.Types (stringifyValidator)
-import Polyform.Batteries.UrlEncoded.Types.Errors as Errors
-import Polyform.Batteries.UrlEncoded.Validators (MissingValue)
-import Polyform.Batteries.UrlEncoded.Validators as Validators
-import Polyform.Validator (liftFnMEither, liftFnMMaybe, liftFnMaybe, runValidator)
-import Polyform.Validator as Validator
+import Polyform (Validator)
+import Polyform.Validator (liftFnMEither, liftFnMaybe)
 import Prim.Row as Row
 import React.Basic (JSX)
-import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Events (EventHandler, SyntheticEvent, handler, handler_)
-import React.Basic.Hooks (type (&), type (/\), Hook, UseEffect, UseMemo, UseState, component, useEffect, useEffectOnce, useMemo, useState, useState', (/\))
+import React.Basic.Events (handler, handler_)
+import React.Basic.Hooks (type (/\), component, useEffectOnce, useState, (/\))
 import React.Basic.Hooks as React
 import Record as Record
-import Safe.Coerce (coerce)
 import Type.Prelude (Proxy(..))
-import Type.Row (type (+))
-import Utils.React.Basic.Hooks (useDebounce)
 
 type RadioFieldChoice = String /\ JSX /\ Boolean
 
@@ -199,11 +178,11 @@ mkBooleanField = do
     , type: RadioButtonField $ ArrayAL.solo ("on" /\ label /\ disabled)
     }
 
+reqValidator :: forall err m a. Applicative m => err -> Validator m (Array err) (Maybe a) a
 reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
 
+reqValidator' :: forall m a. Applicative m => Validator m (Array String) (Maybe a) a
 reqValidator' = reqValidator "This field is required"
-
--- reqValidator' $ Validator.liftFnMMaybe (const $ pure [ "Invalid address" ]) 
 
 type AddressInputValidator m = TextInputValidator m (Maybe Bech32)
 

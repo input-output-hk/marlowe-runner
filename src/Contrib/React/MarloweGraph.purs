@@ -2,12 +2,13 @@ module Contrib.React.MarloweGraph where
 
 import Prelude
 
-import Component.InputHelper (ExecutionBranch(..), ExecutionPath)
+import Component.InputHelper (ExecutionBranch(..), ExecutionPath, StartPathSelection(..))
 import Data.Argonaut (Json, encodeJson)
+import Data.Array as Array
 import Data.Array.NonEmpty as Array.NonEmpty
 import Data.Foldable (foldMap)
 import Data.Maybe (Maybe(..))
-import Data.Nullable (Nullable, toNullable)
+import Data.Nullable (toNullable)
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
 import Data.Undefined.NoProblem (Opt)
@@ -36,14 +37,22 @@ stillPossible = unsafeCoerce "still-possible"
 skipped :: GraphExecutionPath
 skipped = unsafeCoerce "skipped"
 
-pathIndices :: Array (Nullable Int) -> GraphExecutionPath
+foreign import data GraphPathItem :: Type
+
+idxToGraphPathItem :: Index -> GraphPathItem
+idxToGraphPathItem (Index i) = unsafeCoerce $ toNullable i
+idxToGraphPathItem StartSelection = unsafeCoerce "start-selection"
+
+pathIndices :: Array GraphPathItem -> GraphExecutionPath
 pathIndices = unsafeCoerce
 
 executionPathIndicies :: ExecutionPath -> Array Index
-executionPathIndicies = foldMap \(_ /\ path) -> do
+executionPathIndicies = foldMap \((_ /\ _ /\ StartPathSelection startPathSelection) /\ path) -> do
   let
     arr = Array.NonEmpty.toArray path <#> fst
-  map branchIndex arr
+    idxes = (map branchIndex arr)
+  if startPathSelection then Array.cons StartSelection idxes
+  else idxes
 
 foreign import _MarloweGraph
   :: ReactComponent
@@ -52,11 +61,13 @@ foreign import _MarloweGraph
        , onInit :: EffectFn1 ReactFlowInstance Unit
        }
 
-type Index = Maybe Int
+data Index
+  = Index (Maybe Int)
+  | StartSelection
 
 branchIndex :: ExecutionBranch -> Index
-branchIndex (WhenBranch idx) = idx
-branchIndex (IfBranch branch) = if branch then Just 1 else Just 0
+branchIndex (WhenBranch idx) = Index idx
+branchIndex (IfBranch branch) = Index $ if branch then Just 1 else Just 0
 
 type Props =
   { contract :: V1.Contract
@@ -64,7 +75,6 @@ type Props =
   , onInit :: Opt (ReactFlowInstance -> Effect Unit)
   }
 
--- { contract :: V1.Contract, path :: ExecutionPath }
 marloweGraph
   :: forall props
    . NoProblem.Coerce props Props
@@ -79,7 +89,7 @@ marloweGraph props = do
 
     graphExecutionPath = case NoProblem.toMaybe props'.executionPath of
       Nothing -> stillPossible
-      Just p -> pathIndices $ map toNullable $ executionPathIndicies p
+      Just p -> pathIndices $ map idxToGraphPathItem $ executionPathIndicies p
 
     onInit = case NoProblem.toMaybe props'.onInit of
       Just fn -> mkEffectFn1 fn

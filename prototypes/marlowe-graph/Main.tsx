@@ -1,4 +1,4 @@
-import { ContractPathHistory, _MarloweGraph } from './MarloweGraph';
+import { ContractPathHistory, ContractPathHistoryIndices, _MarloweGraph } from './MarloweGraph';
 import { Contract } from './MarloweGraph/Marlowe';
 import { createRoot } from 'react-dom/client';
 
@@ -88,7 +88,7 @@ const contract: Contract = {
 
 const noop = () => { return; }
 
-export const MarloweGraphView = ({ contract, path, onInit }: { contract: Contract, path: ContractPathHistory, onInit: any }): JSX.Element => {
+export const MarloweGraphView = ({ contract, path, onInit }: { contract: Contract, path: ContractPathHistoryIndices, onInit: any }): JSX.Element => {
   return (
     <div style={{ width: "95vw", height: "95vh" }}>
       { _MarloweGraph({contract, path, onInit}) }
@@ -116,6 +116,8 @@ const contract2: Contract = {
 
 root.render(
   <div>
+    <MarloweGraphView contract={contract} path={[1, 'start-selection', 0, 0]} onInit={noop} />
+    <MarloweGraphView contract={contract} path={[1, 0, 'start-selection', 0]} onInit={noop} />
     <MarloweGraphView contract={contract2} path={[0, 0]} onInit={noop} />
     <MarloweGraphView contract={contract} path={[1]} onInit={noop} />
     <MarloweGraphView contract={contract} path={[1, 0]} onInit={noop} />

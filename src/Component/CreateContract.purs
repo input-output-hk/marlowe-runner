@@ -8,7 +8,6 @@ import CardanoMultiplatformLib.Types (Bech32)
 import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.CreateContract.Machine as Machine
-import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (OutlineColoring(..), SpinnerOverlayHeight(..), backToContractListLink, buttonOutlinedClassNames, spinnerOverlay)
@@ -68,7 +67,7 @@ import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
-import React.Basic.DOM (div_, hr, img, input, span_, text) as DOOM
+import React.Basic.DOM (div_, hr, img, input, text) as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated (button, div, h3, label, p, span) as DOM
 import React.Basic.Events (handler_)
@@ -114,31 +113,6 @@ type LabeledFormSpec validatorM = StatelessFormSpec validatorM (Array (FieldId /
 
 fullWidthLayout :: FieldLayout
 fullWidthLayout = MultiColumn { sm: Col12Label, md: Col12Label, lg: Col12Label }
-
-contractSection :: V1.Contract -> V1.State -> JSX
-contractSection contract _ =
-  tabs { fill: false, justify: false, defaultActiveKey: "source", variant: Tabs.variant.pills } do
-    let
-      renderTab props children = tab props $ DOM.div { className: "pt-4 w-100 h-vh50 overflow-auto" } children
-    [ renderTab
-        { eventKey: eventKey "graph"
-        , disabled: true
-        , title: DOOM.span_
-            -- [ Icons.toJSX $ unsafeIcon "diagram-2"
-            [ DOOM.text " Source graph"
-            ]
-        }
-        [ marloweGraph { contract: contract } ]
-    , renderTab
-        { eventKey: eventKey "source"
-        , disabled: false
-        , title: DOOM.span_
-            -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
-            [ DOOM.text " Source code"
-            ]
-        }
-        [ marloweYaml contract ]
-    ]
 
 mkContractFormSpec :: (Bech32 /\ Maybe ContractJsonString /\ AutoRun) -> LabeledFormSpec Effect Query Result
 mkContractFormSpec (changeAddress /\ possibleInitialContract /\ (AutoRun _)) = FormSpecBuilder.evalBuilder Nothing $ do
@@ -477,25 +451,25 @@ mkComponent = do
                 ]
             ] <> Monoid.guard useSpinner [ spinnerOverlay Spinner100VH ]
           content = tabs { fill: false, justify: false, defaultActiveKey: "code", variant: Tabs.variant.pills } do
-            let
-              renderTab props children = tab props $ DOM.div { className: "w-100 pt-4 h-vh50" } children
-            [ renderTab
+            [ tab
                 { eventKey: eventKey "graph"
                 , title: DOOM.text " Source graph"
                 , disabled: case result of
                     Just (V (Right _) /\ _) -> false
                     _ -> true
                 }
+                $ DOM.div { className: "w-100 mt-4 h-vh50 border border-1 rounded p-1" }
                 $ case result of
                     Just (V (Right (contract /\ _ /\ _)) /\ _) -> do
                       [ marloweGraph { contract: contract } ]
                     _ ->
                       [ DOM.div { className: "text-center" } $ DOOM.text "Please fill in the form and submit to see the source graph" ]
-            , renderTab
+            , tab
                 { eventKey: eventKey "code"
                 , disabled: false
                 , title: DOOM.text "Code"
                 }
+                $ DOM.div { className: "w-100 mt-4 h-vh50" }
                 $ formContent
             ]
         BodyLayout.component

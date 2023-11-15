@@ -15,7 +15,6 @@ import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
 import Polyform.Batteries as Batteries
 import Polyform.Batteries.UrlEncoded as UrlEncoded
-import Polyform.Batteries.UrlEncoded as UrleEncoded
 import Polyform.Batteries.UrlEncoded.Validators as Validators
 import Polyform.Validator as Validator
 import Type.Row (type (+))
@@ -48,7 +47,7 @@ type FieldsState err = Map FieldId (FieldState err)
 
 type FormState err =
   { fields :: FieldsState err
-  , errors :: Maybe (UrleEncoded.Errors err /\ Query)
+  , errors :: Maybe (UrlEncoded.Errors err /\ Query)
   , query :: Query
   }
 
@@ -132,8 +131,6 @@ toFormValidator name fieldValidator = do
       value <- Query.lookup name query
       Array.head value
   UrlEncoded.fromValidator name validator'
-
--- Do we use these?
 
 input
   :: forall a doc err m

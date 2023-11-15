@@ -4,6 +4,7 @@ import Prelude
 
 import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
+import Component.InputHelper (StartPathSelection(..))
 import Component.InputHelper as InputHelper
 import Component.Types (MkComponentM)
 import Component.Types.ContractInfo (fetchAppliedInputs)
@@ -62,12 +63,15 @@ mkComponent = do
 
     React.useAff (transactionEndpoints /\ contract /\ state) do
       fetchAppliedInputs serverURL (Array.reverse transactionEndpoints) >>= case _ of
-        V (Right inputs) -> liftEffect $ case InputHelper.executionPath inputs initialContract initialState of
-          Right executionPath -> do
-            setPossibleExecutionPath executionPath
-          Left err -> do
-            logger "ContractDetails: failed to compute execution path"
-            logger $ unsafeStringify err
+        V (Right inputs) -> do
+          let
+            inputs' = inputs <#> \(i /\ t) -> i /\ t /\ StartPathSelection false
+          liftEffect $ case InputHelper.executionPath inputs' initialContract initialState of
+            Right executionPath -> do
+              setPossibleExecutionPath executionPath
+            Left err -> do
+              logger "ContractDetails: failed to compute execution path"
+              logger $ unsafeStringify err
         V (Left err) -> liftEffect $ do
           logger "ContractDetails: failed to fetch applied inputs"
           logger $ unsafeStringify err
@@ -92,7 +96,7 @@ mkComponent = do
             Just _ -> "source"
         tabs { fill: false, justify: false, defaultActiveKey, variant: Tabs.variant.pills } do
           let
-            renderTab props children = tab props $ DOM.div { className: "pt-4 h-vh50 d-flex align-items-stretch" } children
+            renderTab props children = tab props $ DOM.div { className: "mt-4 h-vh50 d-flex align-items-stretch" } children
           [ case contract of
               Nothing -> mempty
               Just contract' ->

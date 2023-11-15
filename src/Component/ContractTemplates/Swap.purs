@@ -7,6 +7,7 @@ import Component.BodyLayout as BodyLayout
 import Component.MarloweYaml (marloweYaml)
 import Component.Types (MkComponentM)
 import Component.Widgets (link)
+import Component.Widgets.Form (reqValidator')
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
 import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, dateTimeField, intInput, textInput)
@@ -22,7 +23,6 @@ import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Polyform.Validator (liftFnMaybe)
 import React.Basic.DOM (text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (JSX, component, fragment, (/\))
@@ -84,10 +84,6 @@ mkSwapContract { tokenADepositDeadline, tokenBDepositDeadline, tokenACurrencySym
     tokenADepositDeadline
     V1.Close
 
-reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
-
-reqValidator' = reqValidator "This field is required"
-
 swapFormSpec
   :: StatelessBootstrapFormSpec Effect Query
        { tokenAAmount :: BigInt
@@ -99,64 +95,66 @@ swapFormSpec
        , tokenADepositDeadline :: Instant
        , tokenBDepositDeadline :: Instant
        }
-swapFormSpec = evalBuilder' $ ado
-  tokenAAmount <- intInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "Token A Amount"
-    , touched: false
-    }
-  tokenAName <- textInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "Token A Name"
-    , touched: false
-    , validator: reqValidator'
-    }
-  tokenACurrencySymbol <- textInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "Token A Currency Symbol"
-    , touched: false
-    , validator: reqValidator'
-    }
-  tokenBAmount <- intInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "Token B Amount"
-    , touched: false
-    }
-  tokenBName <- textInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "Token B Name"
-    , touched: false
-    , validator: reqValidator'
-    }
-  tokenBCurrencySymbol <- textInput
-    { helpText: Nothing
-    , initial: ""
-    , label: Just $ DOOM.text "Token B Currency Symbol"
-    , touched: false
-    , validator: reqValidator'
-    }
+swapFormSpec = do
 
-  tokenADepositDeadline <- dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timeout help") reqValidator'
-  tokenBDepositDeadline <- dateTimeField (Just $ DOOM.text "Token B Deposit timeout") (Just $ DOOM.text "Token B timeout help") reqValidator'
-  in
-    { tokenAAmount: BigInt.fromInt tokenAAmount
-    , tokenAName: tokenAName
-    , tokenACurrencySymbol: tokenACurrencySymbol
-    , tokenBAmount: BigInt.fromInt tokenBAmount
-    , tokenBName: tokenBName
-    , tokenBCurrencySymbol: tokenBCurrencySymbol
-    , tokenADepositDeadline: Instant.fromDateTime tokenADepositDeadline
-    , tokenBDepositDeadline: Instant.fromDateTime tokenBDepositDeadline
-    }
+  evalBuilder' $ ado
+    tokenAAmount <- intInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "Token A Amount"
+      , touched: false
+      }
+    tokenAName <- textInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "Token A Name"
+      , touched: false
+      , validator: reqValidator'
+      }
+    tokenACurrencySymbol <- textInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "Token A Currency Symbol"
+      , touched: false
+      , validator: reqValidator'
+      }
+    tokenBAmount <- intInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "Token B Amount"
+      , touched: false
+      }
+    tokenBName <- textInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "Token B Name"
+      , touched: false
+      , validator: reqValidator'
+      }
+    tokenBCurrencySymbol <- textInput
+      { helpText: Nothing
+      , initial: ""
+      , label: Just $ DOOM.text "Token B Currency Symbol"
+      , touched: false
+      , validator: reqValidator'
+      }
+
+    tokenADepositDeadline <- dateTimeField (Just $ DOOM.text "Token A Deposit timeout") (Just $ DOOM.text "Token A timeout help") reqValidator'
+    tokenBDepositDeadline <- dateTimeField (Just $ DOOM.text "Token B Deposit timeout") (Just $ DOOM.text "Token B timeout help") reqValidator'
+    in
+      { tokenAAmount: BigInt.fromInt tokenAAmount
+      , tokenAName: tokenAName
+      , tokenACurrencySymbol: tokenACurrencySymbol
+      , tokenBAmount: BigInt.fromInt tokenBAmount
+      , tokenBName: tokenBName
+      , tokenBCurrencySymbol: tokenBCurrencySymbol
+      , tokenADepositDeadline: Instant.fromDateTime tokenADepositDeadline
+      , tokenBDepositDeadline: Instant.fromDateTime tokenBDepositDeadline
+      }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
-  liftEffect $ component "ContractTemplates.Swap" \{ onSuccess, onDismiss } -> React.do
+  liftEffect $ component "ContractTemplates.Swap" \{ onDismiss } -> React.do
 
     possibleContract /\ setContract <- React.useState' Nothing
     let

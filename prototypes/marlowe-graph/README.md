@@ -1,6 +1,6 @@
 # marlowe-graph
 
-This project is compiled down to the `MarloweGraph.js` file which is referenced directly in the runner project as foreign module.
+This project is compiled down to the `MarloweGraph.js` file which is referenced directly in the runner project as foreign module. It is not really a prototype any more ;-)
 
 ## Development
 

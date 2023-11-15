@@ -11,17 +11,14 @@ import Component.Types (MkComponentM)
 import Component.Widgets (link)
 import Data.BigInt.Argonaut (BigInt)
 import Component.Widgets.Form (addressInput)
-import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT, formSpecBuilderT)
+import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT, formSpecBuilder)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (FieldLayout(..), StatelessBootstrapFormSpec, booleanField, dateTimeField, intInput, multiField)
-import Control.Monad.Reader (asks)
-import Data.BigInt.Argonaut (BigInt)
 import Data.BigInt.Argonaut as BigInt
 import Data.DateTime.Instant (Instant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either(..))
-import Data.FormURLEncoded.Query (Query)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Seconds(..))
@@ -29,7 +26,6 @@ import Data.Validation.Semigroup (V(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Polyform.Validator (liftFnMaybe)
 import Polyform.Validator (liftFnM, liftFnMaybe)
 import React.Basic.DOM (text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
@@ -137,10 +133,6 @@ mkEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline,
     paymentDeadline
     V1.Close
 
-reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
-
-reqValidator' = reqValidator "This field is required"
-
 data RoleTokenUsage = UseRoleTokens | UseAddress String
 
 roleTokenUsageField
@@ -150,7 +142,11 @@ roleTokenUsageField
   => CardanoMultiplatformLib.Lib
   -> Maybe JSX
   -> Maybe JSX
-  -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query _ -- (Maybe Bech32)
+  -> FormSpecBuilderT
+       builderM
+       (StatelessBootstrapFormSpec validatorM)
+       Query
+       { useRoleTokens :: Boolean, possibleAddress :: Maybe Bech32 }
 roleTokenUsageField cardanoMultiplatformLib possibleLabel possibleHelpText = do
   let
     addrFieldId = FieldId "addr"
@@ -160,7 +156,7 @@ roleTokenUsageField cardanoMultiplatformLib possibleLabel possibleHelpText = do
       -> FormSpecBuilderT builderM (StatelessBootstrapFormSpec validatorM) Query { useRoleTokens :: Boolean, possibleAddress :: Maybe Bech32 }
     fieldsFormBuilder _ = do
       let
-        setUseRoleToken = formSpecBuilderT $ pure $ StatelessFormSpec.liftValidator $ liftFnM \useRoleTokens -> do
+        setUseRoleToken = formSpecBuilder $ pure $ StatelessFormSpec.liftValidator $ liftFnM \useRoleTokens -> do
           -- put useRoleTokens
           pure useRoleTokens
 
@@ -189,9 +185,8 @@ roleTokenUsageField cardanoMultiplatformLib possibleLabel possibleHelpText = do
 
   multiField possibleLabel possibleHelpText fieldsFormBuilder
 
-mkEscrowForm
-  :: CardanoMultiplatformLib.Lib
-  -> StatelessBootstrapFormSpec
+escrowFormSpec
+  :: StatelessBootstrapFormSpec
        Effect
        Query
        { mediationDeadline :: Instant
@@ -200,36 +195,37 @@ mkEscrowForm
        , complaintResponseDeadline :: Instant
        , paymentDeadline :: Instant
        }
-mkEscrowForm cardanoMultiplatformLib = FormSpecBuilder.evalBuilder Nothing $ ado
-  price <- intInput
-    { helpText: Nothing -- Just $ DOOM.text "Price"
-    , initial: ""
-    , label: Just $ DOOM.text "Price"
-    , touched: false
-    }
-  mediationDeadline <- dateTimeField (Just $ DOOM.text "Mediation timeout") (Just $ DOOM.text "MEDIATOR timeout help") reqValidator'
-  complaintDeadline <- dateTimeField (Just $ DOOM.text "Complaint Deadline timeout") (Just $ DOOM.text "COMPLAINT timeout help") reqValidator'
-  complaintResponseDeadline <- dateTimeField (Just $ DOOM.text "Complaint Response Deadline timeout") (Just $ DOOM.text "COMPLAINT RESPONSE timeout help") reqValidator'
-  paymentDeadline <- dateTimeField (Just $ DOOM.text "Payment Deadline timeout") (Just $ DOOM.text "PAYMENT timeout help") reqValidator'
+escrowFormSpec = FormSpecBuilder.evalBuilder Nothing $ do
+  let
+    reqValidator missingError = liftFnMaybe (const [ missingError ]) identity
 
-  -- mediatorParty <- roleTokenUsageField cardanoMultiplatformLib (Just $ DOOM.text "Mediator") (Just $ DOOM.text "Use role token")
-  -- buyerParty <- roleTokenUsageField cardanoMultiplatformLib (Just $ DOOM.text "Buyer") (Just $ DOOM.text "Use role token")
-  -- sellerParty <- roleTokenUsageField cardanoMultiplatformLib (Just $ DOOM.text "Seller") (Just $ DOOM.text "Use role token")
-  in
-    { price: BigInt.fromInt price
-    , mediationDeadline: Instant.fromDateTime mediationDeadline
-    , complaintDeadline: Instant.fromDateTime complaintDeadline
-    , complaintResponseDeadline: Instant.fromDateTime complaintResponseDeadline
-    , paymentDeadline: Instant.fromDateTime paymentDeadline
-    }
+    reqValidator' = reqValidator "This field is required"
+  ado
+    price <- intInput
+      { helpText: Nothing -- Just $ DOOM.text "Price"
+      , initial: ""
+      , label: Just $ DOOM.text "Price"
+      , touched: false
+      }
+    mediationDeadline <- dateTimeField (Just $ DOOM.text "Mediation timeout") (Just $ DOOM.text "MEDIATOR timeout help") reqValidator'
+    complaintDeadline <- dateTimeField (Just $ DOOM.text "Complaint Deadline timeout") (Just $ DOOM.text "COMPLAINT timeout help") reqValidator'
+    complaintResponseDeadline <- dateTimeField (Just $ DOOM.text "Complaint Response Deadline timeout") (Just $ DOOM.text "COMPLAINT RESPONSE timeout help") reqValidator'
+    paymentDeadline <- dateTimeField (Just $ DOOM.text "Payment Deadline timeout") (Just $ DOOM.text "PAYMENT timeout help") reqValidator'
+
+    -- mediatorParty <- roleTokenUsageField cardanoMultiplatformLib (Just $ DOOM.text "Mediator") (Just $ DOOM.text "Use role token")
+    -- buyerParty <- roleTokenUsageField cardanoMultiplatformLib (Just $ DOOM.text "Buyer") (Just $ DOOM.text "Use role token")
+    -- sellerParty <- roleTokenUsageField cardanoMultiplatformLib (Just $ DOOM.text "Seller") (Just $ DOOM.text "Use role token")
+    in
+      { price: BigInt.fromInt price
+      , mediationDeadline: Instant.fromDateTime mediationDeadline
+      , complaintDeadline: Instant.fromDateTime complaintDeadline
+      , complaintResponseDeadline: Instant.fromDateTime complaintResponseDeadline
+      , paymentDeadline: Instant.fromDateTime paymentDeadline
+      }
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
-  cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
-  let
-    formSpec = mkEscrowForm cardanoMultiplatformLib
-
-  liftEffect $ component "ContractTemplates.Escrow" \{ onSuccess, onDismiss } -> React.do
+  liftEffect $ component "ContractTemplates.Escrow" \{ onDismiss } -> React.do
 
     possibleContract /\ setContract <- React.useState' Nothing
 
@@ -240,14 +236,14 @@ mkComponent = do
         _ -> pure unit
 
     { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
-      { spec: formSpec
+      { spec: escrowFormSpec
       , onSubmit
       , validationDebounce: Seconds 0.5
       -- , state: false
       }
 
     let
-      fields = StatelessFormSpec.renderFormSpec formSpec formState
+      fields = StatelessFormSpec.renderFormSpec escrowFormSpec formState
       formBody = case possibleContract of
         Nothing -> DOM.div { className: "form-group" } fields
         Just contract -> marloweYaml contract

@@ -34,37 +34,37 @@ newtype FormSpecBuilderT builderM formSpec i o = FormSpecBuilderT
 type FormSpecBuilder :: forall k1 k2. (k1 -> k2 -> Type) -> k1 -> k2 -> Type
 type FormSpecBuilder = FormSpecBuilderT Identity
 
-formSpecBuilderT
+formSpecBuilder
   :: forall builderM formSpec i o
    . FormSpecBuilderM builderM (formSpec i o)
   -> FormSpecBuilderT builderM formSpec i o
-formSpecBuilderT = FormSpecBuilderT <<< Compose
-
-liftBuilderM
-  :: forall builderM formSpec i o
-   . Monad builderM
-  => builderM (formSpec i o)
-  -> FormSpecBuilderT builderM formSpec i o
-liftBuilderM = formSpecBuilderT <<< lift <<< lift
-
-derive instance Newtype (FormSpecBuilderT builderM formSpec i o) _
-derive newtype instance (Applicative builderM, Functor (formSpec i)) => Functor (FormSpecBuilderT builderM formSpec i)
-derive newtype instance (Monad builderM, Apply (formSpec i)) => Apply (FormSpecBuilderT builderM formSpec i)
-derive newtype instance (Monad builderM, Applicative (formSpec i)) => Applicative (FormSpecBuilderT builderM formSpec i)
-instance (Monad builderM, Semigroupoid formSpec) => Semigroupoid (FormSpecBuilderT builderM formSpec) where
-  compose (FormSpecBuilderT (Compose builder1)) (FormSpecBuilderT (Compose builder2)) = formSpecBuilderT do
-    formSpec1 <- builder1
-    formSpec2 <- builder2
-    pure $ compose formSpec1 formSpec2
-
-instance (Monad builderM, Category formSpec) => Category (FormSpecBuilderT builderM formSpec) where
-  identity = formSpecBuilderT $ pure identity
+formSpecBuilder = FormSpecBuilderT <<< Compose
 
 unFormSpecBuilder
   :: forall builderM i o formSpec
    . FormSpecBuilderT builderM formSpec i o
   -> FormSpecBuilderM builderM (formSpec i o)
 unFormSpecBuilder (FormSpecBuilderT (Compose builder)) = builder
+
+liftBuilderM
+  :: forall builderM formSpec i o
+   . Monad builderM
+  => builderM (formSpec i o)
+  -> FormSpecBuilderT builderM formSpec i o
+liftBuilderM = formSpecBuilder <<< lift <<< lift
+
+derive instance Newtype (FormSpecBuilderT builderM formSpec i o) _
+derive newtype instance (Applicative builderM, Functor (formSpec i)) => Functor (FormSpecBuilderT builderM formSpec i)
+derive newtype instance (Monad builderM, Apply (formSpec i)) => Apply (FormSpecBuilderT builderM formSpec i)
+derive newtype instance (Monad builderM, Applicative (formSpec i)) => Applicative (FormSpecBuilderT builderM formSpec i)
+instance (Monad builderM, Semigroupoid formSpec) => Semigroupoid (FormSpecBuilderT builderM formSpec) where
+  compose (FormSpecBuilderT (Compose builder1)) (FormSpecBuilderT (Compose builder2)) = formSpecBuilder do
+    formSpec1 <- builder1
+    formSpec2 <- builder2
+    pure $ compose formSpec1 formSpec2
+
+instance (Monad builderM, Category formSpec) => Category (FormSpecBuilderT builderM formSpec) where
+  identity = formSpecBuilder $ pure identity
 
 genId
   :: forall builderM

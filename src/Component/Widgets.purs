@@ -247,12 +247,12 @@ spinnerOverlay height = do
 
 marlowePreview :: V1.Contract -> JSX
 marlowePreview contract = DOM.div
-  { className: "overflow-auto hide-vertical-scroll border border-3 rounded w-100" }
+  { className: "overflow-auto hide-vertical-scroll border border-1 rounded w-100" }
   [ marloweYaml contract ]
 
 marloweStatePreview :: V1.State -> JSX
 marloweStatePreview state = DOM.div
-  { className: "overflow-auto hide-vertical-scroll border border-3 rounded w-100" }
+  { className: "overflow-auto hide-vertical-scroll border border-1 rounded w-100" }
   [ marloweStateYaml state ]
 
 submitButton

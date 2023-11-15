@@ -5,33 +5,36 @@ import Prelude
 import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
-import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..))
+import Component.ApplyInputs.Forms (mkApplyInputForm)
+import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..), mkEnvironment)
 import Component.ApplyInputs.Machine as Machine
 import Component.BodyLayout (descriptionLink, wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
-import Component.InputHelper (ChoiceInput(..), DepositInput(..), NotifyInput, toIChoice, toIDeposit)
+import Component.InputHelper (ChoiceInput, DepositInput(..), ExecutionPath, NotifyInput, StartPathSelection(..), toIDeposit)
+import Component.InputHelper as InputHelper
 import Component.Types (ContractInfo, MkComponentM, WalletInfo(..))
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (SpinnerOverlayHeight(..), backToContractListLink, link, marlowePreview, marloweStatePreview, spinnerOverlay)
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
-import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
+import Contrib.Polyform.FormSpecs.StatefulFormSpec as StatefulFormSpec
+import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
 import Contrib.React.Basic.Hooks.UseMooreMachine (MooreMachineSpec, useMooreMachine)
 import Contrib.React.Basic.Hooks.UseMooreMachine as Moore
+import Contrib.React.Basic.Hooks.UseStatefulFormSpec (useStatefulFormSpec)
 import Contrib.React.MarloweGraph (marloweGraph)
 import Contrib.React.Svg (loadingSpinnerLogo)
-import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), FieldLayout(..), LabelSpacing(..), booleanField, choiceField, intInput, radioFieldChoice, selectFieldChoice)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), FieldLayout(..), LabelSpacing(..), booleanField, choiceField, radioFieldChoice)
 import Contrib.ReactSyntaxHighlighter (jsonSyntaxHighlighter)
-import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Control.Monad.Reader.Class (asks)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.BigInt.Argonaut (toString)
 import Data.BigInt.Argonaut as BigInt
-import Data.DateTime.Instant (instant, toDateTime, unInstant)
+import Data.DateTime.Instant (instant, unInstant)
 import Data.Decimal as Decimal
-import Data.Either (Either(..))
+import Data.Either (Either(..), hush)
 import Data.Foldable (foldr)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int as Int
@@ -49,20 +52,20 @@ import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics (computeTransaction) as V1
-import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), ChoiceId(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), State, TimeInterval(..), Token(..), TransactionInput(..), TransactionOutput(..), Value(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), State, TimeInterval, Token(..), TransactionInput(..), TransactionOutput(..), Value(..)) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Input(..))
 import Marlowe.Runtime.Web (Runtime)
 import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsRequest(..), PostContractsResponseContent, PostTransactionsRequest(PostTransactionsRequest), PostTransactionsResponse, PutTransactionRequest(PutTransactionRequest), ServerURL, TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Batteries as Batteries
-import Polyform.Validator (liftFnMMaybe, liftFnMaybe)
+import Polyform.Validator (liftFnMaybe)
 import React.Basic (fragment)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM as R
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
-import React.Basic.Hooks (JSX, component, useState', (/\))
+import React.Basic.Hooks (JSX, component, useEffect, useState', (/\))
 import React.Basic.Hooks as React
 import React.Basic.Hooks.UseStatelessFormSpec (useStatelessFormSpec)
 import ReactBootstrap.Tab (tab)
@@ -77,10 +80,8 @@ data ContractData = ContractData
   { contract :: V1.Contract
   , changeAddress :: Bech32
   , usedAddresses :: Array Bech32
-  -- , collateralUTxOs :: Array TxOutRef
   }
 
--- TODO: Introduce proper error type to the Marlowe.Runtime.Web.Types for this post response
 type ClientError' = ClientError String
 
 create :: ContractData -> ServerURL -> ContractsEndpoint -> Aff (Either ClientError' { resource :: PostContractsResponseContent, links :: { contract :: ContractEndpoint } })
@@ -89,9 +90,8 @@ create contractData serverUrl contractsEndpoint = do
     ContractData { contract, changeAddress, usedAddresses } = contractData
     req = PostContractsRequest
       { metadata: mempty
-      -- , version :: MarloweVersion
       , roles: Nothing
-      , tags: mempty -- TODO: use instead of metadata
+      , tags: mempty
       , contract
       , minUTxODeposit: V1.Lovelace (BigInt.fromInt 2_000_000)
       , changeAddress: changeAddress
@@ -108,19 +108,23 @@ submit witnesses serverUrl contractEndpoint = do
     req = PutTransactionRequest textEnvelope
   put' serverUrl contractEndpoint req
 
-contractSection :: V1.Contract -> V1.State -> JSX
-contractSection contract state =
+contractSection :: V1.Contract -> V1.State -> Maybe ExecutionPath -> JSX
+contractSection contract state possibleExecutionPath = do
   tabs { fill: false, justify: false, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
     let
-      renderTab props children = tab props $ DOM.div { className: "pt-4 h-vh50 d-flex align-items-stretch" } children
-    [ renderTab
+      renderTab props children = tab props $ DOM.div { className: "mt-4 h-vh50 d-flex align-items-stretch" } children
+    [ tab
         { eventKey: eventKey "graph"
         , title: DOOM.span_
             -- [ Icons.toJSX $ unsafeIcon "diagram-2"
             [ DOOM.text " Source graph"
             ]
         }
-        $ marloweGraph { contract: contract }
+        $ DOM.div { className: "mt-4 h-vh50 d-flex align-items-stretch border-1 border rounded p-1" }
+        $ marloweGraph
+            { contract: contract
+            , executionPath: NoProblem.fromMaybe possibleExecutionPath
+            }
     , renderTab
         { eventKey: eventKey "source"
         , title: DOOM.span_
@@ -150,6 +154,7 @@ type DepositFormComponentProps =
 mkDepositFormComponent :: MkComponentM (DepositFormComponentProps -> JSX)
 mkDepositFormComponent = do
   liftEffect $ component "ApplyInputs.DepositFormComponent" \props@{ depositInputs, onDismiss, marloweContext } -> React.do
+    submitting /\ setSubmitting <- useState' false
     let
       choices = RadioButtonFieldChoices do
         let
@@ -180,7 +185,7 @@ mkDepositFormComponent = do
           Map.lookup idx value2Deposit
 
       formSpec = evalBuilder' $
-        choiceField { choices, validator }
+        choiceField { choices, validator, showValidity: false, initial: "0", touched: true }
 
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _ of
@@ -192,13 +197,26 @@ mkDepositFormComponent = do
     { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
       { spec: formSpec
       , onSubmit
-      , validationDebounce: Seconds 0.5
+      , validationDebounce: Seconds 0.0
       }
+
+    possibleTimeInterval /\ setPossibleTimeInterval <- useState' Nothing
+    useEffect result do
+      V1.Environment { timeInterval } <- mkEnvironment
+      setPossibleTimeInterval $ Just timeInterval
+      pure $ pure unit
+
+    let
+      possibleExecutionPath = case result, possibleTimeInterval of
+        Just (V (Right deposit) /\ _), Just ti ->
+          join $ hush $ InputHelper.executionPath [ toIDeposit deposit /\ ti /\ StartPathSelection (not submitting) ] marloweContext.contract marloweContext.state
+        _, _ -> Nothing
+
     pure do
       let
-        fields = renderFormSpec formSpec formState
+        fields = StatelessFormSpec.renderFormSpec formSpec formState
         body = fragment $
-          [ contractSection marloweContext.contract marloweContext.state
+          [ contractSection marloweContext.contract marloweContext.state possibleExecutionPath
           , DOOM.hr {}
           ] <> [ DOM.div { className: "form-group" } fields ]
         actions = fragment
@@ -213,6 +231,8 @@ mkDepositFormComponent = do
                         { className: "btn btn-primary w-100"
                         , onClick: onSubmit'
                         , disabled
+                        , onMouseOver: handler_ $ setSubmitting true
+                        , onMouseOut: handler_ $ setSubmitting false
                         }
                       [ R.text "Make deposit"
                       , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
@@ -234,49 +254,39 @@ type ChoiceFormComponentProps =
 mkChoiceFormComponent :: MkComponentM (ChoiceFormComponentProps -> JSX)
 mkChoiceFormComponent = do
   liftEffect $ component "ApplyInputs.DepositFormComponent" \props@{ choiceInputs, marloweContext, onDismiss } -> React.do
-    _ /\ setPartialFormResult <- useState' Nothing
+    submitting /\ setSubmitting <- React.useState' false
     let
-      choices = SelectFieldChoices do
-        let
-          toChoice idx (ChoiceInput (V1.ChoiceId name _) _ _) = do
-            selectFieldChoice name (show idx)
-        ArrayAL.fromNonEmptyArray $ mapWithIndex toChoice choiceInputs
-
-      -- valueInputs = choices <#> \(ChoiceInput (V1.ChoiceId name _) _ _) = do
-
-      validator :: Batteries.Validator Effect _ _ _
-      validator = do
-        let
-          value2Deposit = Map.fromFoldable $ mapWithIndexFlipped choiceInputs \idx choiceInput -> show idx /\ choiceInput
-        liftFnMMaybe (\v -> pure [ "Invalid choice: " <> show v ]) \possibleIdx -> runMaybeT do
-          deposit <- MaybeT $ pure do
-            idx <- possibleIdx
-            Map.lookup idx value2Deposit
-          liftEffect $ setPartialFormResult $ Just deposit
-          pure deposit
-
-      formSpec = evalBuilder' $ ado
-        choice <- choiceField { choices, validator, touched: true, initial: "0" }
-        value <- intInput { role: NoProblem.opt "textarea", "aria-label": NoProblem.opt "choice-input" }
-        in
-          { choice, value }
+      formSpec = mkApplyInputForm choiceInputs
 
       onSubmit :: { result :: _, payload :: _ } -> Effect Unit
       onSubmit = _.result >>> case _ of
-        Just (V (Right { choice, value }) /\ _) -> case toIChoice choice (BigInt.fromInt value) of
-          Just ichoice -> props.onSubmit $ NormalInput ichoice
-          Nothing -> pure unit
+        Just (V (Right ichoice) /\ _) -> props.onSubmit $ NormalInput ichoice
         _ -> pure unit
 
-    { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec
+    { formState, onSubmit: onSubmit', result } <- useStatefulFormSpec
       { spec: formSpec
       , onSubmit
-      , validationDebounce: Seconds 0.5
+      , validationDebounce: Seconds 0.0
+      , state: Nothing
       }
+
+    -- FIXME: we don't detect or handle timeouts here.
+    -- We should accept timeout actually as a parameter and guard for that across
+    -- all the input application components.
+    possibleTimeInterval /\ setPossibleTimeInterval <- useState' Nothing
+    useEffect result do
+      V1.Environment { timeInterval } <- mkEnvironment
+      setPossibleTimeInterval $ Just timeInterval
+      pure $ pure unit
+
     let
-      fields = renderFormSpec formSpec formState
+      fields = StatefulFormSpec.renderFormSpec formSpec formState
+      possibleExecutionPath = case result, possibleTimeInterval of
+        Just (V (Right ichoice) /\ _), Just ti ->
+          join $ hush $ InputHelper.executionPath [ Just ichoice /\ ti /\ StartPathSelection (not submitting) ] marloweContext.contract marloweContext.state
+        _, _ -> Nothing
       body = DOOM.div_ $
-        [ contractSection marloweContext.contract marloweContext.state
+        [ contractSection marloweContext.contract marloweContext.state possibleExecutionPath
         , DOOM.hr {}
         ] <> [ DOM.div { className: "form-group" } fields ]
       actions = fragment
@@ -291,6 +301,8 @@ mkChoiceFormComponent = do
                       { className: "btn btn-primary w-100"
                       , onClick: onSubmit'
                       , disabled
+                      , onMouseOver: handler_ $ setSubmitting true
+                      , onMouseOut: handler_ $ setSubmitting false
                       }
                     [ R.text "Advance contract"
                     , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
@@ -307,15 +319,21 @@ type NotifyFormComponentProps =
   , marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
   , onSubmit :: Effect Unit
+  , timeInterval :: V1.TimeInterval
   }
 
 mkNotifyFormComponent :: MkComponentM (NotifyFormComponentProps -> JSX)
 mkNotifyFormComponent = do
-  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ marloweContext, onDismiss, onSubmit } -> React.do
+  liftEffect $ component "ApplyInputs.NotifyFormComponent" \{ marloweContext, onDismiss, onSubmit, timeInterval } -> React.do
+    submitting /\ setSubmitting <- useState' false
     pure do
       let
+        possibleExecutionPath = join $ hush $ InputHelper.executionPath
+          [ Just V1.INotify /\ timeInterval /\ StartPathSelection (not submitting) ]
+          marloweContext.contract
+          marloweContext.state
         body = DOOM.div_ $
-          [ contractSection marloweContext.contract marloweContext.state
+          [ contractSection marloweContext.contract marloweContext.state possibleExecutionPath
           , DOOM.hr {}
           ]
         actions = fragment
@@ -325,6 +343,8 @@ mkNotifyFormComponent = do
                       do
                         { className: "btn btn-primary w-100"
                         , onClick: handler_ onSubmit
+                        , onMouseOver: handler_ $ setSubmitting true
+                        , onMouseOut: handler_ $ setSubmitting false
                         }
                       [ R.text "Advance contract"
                       , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
@@ -342,14 +362,21 @@ type AdvanceFormComponentProps =
   { marloweContext :: Machine.MarloweContext
   , onDismiss :: Effect Unit
   , onSubmit :: Effect Unit
+  , timeInterval :: V1.TimeInterval
   }
 
 mkAdvanceFormComponent :: MkComponentM (AdvanceFormComponentProps -> JSX)
 mkAdvanceFormComponent = do
-  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ marloweContext, onDismiss, onSubmit } -> React.do
+  liftEffect $ component "ApplyInputs.AdvanceFormComponent" \{ marloweContext, onDismiss, onSubmit, timeInterval } -> React.do
+    submitting /\ setSubmitting <- useState' false
     let
+      possibleExecutionPath = join $ hush $ InputHelper.executionPath
+        [ Nothing /\ timeInterval /\ StartPathSelection (not submitting) ]
+        marloweContext.contract
+        marloweContext.state
+
       body = DOOM.div_ $
-        [ contractSection marloweContext.contract marloweContext.state
+        [ contractSection marloweContext.contract marloweContext.state possibleExecutionPath
         ]
       actions = fragment
         [ DOM.div { className: "row" } $
@@ -358,6 +385,8 @@ mkAdvanceFormComponent = do
                     do
                       { className: "btn btn-primary w-100"
                       , onClick: handler_ onSubmit
+                      , onMouseOver: handler_ $ setSubmitting true
+                      , onMouseOut: handler_ $ setSubmitting false
                       }
                     [ R.text "Advance contract"
                     , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
@@ -405,8 +434,6 @@ type ContractDetailsProps =
   , onSuccess :: AutoRun -> Effect Unit
   }
 
--- contractSection :: V1.Contract -> State -> JSX
-
 mkContractDetailsComponent :: MkComponentM (ContractDetailsProps -> JSX)
 mkContractDetailsComponent = do
   let
@@ -433,9 +460,9 @@ mkContractDetailsComponent = do
       }
 
     let
-      fields = renderFormSpec autoRunFormSpec formState
+      fields = StatelessFormSpec.renderFormSpec autoRunFormSpec formState
       body = fragment $
-        [ contractSection contract state
+        [ contractSection contract state Nothing
         , DOOM.hr {}
         ]
           <> fields
@@ -731,7 +758,7 @@ mkComponent = do
       Machine.ChoosingInputType { allInputsChoices } -> do
         let
           body = fragment $
-            [ contractSection marloweContext.contract marloweContext.state
+            [ contractSection marloweContext.contract marloweContext.state Nothing
             ]
 
           footer = DOM.div { className: "row" }
@@ -810,9 +837,9 @@ mkComponent = do
           Nothing -> DOOM.text "Should rather not happen ;-)"
           Just { environment, inputChoices } -> do
             let
+              V1.Environment { timeInterval } = environment
               applyPickInputSucceeded input = do
                 let
-                  V1.Environment { timeInterval } = environment
                   transactionInput = V1.TransactionInput
                     { inputs: foldr List.Cons List.Nil input
                     , interval: timeInterval
@@ -852,9 +879,11 @@ mkComponent = do
                 , onSubmit: do
                     setSubmitting true
                     applyPickInputSucceeded <<< Just $ V1.NormalInput V1.INotify
+                , timeInterval
                 }
               AdvanceContract _ -> applyInputBodyLayout shouldUseSpinner $ advanceFormComponent
                 { marloweContext
+                , timeInterval
                 , onDismiss
                 , onSubmit: do
                     setSubmitting true

@@ -16,13 +16,12 @@ import Data.Newtype (un, unwrap)
 import Data.Newtype as Newtype
 import Data.String.Extra as String
 import Data.Traversable (traverse)
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, catchError, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import Foreign.Object as Object
-import React.Basic (JSX, fragment)
+import React.Basic (JSX)
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (button, img, span_, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
