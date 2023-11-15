@@ -58,7 +58,13 @@ If you would like to use optimzed bundle of the project you can run t:
 MARLOWE_WEB_SERVER_URL="http://localhost:3780" npm run bundle
 ```
 
-## Building with Nix 
+## Development with Nix
+
+This repository uses nix to provide a development and build environment.
+
+For instructions on how to install and configure nix (including how to enable access to our binary caches), refer to [this document](https://github.com/input-output-hk/iogx/blob/main/doc/nix-setup-guide.md). 
+
+If you already have nix installed and configured, you may enter the development shell by running `nix develop`.
 
 You can build the static site with Nix using:
 ```nix 
@@ -67,7 +73,7 @@ nix build .#marlowe-runner
 
 Whenever you make changes to `package-json.lock` or `packages.dhall` packages, you must run the 
 `gen-nix-lockfiles` script (available inside the `nix develop` shell) to 
-recreate `spago-packages.nix` and `npm-deps-hash.nix`.
+recreate `nix/spago-packages.nix` and `nix/npm-deps-hash.nix`.
 
 ### Troubleshooting
 
