@@ -225,7 +225,7 @@ in  upstream
       , "validation", "web-html"
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
-      "v0.0.3"
+      "v0.0.4"
 
   with datetime-iso =
       mkPackage
