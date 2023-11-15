@@ -45,7 +45,7 @@ const __dirname = path.dirname(__filename);
 export const common = {
   import: ['./src/step-definitions/**/**/*.js'],
   paths: ['./src/features/**/*.feature'],
-  format: [path.resolve(__dirname, "reporter.js")],
+  format: [path.resolve(__dirname, "reporter.js"), "progress-bar"],
   worldParameters
 }
 
