@@ -1,6 +1,5 @@
 ---
 networks:
-  - preprod
   - preview
 images:
   stagingTag: "51cdf4ad"
