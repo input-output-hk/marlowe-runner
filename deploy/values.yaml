@@ -2,5 +2,5 @@
 networks:
   - preview
 images:
-  stagingTag: "51cdf4ad"
+  stagingTag: "af758720"
   productionTag: "51cdf4ad"
