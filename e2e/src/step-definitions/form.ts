@@ -108,3 +108,23 @@ When('I enter the contents of {string} into the {string} field',
       }
     });
 });
+
+When('I select {string} from the {string} dropdown',
+  async function (this: ScenarioWorld, option: string, name: string) {
+    const {
+      screen: { page },
+      globalConfig,
+      globalStateManager
+    } = this;
+
+    await waitFor(async() => {
+      const locator = await page.locator(`select.${name}`);
+      const result = await locator.isVisible();
+
+      if (result) {
+        await locator.selectOption(option);
+        return result;
+      }
+    });
+  }
+)

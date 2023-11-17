@@ -149,11 +149,31 @@ Feature: As a user, I would like to apply an input on a current contract
       And I should see "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain." text
 
       When I click the first "button" with "Advance" text
-      Then I should see a "button" with "Advance contract" text
+      Then I should see a "button" with "Make deposit" text
 
-      When I fill in the "choice-input" input with "0"
-      When I click the "button" with "Advance contract" text And sign the transaction with nami wallet
+      When I click the "checkbox" with "Deposit 10 ₳" text
+      And I click the "button" with "Make deposit" text And sign the transaction with nami wallet
       Then I should see the first "button" showing "Syncing" text
       And I should see the first "button" showing "Advance" text
       And I should see "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." text
+
+      When I click the first "button" with "Advance" text
+      Then I should see a "button" with "Advance contract" text
+
+      When I select "Report problem" from the "form-select" dropdown
+      And I fill in the "choice-input" input with "1"
+      And I click the "button" with "Advance contract" text And sign the transaction with nami wallet
+      Then I should see the first "button" showing "Syncing" text
+
+      Given I am on the "home" page
+      When I authorize my lace wallet
+      And I should see the first "button" showing "Advance" text
+
+      When I click the first "button" with "Advance" text
+      Then I should see a "button" with "Advance contract" text
+
+      When I select "Confirm problem" from the "form-select" dropdown
+      And I fill in the "choice-input" input with "1"
+      And I click the "button" with "Advance contract" text And sign the transaction with lace wallet
+
       And I pause the page
