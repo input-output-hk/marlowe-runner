@@ -8,7 +8,7 @@ import { MarloweJSON } from "@marlowe.io/adapter/codec";
 
 type ContractName = "SimpleDeposit" | "SimpleChoice" | "TimedOutSimpleChoice" | "SimpleNotify" | "Escrow";
 
-const mkEscrow = (address1: string, address2: string): Contract => {  
+const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {  
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
   const inTwentyMinutes = datetoTimeout(new Date(Date.now() + twentyMinutesInMilliseconds));
  
@@ -17,71 +17,166 @@ const mkEscrow = (address1: string, address2: string): Contract => {
     timeout_continuation: "close",
     when: [
       {
-        then: "close",
-        case: {
-          for_choice: {
-            choice_owner: {
-              address: address1
-            },
-            choice_name: "Everything is alright"
-          },
-          choose_between: [
+        then: {
+          when: [
             {
-              to: 0n,
-              from: 0n
-            }
-          ]
-        }
-      },
-      {
-        then: "close",
-        case: {
-          for_choice: {
-            choice_owner: {
-              address: address1 
+              then: "close",
+              case: {
+                for_choice: {
+                  choice_owner: {
+                    address: buyerAddress
+                  },
+                  choice_name: "Everything is alright"
+                },
+                choose_between: [
+                  {
+                    to: 0n,
+                    from: 0n
+                  }
+                ]
+              }
             },
-            choice_name: "Report problem"
-          },
-          choose_between: [
             {
-              to: 1n,
-              from: 1n
+              then: {
+                token: {
+                  token_name: "",
+                  currency_symbol: ""
+                },
+                to: {
+                  account: {
+                    address: buyerAddress
+                  }
+                },
+                then: {
+                  when: [
+                    {
+                      then: "close",
+                      case: {
+                        for_choice: {
+                          choice_owner: {
+                            address: sellerAddress
+                          },
+                          choice_name: "Confirm problem"
+                        },
+                        choose_between: [
+                          {
+                            to: 1n,
+                            from: 1n
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      then: {
+                        when: [
+                          {
+                            then: {
+                              token: {
+                                token_name: "",
+                                currency_symbol: ""
+                              },
+                              to: {
+                                party: {
+                                  address: sellerAddress
+                                }
+                              },
+                              then: "close",
+                              pay: 10000000n,
+                              from_account: {
+                                address: buyerAddress
+                              }
+                            },
+                            case: {
+                              for_choice: {
+                                choice_owner: {
+                                  address: sellerAddress
+                                },
+                                choice_name: "Dismiss claim"
+                              },
+                              choose_between: [
+                                {
+                                  to: 0n,
+                                  from: 0n
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            then: "close",
+                            case: {
+                              for_choice: {
+                                choice_owner: {
+                                  address: sellerAddress
+                                },
+                                choice_name: "Confirm problem"
+                              },
+                              choose_between: [
+                                {
+                                  to: 1n,
+                                  from: 1n
+                                }
+                              ]
+                            }
+                          }
+                        ],
+                        timeout_continuation: "close",
+                        timeout: inTwentyMinutes
+                      },
+                      case: {
+                        for_choice: {
+                          choice_owner: {
+                            address: sellerAddress
+                          },
+                          choice_name: "Dispute problem"
+                        },
+                        choose_between: [
+                          {
+                            to: 0n,
+                            from: 0n
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  timeout_continuation: "close",
+                  timeout: inTwentyMinutes
+                },
+                pay: 10000000n,
+                from_account: {
+                  address: sellerAddress
+                }
+              },
+              case: {
+                for_choice: {
+                  choice_owner: {
+                    address: buyerAddress
+                  },
+                  choice_name: "Report problem"
+                },
+                choose_between: [
+                  {
+                    to: 1n,
+                    from: 1n
+                  }
+                ]
+              }
             }
-          ]
-        }
-      },
-      {
-        then: "close",
+          ],
+          timeout_continuation: "close",
+          timeout: inTwentyMinutes
+        },
         case: {
-          for_choice: {
-            choice_owner: {
-              address: address2
-            },
-            choice_name: "Choice between 1-6"
+          party: {
+            address: buyerAddress
           },
-          choose_between: [
-            {
-              to: 3n,
-              from: 1n
-            }
-          ]
-        }
-      },
-      {
-        then: "close",
-        case: {
-          for_choice: {
-            choice_owner: {
-              address: address2
-            },
-            choice_name: "Choice between 1-5"
+          of_token: {
+            token_name: "",
+            currency_symbol: ""
           },
-          choose_between: [
-            {
-              to: 4n,
-              from: 1n
-            }
-          ]
+          into_account: {
+            address: sellerAddress
+          },
+          deposits: 10000000n
         }
       }
     ],
