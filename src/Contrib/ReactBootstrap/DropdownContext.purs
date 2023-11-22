@@ -1,17 +1,7 @@
 module Contrib.ReactBootstrap.DropdownContext where
 
-import Effect (Effect)
-import Effect.Uncurried (EffectFn2)
-import Prim.Row as Row
-import React.Basic (JSX, ReactComponent, element)
-import React.Basic.DOM.Simplified.ToJSX (class ToJSX, toJSX)
-import ReactBootstrap.Types (SelectCallback)
 import Contrib.ReactBootstrap.Types (AlignType)
-import React.HTMLAttributes (HTMLAttributes)
-import Record as Record
-import Type.Row (type (+))
 import Unsafe.Coerce (unsafeCoerce)
-import Web.HTML (HTMLElement)
 
 -- import * as React from 'react';
 -- import { AlignType } from './types';

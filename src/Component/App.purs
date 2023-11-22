@@ -73,12 +73,14 @@ data WalletBrand
   | Yoroi
   | Nami
   | Eternl
+  | Typhon
 
 instance Show WalletBrand where
   show Yoroi = "Yoroi"
   show Nami = "Nami"
   show Lace = "Lace"
   show Eternl = "Eternl"
+  show Typhon = "Typhon"
 
 autoConnectWallet :: WalletBrand -> (WalletInfo Wallet.Api -> Effect Unit) -> Aff Unit
 autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano) >>= case _ of
@@ -92,6 +94,7 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
         Nami -> Wallet.nami
         Yoroi -> Wallet.yoroi
         Eternl -> Wallet.eternl
+        Typhon -> Wallet.typhon
     liftEffect (extractWallet cardano) >>= traverse walletInfo >>= case _ of
       Nothing -> do
         liftEffect $ throw $ "Unable to extract wallet " <> show walletBrand
@@ -170,13 +173,12 @@ mkApp = do
 
     (possibleSyncFn /\ setSyncFn) <- useState' Nothing
 
+    -- FIXME: track withdrawal status in similar fashion to contract info
     submittedWithdrawalsInfo <- React.do
       submit /\ updateSubmit <- useState (Map.empty :: Map Runtime.ContractId (Array Runtime.TxOutRef))
       let
         addAndSync contractId payoutId = do
           updateSubmit $ Map.insertWith append contractId [ payoutId ]
-      -- FIXME:
-      -- add a sync loop here
       pure (submit /\ addAndSync)
 
     (contractInfoMap /\ contractMapInitialized) /\ updateContractInfoMap <- useState (ContractInfoMap.uninitialized slotting /\ false)
@@ -250,7 +252,7 @@ mkApp = do
             untilJust do
               newSynced <- liftEffect $ contractStream.getLiveState
               liftEffect $ updateContractInfoMap \(contractMap /\ initialized) ->
-                ContractInfoMap.updateSynced (Just newSynced) contractMap /\ initialized
+                ContractInfoMap.updateSynced newSynced contractMap /\ initialized
               delay syncDelay
               pure Nothing
 
@@ -364,7 +366,7 @@ mkApp = do
         Nothing -> mempty
       possibleContracts = Array.fromFoldable <$> ContractInfoMap.getContractsMap contractInfoMap
       topNavbar = provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
-        [ DOM.div { className: "container position-relative z-index-2" }
+        [ DOM.div { className: "container" }
             [ DOM.div { className: "row" }
                 [ DOM.div
                     { className: "col-3 pt-2 pb-4 background-color-primary-light", id: "marlowe-logo-container" } $

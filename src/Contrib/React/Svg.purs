@@ -1,14 +1,10 @@
 module Contrib.React.Svg where
 
-import Data.Array.NonEmpty (elem)
-import Data.Newtype (class Newtype, un)
+import Data.Newtype (class Newtype)
 import Prim.Row as Row
 import React.Basic (JSX, ReactComponent, element)
-import React.Basic.DOM (Props_img, p)
+import React.Basic.DOM (Props_img)
 import React.Basic.DOM as DOM
-import React.Basic.DOM.SVG as DOM.SVG
-import Record as Record
-import Type.Prelude (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype SvgUrl = SvgUrl String

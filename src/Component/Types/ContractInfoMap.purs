@@ -10,14 +10,14 @@ module Component.Types.ContractInfoMap
 import Prelude
 
 import Component.Types (ContractInfo(..))
-import Component.Types.ContractInfo (ContractCreated, ContractUpdated(..), MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), addContractCreated, addContractUpdated, emptyNotSyncedYet, someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
+import Component.Types.ContractInfo (ContractCreated, ContractUpdated(..), MarloweInfo(..), NotSyncedYet(..), SomeContractInfo(..), ContractStatus(..), addContractCreated, addContractUpdated, emptyNotSyncedYet, someContractInfoFromContractCreated, someContractInfoFromContractUpdated)
 import Component.Types.ContractInfo as ContractInfo
 import Contrib.Cardano (Slotting, slotToTimestamp)
 import Data.Array as Array
 import Data.DateTime.Instant (Instant)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Set as Set
 import Data.These (These, maybeThese, theseLeft, theseRight)
 import Data.Tuple.Nested ((/\))
@@ -26,11 +26,11 @@ import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsMap)
 import Marlowe.Runtime.Web.Types (ContractHeader(..), PolicyId(..), TxHeader(..), TxOutRef(..))
 import Marlowe.Runtime.Web.Types as Runtime
 
---  * The `contractsMap` contains correct final view of the contracts and is a public piece of the API
---    the `contractsSources` piece is private.
+--  * The `contractsMap` contains correct final view of the contracts and it is a public piece of the API.
+--  * The `contractsSources` piece is private.
 --  * The `contractsMap` creation depends on the union ordering so we have to keep only
 --    the smaller `NotSyncedYet` `Map`s up to date in `contractsSources`.
---  * The `ContractWithTransactionsMap` contains all the contracts which are synced meaning
+--  * The `ContractWithTransactionsMap` contains all the contracts which are/were synced meaning
 --    it could contain duplicates for some contracts from `NotSyncedYet` `Map`s.
 data ContractInfoMap
   = UninitializedContractInfoMap
@@ -63,13 +63,13 @@ mkContractInfoMap slotting possiblySynced possiblyNotSyncedYet = fromMaybe (Unin
       pure $ Map.catMaybes $ synced <#> \contractWithTransactions -> do
         let
           { contract:
-              { resource: contractHeader@(Runtime.ContractHeader { roleTokenMintingPolicyId, tags })
+              { resource: contractHeader@(Runtime.ContractHeader { roleTokenMintingPolicyId, tags, status: createTxStatus })
               , links: endpoints
               }
           , contractState
-          , transactions
+          , transactions: possibleTransactions
           } = contractWithTransactions
-          marloweInfo = do
+          possibleMarloweInfo = do
             Runtime.ContractState contractState' <- contractState
             pure $ MarloweInfo
               { initialContract: contractState'.initialContract
@@ -84,11 +84,38 @@ mkContractInfoMap slotting possiblySynced possiblyNotSyncedYet = fromMaybe (Unin
           Runtime.ContractHeader { contractId, block } = contractHeader
           blockSlotTimestamp (Runtime.BlockHeader { slotNo }) = slotToTimestamp slotting slotNo
 
+          contractStatus = fromMaybe (StillFetching { possibleMarloweInfo, endpoint: endpoints.contract }) do
+            marloweInfo <- possibleMarloweInfo
+            transactionsHeadersWithEndpoints <- possibleTransactions
+            transactionsEndpoint <- endpoints.transactions
+            let
+              txStatuses = transactionsHeadersWithEndpoints <#> \(TxHeader { status: txStatus } /\ _) -> txStatus
+              endpoints' = { contract: endpoints.contract, transactions: transactionsEndpoint }
+            pure $ case txStatuses, createTxStatus of
+              [], Runtime.Confirmed -> Confirmed
+                { marloweInfo, endpoints: endpoints', transactionsHeadersWithEndpoints }
+              [], _ -> NotConfirmedCreation
+                { marloweInfo, endpoint: endpoints.contract, txStatus: createTxStatus }
+              _, _ ->
+                case Array.find (_ /= Runtime.Confirmed) txStatuses of
+                  Just txStatus -> NotConfirmedInputsApplication
+                    { marloweInfo
+                    , endpoints: endpoints'
+                    , transactionsHeadersWithEndpoints
+                    , txStatus
+                    }
+                  Nothing -> Confirmed
+                    { marloweInfo
+                    , endpoints: endpoints'
+                    , transactionsHeadersWithEndpoints
+                    }
+
           createdAt :: Maybe Instant
           createdAt = blockSlotTimestamp <$> block
 
           updatedAt :: Maybe Instant
           updatedAt = do
+            transactions <- possibleTransactions
             Runtime.TxHeader tx /\ _ <- Array.head transactions
             blockSlotTimestamp <$> tx.block
 
@@ -96,10 +123,9 @@ mkContractInfoMap slotting possiblySynced possiblyNotSyncedYet = fromMaybe (Unin
           { contractId
           , createdAt
           , updatedAt
-          , endpoints
-          , marloweInfo
+          , contractStatus
           , tags
-          , _runtime: { contractHeader, transactions }
+          , _runtime: { contractHeader, transactions: possibleTransactions }
           }
   pure $ ContractInfoMap { contractsMap: ns `Map.union` s, contractsSources, slotting }
 
@@ -112,53 +138,50 @@ getContractsMap :: ContractInfoMap -> Maybe (Map Runtime.ContractId SomeContract
 getContractsMap (UninitializedContractInfoMap _) = Nothing
 getContractsMap (ContractInfoMap { contractsMap }) = Just contractsMap
 
--- We want to check if the contract in the synced map is exactly the same as the contract
--- which are updating - the safest way to do equality check is to use transaction ids.
---
--- If the contract was changed or is missing we have to ignore the update information - it is no longer relevant.
--- If it is we want to remove the contract from the synced map and add it to the not synced yet map.
---
--- This check is rather a coner case checking (rarely happens on the app level - too short timespan)
--- but still valid from the structure consistency perspective.
-isContractUpdateStillRelevant :: ContractUpdated -> Maybe ContractWithTransactionsMap -> Boolean
-isContractUpdateStillRelevant contractUpdated possibleContractsMap = fromMaybe false do
+-- * We want to rely on server data as much as we can.
+-- * `ContractUpdated` doesn't store the tx details - it is only a placeholder which
+--   tells us that the contract was updated and we await for the server.
+-- * As quickly as we get new data (either extra txId or changed txId list) we want do
+--   ignore the old `ContractUpdated` and use the new one.
+isContractUpdateStillRelevant :: ContractUpdated -> ContractWithTransactionsMap -> Boolean
+isContractUpdateStillRelevant contractUpdated contractsMap = do
   let
     ContractUpdated { contractInfo } = contractUpdated
-    ContractInfo { contractId, _runtime: runtime } = contractInfo
-
-  contractsMap <- possibleContractsMap
-  contractWithTransactions <- Map.lookup contractId contractsMap
-  let
-    runtime' = do
+    ContractInfo { contractId, _runtime: contractUpdatedTxsInfo } = contractInfo
+  case Map.lookup contractId contractsMap of
+    -- If contract is missing we drop the update - probably was removed
+    Nothing -> false
+    -- If contract is not synced (impossible case) then we keep the update
+    Just { transactions: Nothing } -> true
+    Just { contract: { resource: contractHeader }, transactions } -> do
       let
-        { contract: { resource: contractHeader }, transactions } = contractWithTransactions
-      { contractHeader, transactions }
-    allTxIds { contractHeader: ContractHeader { contractId: TxOutRef { txId } }, transactions } =
-      txId Array.: (transactions <#> \(TxHeader { transactionId } /\ _) -> transactionId)
-    txIds = allTxIds runtime
-    txIds' = allTxIds runtime'
-  pure $ txIds == txIds'
+        contractMapTxsInfo = { contractHeader, transactions }
+        txIds { contractHeader: ContractHeader { contractId: TxOutRef { txId } }, transactions: txs } = do
+          let
+            applyInputsTxIds Nothing = []
+            applyInputsTxIds (Just txHeaders) = txHeaders <#> \(TxHeader { transactionId } /\ _) -> transactionId
+          txId Array.: (applyInputsTxIds txs)
+      (txIds contractMapTxsInfo) == (txIds contractUpdatedTxsInfo)
 
-updateSynced :: Maybe ContractWithTransactionsMap -> ContractInfoMap -> ContractInfoMap
-updateSynced possiblySynced contractInfoMap = do
+updateSynced :: ContractWithTransactionsMap -> ContractInfoMap -> ContractInfoMap
+updateSynced synced contractInfoMap = do
   let
     possiblyNotSyncedYet = case contractInfoMap of
       UninitializedContractInfoMap _ -> Nothing
       ContractInfoMap { contractsSources } -> theseLeft contractsSources
     slotting = contractInfoMapSlotting contractInfoMap
 
-    syncedKeys = fromMaybe mempty $ Map.keys <$> possiblySynced
-
+    syncedKeys = Map.keys synced
     possiblyNotSyncedYet' = do
       NotSyncedYet { created, updated } <- possiblyNotSyncedYet
       let
-        updated' = Map.filter (_ `isContractUpdateStillRelevant` possiblySynced) updated
+        updated' = Map.filter (_ `isContractUpdateStillRelevant` synced) updated
 
       pure $ NotSyncedYet $
         { created: Map.filter (\(ContractInfo.ContractCreated { contractId }) -> contractId `not Set.member` syncedKeys) created
         , updated: updated'
         }
-  mkContractInfoMap slotting possiblySynced possiblyNotSyncedYet'
+  mkContractInfoMap slotting (Just synced) possiblyNotSyncedYet'
 
 insertContractCreated :: ContractCreated -> ContractInfoMap -> ContractInfoMap
 insertContractCreated contractCreated@(ContractInfo.ContractCreated { contractId }) contractInfoMap = do
@@ -189,7 +212,7 @@ insertContractUpdated contractUpdated contractInfoMap = do
       UninitializedContractInfoMap _ -> Nothing
       ContractInfoMap { contractsSources } -> theseRight contractsSources
 
-  if isContractUpdateStillRelevant contractUpdated possiblySynced then do
+  if maybe false (isContractUpdateStillRelevant contractUpdated) possiblySynced then do
     let
       notSyncedYet = addContractUpdated contractUpdated $ case contractInfoMap of
         UninitializedContractInfoMap _ -> emptyNotSyncedYet

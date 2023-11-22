@@ -107,7 +107,8 @@ mkConnectWallet = do
           lace <- liftEffect (Wallet.lace cardano) >>= traverse walletInfo
           nami <- liftEffect (Wallet.nami cardano) >>= traverse walletInfo
           yoroi <- liftEffect (Wallet.yoroi cardano) >>= traverse walletInfo
-          case ArrayAL.fromArray (Proxy :: Proxy 1) (Array.catMaybes [ lace, nami, gerowallet, yoroi, eternl ]) of
+          typhon <- liftEffect (Wallet.typhon cardano) >>= traverse walletInfo
+          case ArrayAL.fromArray (Proxy :: Proxy 1) (Array.catMaybes [ lace, nami, gerowallet, yoroi, eternl, typhon ]) of
             Nothing -> liftEffect $ do
               setWallets NoWalletsAvailable
               onWalletConnect NoWallets

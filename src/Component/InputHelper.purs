@@ -22,16 +22,26 @@ import Language.Marlowe.Core.V1.Semantics (applyCases, evalObservation, reduceCo
 import Language.Marlowe.Core.V1.Semantics (evalObservation, evalValue, reduceContractUntilQuiescent)
 import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId(..), Contract(..), Environment(..), Observation(..), Party(..), Payee(..), State, TimeInterval(..), Token, TokenName, Value(..), Address)
 import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State, TimeInterval(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State, TimeInterval(..)) as V1
 
 data DepositInput = DepositInput AccountId Party Token BigInt.BigInt (Maybe Contract)
 
 derive instance Eq DepositInput
+
 data ChoiceInput = ChoiceInput ChoiceId (Array Bound) (Maybe Contract)
 
 derive instance Eq ChoiceInput
+
 data NotifyInput = NotifyInput (Maybe Contract)
 
 derive instance Eq NotifyInput
+
+data AnyInput
+  = AnyDepositInput DepositInput
+  | AnyChoiceInput ChoiceInput
+  | AnyNotifyInput NotifyInput
+
+derive instance Eq AnyInput
 
 toIDeposit :: DepositInput -> Maybe V1.InputContent
 toIDeposit (DepositInput accId p tok val (Just _)) = Just $ V1.IDeposit accId p tok val
@@ -196,11 +206,6 @@ addressesInContract = Array.nub <<< foldMapContract
   addressesContract (If _ _ _) = []
   addressesContract (Let _ _ _) = []
   addressesContract (Assert _ _) = []
-
--- computePath :: [InputContent /\ TimeInterval] → Contract → State → [Maybe Int]
--- computePath inputs contract state = foldr step 
-
--- reduceContractStep :: Environment -> State -> Contract -> ReduceStepResult
 
 data ExecutionBranch
   = WhenBranch (Maybe Int)
