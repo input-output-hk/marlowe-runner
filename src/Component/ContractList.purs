@@ -590,28 +590,6 @@ mkContractList = do
                           ]
           ]
 
-assetToString :: Cardano.AssetId -> Maybe String
-assetToString Cardano.AdaAssetId = Nothing
-assetToString (Cardano.AssetId _ assetName) = Cardano.assetNameToString assetName
-
-prettyState :: V1.State -> String
-prettyState = stringify <<< encodeJson
-
-instantFromMillis :: Number -> Maybe Instant
-instantFromMillis ms = instant (Duration.Milliseconds ms)
-
-filterCurrencySymbol :: forall a. String -> Map AssetId a -> Map AssetId a
-filterCurrencySymbol currencySymbol = Map.filterKeys $ \assetId -> Cardano.assetIdToString assetId `eq` currencySymbol
-
-listRoles :: forall a. Map AssetId a -> Array String
-listRoles = catMaybes <<< map assetToString <<< List.toUnfoldable <<< Set.toUnfoldable <<< Map.keys
-
-remainingRoles :: forall a. String -> Map AssetId a -> Array Payout -> Array String
-remainingRoles currencySymbol balance payouts = do
-  let
-    roles = listRoles $ filterCurrencySymbol currencySymbol balance
-  Array.intersect roles $ map (\(Payout { role }) -> role) payouts
-
 remainingPayouts :: ContractId -> Array V1.Party -> Map ContractId (Array TxOutRef) -> Array Payout -> Array Payout
 remainingPayouts contractId parties submittedPayouts unclaimedPayouts = do
   let
@@ -658,8 +636,6 @@ walletParties walletContext@(WalletContext { changeAddress, usedAddresses }) pos
         <<< map bech32ToString
         $ Array.cons changeAddress usedAddresses
   pure $ roleParties <> addressParties
-
--- onClick: setModalAction $ ApplyInputs contractInfo transactionsEndpoint { initialContract, state, contract }
 
 data CanAdvance = CanAdvance
   { transactionsEndpoint :: Runtime.TransactionsEndpoint

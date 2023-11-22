@@ -69,8 +69,6 @@ data ContractStatus
           { contract :: Runtime.ContractEndpoint
           , transactions :: Runtime.TransactionsEndpoint
           }
-      -- | This should be turned into high level representation - it could be
-      -- | lazy one like `Fiber (AppliedInputs [AppliedInput])` with confirmation info.
       }
 
 derive instance Eq ContractStatus
@@ -103,10 +101,6 @@ newtype ContractInfo = ContractInfo
   , tags :: Tags
   , createdAt :: Maybe Instant
   , updatedAt :: Maybe Instant
-  -- , endpoints ::
-  --     { contract :: Runtime.ContractEndpoint
-  --     , transactions :: Maybe Runtime.TransactionsEndpoint
-  --     }
   -- Use this only for debugging - all domain specific data
   -- should be precomputed and exposed as separate fields.
   , _runtime ::

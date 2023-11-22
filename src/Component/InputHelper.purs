@@ -207,26 +207,6 @@ addressesInContract = Array.nub <<< foldMapContract
   addressesContract (Let _ _ _) = []
   addressesContract (Assert _ _) = []
 
--- data Party
---   = Address Address
---   | Role TokenName
--- data ChoiceId = ChoiceId String Party
--- type AccountId = Party
--- type Accounts = Map (Tuple AccountId Token) BigInt
--- newtype State = State
---   { accounts :: Accounts
---   , choices :: Map ChoiceId ChosenNum
---   }
--- 
--- rolesInState :: V1.State -> Array TokenName
--- rolesInState (V1.State { accounts, choices }) =
---   Array.nub $ Map.keys accounts
---     <> foldMap (foldMap rolesInParty <<< snd) (Map.toList choices)
---   where
---   rolesInParty :: Party -> Array TokenName
---   rolesInParty (Role t) = [ t ]
---   rolesInParty _ = []
-
 data ExecutionBranch
   = WhenBranch (Maybe Int)
   | IfBranch Boolean

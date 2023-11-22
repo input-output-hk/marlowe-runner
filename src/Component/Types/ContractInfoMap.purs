@@ -26,8 +26,8 @@ import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsMap)
 import Marlowe.Runtime.Web.Types (ContractHeader(..), PolicyId(..), TxHeader(..), TxOutRef(..))
 import Marlowe.Runtime.Web.Types as Runtime
 
---  * The `contractsMap` contains correct final view of the contracts and it is a public piece of the API
---    The `contractsSources` piece is private.
+--  * The `contractsMap` contains correct final view of the contracts and it is a public piece of the API.
+--  * The `contractsSources` piece is private.
 --  * The `contractsMap` creation depends on the union ordering so we have to keep only
 --    the smaller `NotSyncedYet` `Map`s up to date in `contractsSources`.
 --  * The `ContractWithTransactionsMap` contains all the contracts which are/were synced meaning
