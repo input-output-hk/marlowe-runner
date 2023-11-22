@@ -450,8 +450,8 @@ $link-color: #511CF7;
 
 .pointer-events-none { pointer-events: none; }
 /* Not sure which one actually "fixes" the flickering problem.. */
-.tooltip { position: fixed !important; }
-.bs-tooltip-start { position: fixed !important; }
+// .tooltip { position: fixed !important; }
+// .bs-tooltip-start { position: fixed !important; }
 
 $utilities: map-merge(
   $utilities, (

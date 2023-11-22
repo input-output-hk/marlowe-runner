@@ -5,7 +5,6 @@ import Prelude
 import Component.Types (Message, MessageContent(..), MessageHub(..), MessageId)
 import ReactBootstrap (alert)
 import ReactBootstrap.Collapse (collapse, dimension)
-import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Types (variant)
 import Data.Array as Array
 import Data.List as List
@@ -21,13 +20,8 @@ import Halogen.Subscription as Subscription
 import React.Basic (JSX, createContext, provider)
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_) as DOOM
-import React.Basic.DOM.Simplified.Generated as DOM
-import React.Basic.Hooks (component, readRef, useContext, useEffect, useRef, useState, useState', writeRef, (/\))
+import React.Basic.Hooks (component, readRef, useContext, useEffect, useState, useState', (/\))
 import React.Basic.Hooks as R
-import ReactBootstrap (alert)
-import ReactBootstrap.Collapse (collapse, dimension)
-import ReactBootstrap.Icons as Icons
-import ReactBootstrap.Types (color, variant)
 import Utils.React.Basic.Hooks (useEmitter, useStateRef')
 
 renderMsg :: (MessageId -> Effect Unit) -> String -> Message -> JSX

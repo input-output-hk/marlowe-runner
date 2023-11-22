@@ -1,16 +1,6 @@
 module Contrib.ReactBootstrap.Types where
 
-import Effect (Effect)
-import Effect.Uncurried (EffectFn2)
-import Prim.Row as Row
-import React.Basic (JSX, ReactComponent, element)
-import React.Basic.DOM.Simplified.ToJSX (class ToJSX, toJSX)
-import ReactBootstrap.Types (SelectCallback)
-import React.HTMLAttributes (HTMLAttributes)
-import Record as Record
-import Type.Row (type (+))
 import Unsafe.Coerce (unsafeCoerce)
-import Web.HTML (HTMLElement)
 
 -- export type DropDirection = 'up' | 'up-centered' | 'start' | 'end' | 'down' | 'down-centered';
 

@@ -2,10 +2,8 @@ module Contrib.Data.DateTime.Instant where
 
 import Prelude
 
-import Data.DateTime (adjust)
 import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Int as Int
-import Data.Interval (Duration(..))
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)

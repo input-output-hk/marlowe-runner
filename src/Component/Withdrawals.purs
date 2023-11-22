@@ -52,8 +52,7 @@ type Props =
   , onSuccess :: WithdrawalEndpoint -> Effect Unit
   , onError :: String -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
-  , roles :: NonEmptyArray String
-  , unclaimedPayouts :: Array Payout
+  , unclaimedPayouts :: NonEmptyArray Payout
   , updateSubmitted :: TxOutRef -> Effect Unit
   , walletContext :: WalletContext
   }
@@ -79,8 +78,9 @@ withdrawalBodyLayout (UseSpinnerOverlay useSpinnerOverlay) content = do
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
   Runtime runtime <- asks _.runtime
-  liftEffect $ component "Withdrawal" \props@{ connectedWallet, onDismiss, onError, onSuccess, roles, unclaimedPayouts, updateSubmitted } -> React.do
+  liftEffect $ component "Withdrawal" \props@{ connectedWallet, onDismiss, onError, onSuccess, unclaimedPayouts, updateSubmitted } -> React.do
     let
+      roles = map (\(Payout { role }) -> role) unclaimedPayouts
       shouldAutoSubmit = NonEmptyArray.tail roles == []
       shouldUseSpinnerOverlay = UseSpinnerOverlay shouldAutoSubmit
 
@@ -109,7 +109,7 @@ mkComponent = do
       -- Let's copy the above subsection
       submitRoleWithdrawal selectedRole = do
         let
-          payouts = filter (\(Payout { role }) -> role == selectedRole) unclaimedPayouts
+          payouts = filter (\(Payout { role }) -> role == selectedRole) $ NonEmptyArray.toArray unclaimedPayouts
           withdrawalContext = WithdrawalContext
             { wallet: { changeAddress, usedAddresses }
             , payouts
@@ -184,6 +184,7 @@ mkComponent = do
 
 newtype WithdrawalContext = WithdrawalContext
   { wallet :: { changeAddress :: Bech32, usedAddresses :: Array Bech32 }
+  -- FIXME: This should be NonEmptyArray
   , payouts :: Array Payout
   }
 

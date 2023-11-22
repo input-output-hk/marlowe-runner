@@ -6,7 +6,7 @@ import Data.Array as Array
 import Data.Either (note)
 import Data.FormURLEncoded.Query (FieldId, Query)
 import Data.FormURLEncoded.Query as Query
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Polyform.Batteries as Batteries
 import Polyform.Batteries.UrlEncoded as UrlEncoded
 import Polyform.Validator as Validator

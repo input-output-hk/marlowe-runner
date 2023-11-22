@@ -19,7 +19,6 @@ import Web.DOM.Element (removeAttribute, setAttribute)
 import Web.DOM.Element as Element
 import Web.DOM.HTMLCollection as HTMLCollection
 import Web.DOM.Node as Node
-import Web.DOM.Text as Text
 import Web.HTML (window)
 import Web.HTML.HTMLDocument (toDocument)
 import Web.HTML.Window (document)

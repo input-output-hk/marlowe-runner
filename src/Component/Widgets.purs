@@ -7,7 +7,8 @@ import Contrib.React.Svg (loadingSpinnerLogo)
 import ConvertableOptions (defaults, class Defaults)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Undefined.NoProblem (Opt, fromOpt)
-import Data.Undefined.NoProblem.Closed as NoProblem
+import Data.Undefined.NoProblem (fromMaybe, toMaybe) as NoProblem
+import Data.Undefined.NoProblem.Closed (class Coerce, coerce) as NoProblem
 import Effect (Effect)
 import Effect.Uncurried (EffectFn1)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
@@ -20,8 +21,8 @@ import React.Basic.Events (SyntheticEvent, handler)
 import ReactBootstrap (overlayTrigger, tooltip)
 import ReactBootstrap.Icons (Icon)
 import ReactBootstrap.Icons as Icons
+import ReactBootstrap.Tooltip (TooltipPropsRow)
 import ReactBootstrap.Types (Placement)
-import ReactBootstrap.Types as OverlayTrigger
 import Record as Record
 import Type.Proxy (Proxy(..))
 
@@ -115,15 +116,18 @@ linkWithIcon provided = do
   case tooltipText of
     Just text -> do
       let
-        placement = fromMaybe OverlayTrigger.placement.left tooltipPlacement
-        tooltipJSX = tooltip { placement, className: "p-fixed" } (DOOM.text text)
+        placement :: Opt Placement
+        placement = NoProblem.fromMaybe tooltipPlacement
+
+        tooltipJSX :: { | TooltipPropsRow } -> JSX
+        tooltipJSX props = tooltip props (DOOM.text text)
       DOM.div
         { className: "d-inline-block" }
         [ overlayTrigger
             { overlay: tooltipJSX
             , placement
             }
-            button
+            \props -> DOM.span props [ button ]
         ]
     Nothing -> button
 
@@ -168,9 +172,9 @@ type ButtonOutlinedProps =
   , onClick :: Opt (Effect Unit)
   , extraClassNames :: Opt String
   -- FIXME: Add tooltip support
-  -- , disabled :: Opt Boolean
-  -- , tooltipText :: Opt String
-  -- , tooltipPlacement :: Opt Placement
+  , disabled :: Opt Boolean
+  , tooltipText :: Opt String
+  , tooltipPlacement :: Opt Placement
   }
 
 buttonOutlinedClassNames :: OutlineColoring -> String -> String
@@ -183,13 +187,26 @@ buttonOutlined props = do
     props' :: ButtonOutlinedProps
     props' = NoProblem.coerce props
     { coloring, label, onClick } = props'
-  DOM.button
-    { className: buttonOutlinedClassNames coloring $ fromOpt "" props'.extraClassNames
-    , onClick: handler preventDefault (const $ fromOpt (pure unit) onClick)
-    , type: "button"
-    }
-    [ label
-    ]
+    button = DOM.button
+      { className: buttonOutlinedClassNames coloring $ fromOpt "" props'.extraClassNames
+      , onClick: handler preventDefault (const $ fromOpt (pure unit) onClick)
+      , type: "button"
+      , disabled: fromOpt false props'.disabled
+      }
+      [ label ]
+
+  case NoProblem.toMaybe props'.tooltipText of
+    Just tooltipText -> do
+      let
+        tooltipJSX p = tooltip p (DOOM.text tooltipText)
+        button' p = DOM.span p [ button ]
+
+      overlayTrigger
+        { overlay: tooltipJSX
+        , placement: props'.tooltipPlacement
+        }
+        button'
+    Nothing -> button
 
 buttonOutlinedPrimary
   :: forall props

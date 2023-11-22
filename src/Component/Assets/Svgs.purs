@@ -1,6 +1,5 @@
 module Component.Assets.Svgs where
 
-import Prelude
 import React.Basic (JSX)
 import Contrib.React.Svg (SvgUrl(..), svgImg)
 
