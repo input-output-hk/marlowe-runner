@@ -199,11 +199,11 @@ let
 
     "cardano-wallet-client" = pkgs.stdenv.mkDerivation {
       name = "cardano-wallet-client";
-      version = "v0.0.1";
+      version = "v0.1.0";
       src = pkgs.fetchgit {
         url = "https://github.com/input-output-hk/purescript-cardano-wallet-client.git";
-        rev = "c4242d750e7920bdb4cd5766e1e9c9ea87bab1e2";
-        sha256 = "0aq5a488jq7fkd9xhk9qhcxj1i0qycfvsvq8x80naw5z6dsm4ab5";
+        rev = "a2b08694d2c9d5e55e0707a1ce7d292503ee1eca";
+        sha256 = "1pin92qfjm8lvirkrc9n8i38940nsa12cfadz2m9drrzr0z45m29";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";
@@ -883,11 +883,11 @@ let
 
     "marlowe-runtime-client" = pkgs.stdenv.mkDerivation {
       name = "marlowe-runtime-client";
-      version = "v0.2.0";
+      version = "v0.3.2";
       src = pkgs.fetchgit {
         url = "https://github.com/input-output-hk/purescript-marlowe-runtime-client.git";
-        rev = "f232d4493a5ba71ed9f7b84847a79a9ad575e878";
-        sha256 = "17jcnafpshc320ry8q1f20ms2cmr59n3adiy3za8g5s0aaw958qc";
+        rev = "3c9b5af0adad6bd86233e015785dade783f968d8";
+        sha256 = "0mr8dfgd7gskbar4l31xfiq05ls4m7xbblksj5mjbc9f784hiwfv";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";
@@ -1315,11 +1315,11 @@ let
 
     "react-bootstrap" = pkgs.stdenv.mkDerivation {
       name = "react-bootstrap";
-      version = "v0.0.4";
+      version = "v0.1.1";
       src = pkgs.fetchgit {
         url = "https://github.com/paluh/purescript-react-bootstrap.git";
-        rev = "12298126c9d5a62b5b7d65abc511f53a35216037";
-        sha256 = "06m6whd8i0fhgdjagxrm72jxqy626s9qmky1d7pl4fazfkadsr1x";
+        rev = "106bd3114994f2aa78a3c76807ae84220f12dcef";
+        sha256 = "0mhss4anlnklpm61hf65im9pik7h4kxn0z5niqr5j8jlkc3n8a6x";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";
