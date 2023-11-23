@@ -553,13 +553,13 @@ mkContractList = do
                               SyncingContract sc -> buttonOutlinedInactive do
                                 let
                                   tooltipText = case sc of
-                                    NotSyncedCreatedContract _ -> "Awaiting Runtime submission confirmation."
-                                    NotSyncedUpdatedContract _ -> "Awaiting Runtime submission confirmation."
+                                    NotSyncedCreatedContract _ -> "Awaiting Runtime submission confirmation"
+                                    NotSyncedUpdatedContract _ -> "Awaiting Runtime submission confirmation"
                                     SyncedConractInfo (ContractInfo { contractStatus }) -> case contractStatus of
-                                      StillFetching _ -> "Still fetching contract info."
+                                      StillFetching _ -> "Still fetching contract details"
                                       NotConfirmedCreation { txStatus } -> "Runtime reports last transaction status: " <> show txStatus
                                       NotConfirmedInputsApplication { txStatus } -> "Runtime reports last transaction status: " <> show txStatus
-                                      Confirmed _ -> "Transaction status confirmed - you should not see Syncing button any more!"
+                                      Confirmed _ -> "Transaction status confirmed" -- should never be visible
                                 { label: DOOM.text $ "Syncing"
                                 , tooltipText: tooltipText
                                 , tooltipPlacement: placement.left
@@ -573,7 +573,7 @@ mkContractList = do
                                     Just (CanWithdraw payouts) -> do
                                       buttonOutlinedWithdraw
                                         { label: DOOM.text "Withdraw"
-                                        , tooltipText: "This wallet has funds available for withdrawal from this contract. Click to submit a withdrawal"
+                                        , tooltipText: "You have funds available for withdrawal from this contract. Click to submit a withdrawal"
                                         , tooltipPlacement: placement.left
                                         , onClick: setModalAction $ Withdrawal walletContext contractId payouts
                                         }
@@ -583,7 +583,7 @@ mkContractList = do
                                       { label: DOOM.text "Advance"
                                       , onClick: setModalAction $ ApplyInputs contractInfo transactionsEndpoint { initialContract, state, contract }
                                       , tooltipPlacement: placement.left
-                                      , tooltipText: "You are able to execuate a step in this Contract."
+                                      , tooltipText: "You are able to execuate a step in this contract"
                                       }
                                     _ -> mempty
                                 ]
