@@ -30,6 +30,7 @@ import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.DropdownButton (dropdownButton)
 import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, textInput)
+import Contrib.Web.Clipboard as Contrib.Web.Clipboard
 import Control.Alt ((<|>))
 import Control.Alternative as Alternative
 import Control.Monad.Error.Class (throwError)
@@ -45,6 +46,7 @@ import Data.Either (Either, hush)
 import Data.Foldable (fold, for_, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
+import Data.Functor.Variant (case_)
 import Data.JSDate (fromDateTime) as JSDate
 import Data.List (intercalate)
 import Data.List as List
@@ -201,7 +203,7 @@ someContractTags (NotSyncedCreatedContract { tags }) = runnerTags tags
 mkContractList :: MkComponentM (Props -> JSX)
 mkContractList = do
   MessageHub msgHubProps <- asks _.msgHub
-
+  browserCapabilities <- asks _.browserCapabilities
   createContractComponent <- CreateContract.mkComponent
   applyInputsComponent <- ApplyInputs.mkComponent
   withdrawalsComponent <- Withdrawals.mkComponent
@@ -478,10 +480,6 @@ mkContractList = do
                       let
                         conractIdStr = txOutRefToString contractId
 
-                        copyToClipboard :: Effect Unit
-                        copyToClipboard = window >>= navigator >>= clipboard >>= \c -> do
-                          launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr c)
-
                       tdCentered $ DOM.span { className: "d-flex" }
                         [ case possibleMarloweInfo of
                             Just (MarloweInfo { state, currentContract, initialContract, initialState }) -> do
@@ -496,18 +494,26 @@ mkContractList = do
                                       , initialContract: initialContract
                                       , transactionEndpoints
                                       }
-                                  { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover truncate-text w-16rem d-inline-block"
+                                  { className: "cursor-pointer text-decoration-none text-reset text-decoration-underline-hover d-inline-block" <> case browserCapabilities.clipboard of
+                                      Just _ -> " truncate-text w-16rem"
+                                      Nothing -> ""
                                   , onClick: handler_ onClick
                                   }
                                 [ text conractIdStr ]
                             Nothing -> DOM.span { className: "text-muted truncate-text w-16rem" } $ text conractIdStr
-                        , DOM.a
-                            { href: "#"
-                            , onClick: handler_ copyToClipboard
-                            , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
-                            }
-                            $ Icons.toJSX
-                            $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
+                        , case browserCapabilities.clipboard of
+                            Just clipboard -> do
+                              let
+                                copyToClipboard :: Effect Unit
+                                copyToClipboard = launchAff_ (Promise.toAffE $ Clipboard.writeText conractIdStr clipboard)
+                              DOM.a
+                                { href: "#"
+                                , onClick: handler_ copyToClipboard
+                                , className: "cursor-pointer text-decoration-none text-decoration-underline-hover text-reset"
+                                }
+                                $ Icons.toJSX
+                                $ unsafeIcon "clipboard-plus ms-1 d-inline-block"
+                            Nothing -> mempty
                         ]
 
                   mkTable

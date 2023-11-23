@@ -1,5 +1,6 @@
 module Component.Types
-  ( ContractJsonString(..)
+  ( BrowserCapabilities(..)
+  , ContractJsonString(..)
   , ConfigurationError(..)
   , MkContextBase(..)
   , MkComponentMBase(..)
@@ -30,6 +31,7 @@ import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX, ReactContext)
 import Wallet as Wallet
 import WalletContext (WalletContext)
+import Web.Clipboard (Clipboard)
 
 newtype WalletInfo wallet = WalletInfo
   { name :: String
@@ -60,8 +62,13 @@ newtype MessageHub = MessageHub
   , ctx :: ReactContext (List Message)
   }
 
+type BrowserCapabilities =
+  { clipboard :: Maybe Clipboard
+  }
+
 type MkContextBase r =
-  { cardanoMultiplatformLib :: CardanoMultiplatformLib.Lib
+  { browserCapabilities :: BrowserCapabilities
+  , cardanoMultiplatformLib :: CardanoMultiplatformLib.Lib
   , walletInfoCtx :: ReactContext (Maybe (WalletInfo Wallet.Api /\ WalletContext))
   -- FIXME: use more advanced logger so we use levels and setup app verbosity.
   , logger :: String -> Effect Unit
