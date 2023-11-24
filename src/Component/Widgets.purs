@@ -11,6 +11,7 @@ import Data.Undefined.NoProblem (fromMaybe, toMaybe) as NoProblem
 import Data.Undefined.NoProblem.Closed (class Coerce, coerce) as NoProblem
 import Effect (Effect)
 import Effect.Uncurried (EffectFn1)
+import Foreign.Object as Object
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Prim.Row as Row
 import React.Basic (JSX)
@@ -24,6 +25,7 @@ import ReactBootstrap.Icons as Icons
 import ReactBootstrap.Tooltip (TooltipPropsRow)
 import ReactBootstrap.Types (Placement)
 import Record as Record
+import Runner.Contrib.ReactLoadingOverlayTs as LoadingOverlay
 import Type.Proxy (Proxy(..))
 
 spinner :: Maybe JSX -> JSX
@@ -297,3 +299,25 @@ backToContractListLink onDismiss = do
         }
     ]
 
+type LoadingOverlayProps =
+  { active :: Opt Boolean, showSpinner :: Opt Boolean }
+
+loadingOverlay :: forall props. NoProblem.Coerce props LoadingOverlayProps => props -> Array JSX -> JSX
+loadingOverlay props body = do
+  let
+    props' :: LoadingOverlayProps
+    props' = NoProblem.coerce props
+    overlaySpinner =
+      if fromOpt true props'.showSpinner then LoadingOverlay.spinner.jsx $ loadingSpinnerLogo {}
+      else LoadingOverlay.spinner.boolean false
+    overlayStyles = do
+      let
+        overlay orig = do
+          let
+            new = Object.fromHomogeneous { "background-color": "rgba(255, 255, 255, 0.9) !important" }
+            override = Object.unionWith (\_ n -> n)
+          orig `override` new
+      { overlay }
+  LoadingOverlay.loadingOverlay
+    { className: "blur-bg rounded", active: props'.active, spinner: overlaySpinner, styles: overlayStyles }
+    body
