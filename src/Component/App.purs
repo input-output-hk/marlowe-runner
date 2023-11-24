@@ -73,18 +73,20 @@ import Web.HTML (window)
 
 -- | Debugging helpers which allow us to automatically connect wallet
 data WalletBrand
-  = Lace
-  | Yoroi
+  = Eternl
+  | Gero
+  | Lace
   | Nami
-  | Eternl
   | Typhon
+  | Yoroi
 
 instance Show WalletBrand where
-  show Yoroi = "Yoroi"
-  show Nami = "Nami"
-  show Lace = "Lace"
   show Eternl = "Eternl"
+  show Gero = "Gero"
+  show Lace = "Lace"
+  show Nami = "Nami"
   show Typhon = "Typhon"
+  show Yoroi = "Yoroi"
 
 autoConnectWallet :: WalletBrand -> (WalletInfo Wallet.Api -> Effect Unit) -> Aff Unit
 autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano) >>= case _ of
@@ -94,12 +96,13 @@ autoConnectWallet walletBrand onSuccess = liftEffect (window >>= Wallet.cardano)
   Just cardano -> do
     let
       extractWallet = case walletBrand of
+        Eternl -> Wallet.eternl
+        Gero -> Wallet.gerowallet
         Lace -> Wallet.lace
         Nami -> Wallet.nami
-        Yoroi -> Wallet.yoroi
-        Eternl -> Wallet.eternl
         Typhon -> Wallet.typhon
-    liftEffect (extractWallet cardano) >>= traverse walletInfo >>= case _ of
+        Yoroi -> Wallet.yoroi
+    liftEffect (extractWallet cardano) >>= traverse walletInfo >>= join >>> case _ of
       Nothing -> do
         liftEffect $ throw $ "Unable to extract wallet " <> show walletBrand
       Just walletInfo@(WalletInfo { wallet }) -> do

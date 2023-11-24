@@ -199,11 +199,11 @@ let
 
     "cardano-wallet-client" = pkgs.stdenv.mkDerivation {
       name = "cardano-wallet-client";
-      version = "v0.1.0";
+      version = "v0.1.1";
       src = pkgs.fetchgit {
         url = "https://github.com/input-output-hk/purescript-cardano-wallet-client.git";
-        rev = "a2b08694d2c9d5e55e0707a1ce7d292503ee1eca";
-        sha256 = "1pin92qfjm8lvirkrc9n8i38940nsa12cfadz2m9drrzr0z45m29";
+        rev = "d6c4be8bc24d285e700264ad29cf6b6b7623c6ed";
+        sha256 = "09vqahbsawzp8qjcylvpcy1yrk0b489c4hd9z22jabs8mpai624r";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";
