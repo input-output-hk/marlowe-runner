@@ -78,6 +78,7 @@
   , "typelevel-prelude"
   , "undefined-is-not-a-problem"
   , "unsafe-coerce"
+  , "unsafe-reference"
   , "uri"
   , "validation"
   , "variant"

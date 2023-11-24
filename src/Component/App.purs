@@ -13,10 +13,12 @@ import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Testing (mkDataTestAttrs)
 import Component.Types (ConfigurationError(..), ContractInfo(..), ContractJsonString, MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
+import Component.Types as MessageHub
 import Component.Types.ContractInfo (ContractCreated(..), ContractUpdated(..)) as ContractInfo
 import Component.Types.ContractInfo (SomeContractInfo)
 import Component.Types.ContractInfoMap as ContractInfoMap
 import Component.Widgets (linkWithIcon)
+import Component.Widgets as Widgets
 import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Loops (untilJust)
@@ -37,6 +39,7 @@ import Data.String.Extra (upperCaseFirst) as String
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple.Nested (type (/\), (/\))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
@@ -60,6 +63,7 @@ import ReactBootstrap.Modal (modal, modalBody, modalHeader)
 import ReactBootstrap.Offcanvas (offcanvas)
 import ReactBootstrap.Offcanvas as Offcanvas
 import Record as Record
+import Runner.Contrib.Effect.Aff (withTimeout, withTimeout_)
 import Type.Prelude (Proxy(..))
 import Utils.React.Basic.Hooks (useLoopAff, useStateRef, useStateRef')
 import Wallet as Wallet
@@ -272,16 +276,19 @@ mkApp = do
         Nothing, Just _ -> do
           liftEffect $ setWalletContext Nothing
         Just (WalletInfo walletInfo), _ -> do
-          let
-            action = do
-              walletContext <- WalletContext.walletContext cardanoMultiplatformLib walletInfo.wallet
-              liftEffect $ setWalletContext walletContext
-              -- FIXME: Another work around the rounting issue.
-              when (isNothing pwc) do
-                liftEffect $ props.setPage ContractListPage
-          action `catchError` \_ -> do
-            -- FIXME: Report back (to the reporting backend) a wallet problem?
-            pure unit
+          res <- withTimeout (Milliseconds 7000.0) do
+            traceM "TRYING TO FETCH WALLET CONTEXT"
+            walletContext <- WalletContext.walletContext cardanoMultiplatformLib walletInfo.wallet
+            traceM "FAILED"
+            liftEffect $ setWalletContext walletContext
+            -- FIXME: Another work around the rounting issue.
+            when (isNothing pwc) do
+              liftEffect $ props.setPage ContractListPage
+          case res of
+            Nothing -> liftEffect do
+              msgHubProps.add $ MessageHub.Error $ DOOM.text "Wallet is not responding. Please check its configuration or try another wallet"
+              setWalletInfo Nothing
+            Just _ -> pure unit
 
     disconnectingWallet /\ setDisconnectingWallet <- useState' false
     checkingNotifications /\ setCheckingNotifications <- useState' false
@@ -475,9 +482,12 @@ mkApp = do
             }
         , footer
         ]
-      _, _ -> DOM.div {} $
-        [ topNavbar
-        , appError
-        , landingPage { setWalletInfo: setWalletInfo <<< Just }
-        ]
+      _, _ ->
+        Widgets.loadingOverlay { active: isJust possibleWalletInfo, showSpinner: false }
+          [ DOM.div {} $
+              [ topNavbar
+              , appError
+              , landingPage { setWalletInfo: setWalletInfo <<< Just }
+              ]
+          ]
 

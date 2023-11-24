@@ -3,23 +3,26 @@ module Component.ConnectWallet where
 import Prelude
 
 import Component.Types (MkComponentM, WalletInfo(..))
-import Component.Widgets (link)
+import Component.Widgets (SpinnerOverlayHeight(..), link, spinnerOverlay)
+import Component.Widgets as Widgets
 import Component.Widgets.Form (mkSingleChoiceField)
 import Component.Widgets.Form as Form
 import Contrib.React.Svg (loadingSpinnerLogo)
 import Data.Array as Array
 import Data.Array.ArrayAL (ArrayAL)
 import Data.Array.ArrayAL as ArrayAL
+import Data.Either (Either(..), fromRight)
 import Data.Map (Map)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (un, unwrap)
 import Data.Newtype as Newtype
 import Data.String.Extra as String
+import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (traverse)
+import Data.Variant (Variant, on)
 import Effect (Effect)
-import Effect.Aff (Aff, catchError, launchAff_)
+import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
-import Effect.Exception (Error)
 import Foreign.Object as Object
 import React.Basic (JSX)
 import React.Basic (fragment) as DOOM
@@ -30,32 +33,46 @@ import React.Basic.Hooks (component, useEffectOnce, useState', (/\))
 import React.Basic.Hooks as React
 import ReactBootstrap.Modal (modal, modalBody, modalFooter, modalHeader)
 import Record as Record
+import Runner.Contrib.Effect.Aff (withTimeout)
+import Runner.Contrib.ReactLoadingOverlayTs (loadingOverlay)
+import Runner.Contrib.ReactLoadingOverlayTs as LoadingOverlay
 import Type.Prelude (Proxy(..))
+import Type.Row (type (+))
 import Wallet (Wallet)
 import Wallet as Wallet
 import Web.HTML (window)
 
 type Wallets = Map String Wallet
 
-walletInfo :: Wallet -> Aff (WalletInfo Wallet)
-walletInfo wallet = WalletInfo <$> ado
+walletInfo :: Wallet -> Aff (Maybe (WalletInfo Wallet))
+walletInfo wallet = withTimeout (Milliseconds 7000.0) $ WalletInfo <$> ado
   name <- liftEffect (Wallet.name wallet)
   icon <- liftEffect (Wallet.icon wallet)
-  isEnabled <- Wallet.isEnabled_ wallet
+  isEnabled <- Wallet.isEnabled wallet <#> fromRight false
   apiVersion <- liftEffect (Wallet.apiVersion wallet)
   in
     { name, icon, isEnabled, apiVersion, wallet }
 
-data Response
+-- Version of ApiError without rejection because we handle it using `onDismiss`.
+type ApiError' r =
+  ( invalidRequest :: String
+  , internalError :: String
+  , accountChange :: String
+  | r
+  )
+
+data ConnectionError
   = NoWallets
-  | ConnectionError Error
-  | Connected (WalletInfo Wallet.Api)
+  | ConnectionError (Variant (ApiError' + Wallet.ApiForeignErrors + Wallet.UnknownError + ()))
+  | TimeoutReached
+
+type Result = WalletInfo Wallet.Api
 
 type Props =
   { currentlyConnected :: Maybe (WalletInfo Wallet.Api)
   , onDismiss :: Effect Unit
-  , onWalletConnect :: Response -> Effect Unit
-  , inModal :: Boolean
+  , onWalletConnect :: Result -> Effect Unit
+  , onError :: ConnectionError -> Effect Unit
   }
 
 formatName :: String -> String
@@ -89,12 +106,10 @@ data AvailableWallets
 
 mkConnectWallet :: MkComponentM (Props -> JSX)
 mkConnectWallet = do
-  singleChoiceField <- liftEffect mkSingleChoiceField
-  -- modal <- liftEffect mkModal
 
-  liftEffect $ component "Wallet" \{ currentlyConnected, onWalletConnect, onDismiss, inModal } -> React.do
+  liftEffect $ component "Wallet" \{ currentlyConnected, onWalletConnect, onError, onDismiss } -> React.do
     possibleWallets /\ setWallets <- useState' FetchingWalletList
-    selectedWallet /\ setSelectedWallet <- useState' $ Nothing
+    connecting /\ setConnecting <- useState' false
 
     useEffectOnce do
       liftEffect (Wallet.cardano =<< window) >>= case _ of
@@ -108,135 +123,63 @@ mkConnectWallet = do
           nami <- liftEffect (Wallet.nami cardano) >>= traverse walletInfo
           yoroi <- liftEffect (Wallet.yoroi cardano) >>= traverse walletInfo
           typhon <- liftEffect (Wallet.typhon cardano) >>= traverse walletInfo
-          case ArrayAL.fromArray (Proxy :: Proxy 1) (Array.catMaybes [ eternl, gerowallet, lace, nami, typhon, yoroi ]) of
+          case ArrayAL.fromArray (Proxy :: Proxy 1) (Array.catMaybes $ map join [ eternl, gerowallet, lace, nami, typhon, yoroi ]) of
             Nothing -> liftEffect $ do
               setWallets NoWalletsAvailable
-              onWalletConnect NoWallets
+              onError NoWallets
             Just wallets -> liftEffect $ do
               setWallets $ WalletList wallets
-              setSelectedWallet $ do
-                { name } <- un WalletInfo <$> currentlyConnected
-                Array.find (\(WalletInfo wallet) -> wallet.name == name) (ArrayAL.toArray wallets)
       pure (pure unit)
 
     let
       submit w = case w of
         Just selected@(WalletInfo s) ->
           if Just s.name == (_.name <<< unwrap <$> currentlyConnected) then onDismiss
-          else launchAff_ do
-            possibleApi <- (Just <$> Wallet.enable_ s.wallet) `catchError` \error -> do
-              liftEffect $ onWalletConnect (ConnectionError error)
-              pure Nothing
-            case possibleApi of
-              Just (walletApi :: Wallet.Api) -> do
-                let
-                  selected' = Newtype.over WalletInfo (Record.set (Proxy :: Proxy "wallet") walletApi) selected
-                liftEffect $ onWalletConnect (Connected selected')
-              Nothing -> do
-                -- FIXME: Error handling
-                liftEffect $ onDismiss
-        Nothing -> onDismiss
-      onSubmit = submit selectedWallet
-
-    pure
-      if inModal then do
-        let
-          { formBody, formActions } = case possibleWallets of
-            WalletList wallets -> do
-              let
-                choices = wallets <#> \(WalletInfo { icon, name }) -> do
+          else do
+            setConnecting true
+            launchAff_ do
+              withTimeout (Milliseconds 30000.0) (Wallet.enable s.wallet) >>= case _ of
+                Nothing -> liftEffect $ onError TimeoutReached
+                Just (Right (walletApi :: Wallet.Api)) -> do
                   let
-                    label = DOM.span { className: "h5" }
-                      [ DOOM.img { src: icon, alt: name, className: "w-2rem me-2" }
-                      , DOOM.span_ [ DOOM.text name ]
-                      ]
-                  -- We know that only Nami is working - should we disable all the other wallets?
-                  name /\ label /\ false
+                    selected' = Newtype.over WalletInfo (Record.set (Proxy :: Proxy "wallet") walletApi) selected
+                  liftEffect $ onWalletConnect selected'
+                Just (Left walletError) -> do
+                  let
+                    _refused :: Proxy "refused"
+                    _refused = Proxy
+                    handler =
+                      (ConnectionError >>> onError)
+                        # on _refused \_ -> liftEffect onDismiss
+                  liftEffect $ handler walletError
+              liftEffect $ setConnecting false
+        Nothing -> onDismiss
+      overlayActive = connecting || case possibleWallets of
+        FetchingWalletList -> true
+        _ -> false
 
-              { formBody: singleChoiceField
-                  { initialValue: fromMaybe "" (_.name <<< unwrap <$> selectedWallet)
-                  , onValueChange: \walletName -> do
-                      setSelectedWallet $ Array.find (\(WalletInfo wallet) -> wallet.name == walletName) (ArrayAL.toArray wallets)
-                  , type: Form.RadioButtonField choices
-                  }
-              , formActions: DOOM.fragment
-                  if inModal then
-                    [ link { label: DOOM.text "Cancel", onClick: onDismiss, showBorders: true }
-                    , DOOM.button do
-                        let
-                          _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
-                          _name = map $ (_.name <<< unwrap)
-                          selectedIsConnected = _name selectedWallet == _name currentlyConnected
-
-                        { type: "button"
-                        , className: "btn btn-primary"
-                        , onClick: handler_ onSubmit
-                        , disabled: selectedIsConnected
-                        , children: [ DOOM.text "Connect wallet" ]
-                        }
+    pure $ Widgets.loadingOverlay { active: overlayActive } $ Array.singleton $ DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
+      [ DOM.div { className: "col-12 shadow-sm rounded p-5 min-height-250px" } do
+          let
+            renderWallets maybeWallets = do
+              [ DOM.div { className: "row" } $
+                  DOM.div { className: "col-12" }
+                    [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
+                    , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please select a wallet to deploy a contract." ]
                     ]
-                  else
-                    [ DOOM.button do
-                        let
-                          _name :: forall wallet. Maybe (WalletInfo wallet) -> Maybe String
-                          _name = map $ (_.name <<< unwrap)
-                          selectedIsConnected = _name selectedWallet == _name currentlyConnected
-
-                        { type: "button"
-                        , className: "btn btn-primary mt-3"
-                        , onClick: handler_ onSubmit
-                        , disabled: selectedIsConnected
-                        , children: [ DOM.p { className: "h4 font-weight-bold" } [ DOOM.text "Connect wallet" ] ]
-                        }
-                    ]
-              }
-            _ -> do
-              { formBody: DOM.div { className: "d-flex justify-content-center" } $ loadingSpinnerLogo {}
-              , formActions: mempty
-              }
-
-        modal
-          { onHide: onDismiss -- : setConfiguringWallet false
-          -- , footer: formActions
-          -- , body: formBody
-          -- , title: DOOM.text "Connect wallet"
-          , show: true
-          }
-          [ modalHeader {} $ DOOM.text "Choose a wallet"
-          , modalBody {} formBody
-          , modalFooter {} formActions
-          ]
-      else
-        DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
-          [ DOM.div { className: "col-12 shadow-sm rounded p-5" } do
-              let
-                renderWallets maybeWallets = do
-                  [ DOM.div { className: "row" } $
-                      DOM.div { className: "col-12" }
-                        [ DOM.h5 { className: "card-title font-weight-bold text-left" } [ DOOM.text "Choose a wallet" ]
-                        , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please select a wallet to deploy a contract." ]
-                        ]
-                  ] <> case maybeWallets of
-                    Just wallets -> (ArrayAL.toArray wallets) <#> \wallet -> do
-                      renderWallet (submit $ Just wallet) wallet
-                    Nothing ->
-                      [ DOM.div { className: "d-flex justify-content-center" } $ loadingSpinnerLogo {} ]
-              -- <>
-              --   [ DOM.div { className: "row mt-4" }
-              --     [ DOM.div { className: "col-6 text-left p-0" } [ DOM.a { href: "#" } [ DOOM.text "Learn more" ] ]
-              --     , DOM.div { className: "col-6 p-0" } [ DOM.a { href: "#", className: "text-muted text-right text-decoration-none" } [ DOOM.text "I don't have a wallet" ] ]
-              --     ]
-              --   ]
-              case possibleWallets of
-                NoWalletsAvailable ->
-                  [ DOM.div { className: "row" }
-                      [ DOM.div { className: "col-12" }
-                          [ DOM.h5 { className: "card-title font-weight-bold text-left mb-3" } [ DOOM.text "Looks like you don't have a wallet extension installed." ]
-                          , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please install a cardano wallet extension, such as Lace, Nami or Eternl in order to proceed and start running Marlowe contracts." ]
-                          ]
+              ] <> case maybeWallets of
+                Just wallets -> (ArrayAL.toArray wallets) <#> \wallet -> do
+                  renderWallet (submit $ Just wallet) wallet
+                Nothing -> mempty
+          case possibleWallets of
+            NoWalletsAvailable ->
+              [ DOM.div { className: "row" }
+                  [ DOM.div { className: "col-12" }
+                      [ DOM.h5 { className: "card-title font-weight-bold text-left mb-3" } [ DOOM.text "Looks like you don't have a wallet extension installed." ]
+                      , DOM.p { className: "card-help-text text-muted text-left" } [ DOOM.text "Please install a cardano wallet extension, such as Lace, Nami or Eternl in order to proceed and start running Marlowe contracts." ]
                       ]
                   ]
-                WalletList wallets -> renderWallets (Just wallets)
-                _ -> renderWallets Nothing
-
-          ]
+              ]
+            WalletList wallets -> renderWallets (Just wallets)
+            _ -> renderWallets Nothing
+      ]
