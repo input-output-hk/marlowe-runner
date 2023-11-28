@@ -1745,6 +1745,18 @@ let
       installPhase = "ln -s $src $out";
     };
 
+    "web-resize-observer" = pkgs.stdenv.mkDerivation {
+      name = "web-resize-observer";
+      version = "f941993a7d22ec19196e8e5bf7ac924502d5dc7e";
+      src = pkgs.fetchgit {
+        url = "https://github.com/paluh/purescript-web-resize-observer.git";
+        rev = "f941993a7d22ec19196e8e5bf7ac924502d5dc7e";
+        sha256 = "0rjzvh52q8q443lk646ypab8lf7lcf4rj98k0yni6xw5vj6nqkic";
+      };
+      phases = "installPhase";
+      installPhase = "ln -s $src $out";
+    };
+
     "web-storage" = pkgs.stdenv.mkDerivation {
       name = "web-storage";
       version = "v5.0.0";
