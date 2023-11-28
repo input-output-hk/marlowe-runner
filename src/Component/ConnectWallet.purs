@@ -3,18 +3,14 @@ module Component.ConnectWallet where
 import Prelude
 
 import Component.Types (MkComponentM, WalletInfo(..))
-import Component.Widgets (SpinnerOverlayHeight(..), link, spinnerOverlay)
 import Component.Widgets as Widgets
-import Component.Widgets.Form (mkSingleChoiceField)
-import Component.Widgets.Form as Form
-import Contrib.React.Svg (loadingSpinnerLogo)
 import Data.Array as Array
 import Data.Array.ArrayAL (ArrayAL)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Either (Either(..), fromRight)
 import Data.Map (Map)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (un, unwrap)
+import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.Newtype as Newtype
 import Data.String.Extra as String
 import Data.Time.Duration (Milliseconds(..))
@@ -25,17 +21,13 @@ import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Foreign.Object as Object
 import React.Basic (JSX)
-import React.Basic (fragment) as DOOM
-import React.Basic.DOM (button, img, span_, text) as DOOM
+import React.Basic.DOM (img, text) as DOOM
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (component, useEffectOnce, useState', (/\))
 import React.Basic.Hooks as React
-import ReactBootstrap.Modal (modal, modalBody, modalFooter, modalHeader)
 import Record as Record
 import Runner.Contrib.Effect.Aff (withTimeout)
-import Runner.Contrib.ReactLoadingOverlayTs (loadingOverlay)
-import Runner.Contrib.ReactLoadingOverlayTs as LoadingOverlay
 import Type.Prelude (Proxy(..))
 import Type.Row (type (+))
 import Wallet (Wallet)
@@ -73,6 +65,7 @@ type Props =
   , onDismiss :: Effect Unit
   , onWalletConnect :: Result -> Effect Unit
   , onError :: ConnectionError -> Effect Unit
+  , overlay :: Boolean
   }
 
 formatName :: String -> String
@@ -107,7 +100,7 @@ data AvailableWallets
 mkConnectWallet :: MkComponentM (Props -> JSX)
 mkConnectWallet = do
 
-  liftEffect $ component "Wallet" \{ currentlyConnected, onWalletConnect, onError, onDismiss } -> React.do
+  liftEffect $ component "Wallet" \{ currentlyConnected, onWalletConnect, onError, onDismiss, overlay } -> React.do
     possibleWallets /\ setWallets <- useState' FetchingWalletList
     connecting /\ setConnecting <- useState' false
 
@@ -154,11 +147,13 @@ mkConnectWallet = do
                   liftEffect $ handler walletError
               liftEffect $ setConnecting false
         Nothing -> onDismiss
-      overlayActive = connecting || case possibleWallets of
+      overlayActive = overlay || connecting || case possibleWallets of
         FetchingWalletList -> true
         _ -> false
 
-    pure $ Widgets.loadingOverlay { active: overlayActive } $ Array.singleton $ DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
+    -- wrapInLoadingOverlay <- useLoadingOverlay
+
+    pure $ Widgets.renderOverlay { active: overlayActive } $ Array.singleton $ DOM.div { className: "container" } $ DOM.div { className: "row justify-content-center mt-4" }
       [ DOM.div { className: "col-12 shadow-sm rounded p-5 min-height-250px" } do
           let
             renderWallets maybeWallets = do

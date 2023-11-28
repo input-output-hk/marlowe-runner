@@ -8,7 +8,7 @@ newtype Fixed = Fixed Boolean
 footer :: JSX
 footer = do
   DOM.footer
-    { className: "mt-auto py-2 bg-light"
+    { className: "bg-light border-top"
     , children:
         [ DOM.div
             { className: "container"

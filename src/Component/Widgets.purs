@@ -17,7 +17,7 @@ import Prim.Row as Row
 import React.Basic (JSX)
 import React.Basic.DOM as DOOM
 import React.Basic.DOM.Events (preventDefault)
-import React.Basic.DOM.Simplified.Generated as DOM
+import React.Basic.DOM.Simplified.Generated (b, button, div, span) as DOM
 import React.Basic.Events (SyntheticEvent, handler)
 import ReactBootstrap (overlayTrigger, tooltip)
 import ReactBootstrap.Icons (Icon)
@@ -300,13 +300,22 @@ backToContractListLink onDismiss = do
     ]
 
 type LoadingOverlayProps =
-  { active :: Opt Boolean, showSpinner :: Opt Boolean }
+  { active :: Opt Boolean
+  , showSpinner :: Opt Boolean
+  , top :: Opt Int
+  }
 
-loadingOverlay :: forall props. NoProblem.Coerce props LoadingOverlayProps => props -> Array JSX -> JSX
-loadingOverlay props body = do
+renderOverlay
+  :: forall props
+   . NoProblem.Coerce props LoadingOverlayProps
+  => props
+  -> Array JSX
+  -> JSX
+renderOverlay props body = do
   let
     props' :: LoadingOverlayProps
     props' = NoProblem.coerce props
+
     overlaySpinner =
       if fromOpt true props'.showSpinner then LoadingOverlay.spinner.jsx $ loadingSpinnerLogo {}
       else LoadingOverlay.spinner.boolean false
@@ -314,10 +323,84 @@ loadingOverlay props body = do
       let
         overlay orig = do
           let
-            new = Object.fromHomogeneous { "background-color": "rgba(255, 255, 255, 0.9) !important" }
+            -- heightValue = case possibleHeight of
+            --   Nothing -> "100%"
+            --   Just height -> show height <> "px"
+            new = Object.fromHomogeneous
+              { "background-color": "rgba(255, 255, 255, 0.9) !important"
+              , top: (show $ fromOpt 0 props'.top) <> "px !important"
+              }
             override = Object.unionWith (\_ n -> n)
           orig `override` new
       { overlay }
   LoadingOverlay.loadingOverlay
     { className: "blur-bg rounded", active: props'.active, spinner: overlaySpinner, styles: overlayStyles }
     body
+
+-- newtype UseLoadingOverlay hooks = UseLoadingOverlay
+--   ( UseState (Maybe Number) hooks
+--     # UseState (Maybe DOM.Node)
+--     # UseRef (Nullable DOM.Node)
+--     # UseLayoutEffect Unit
+--     # UseResizeObserver
+--   )
+-- 
+-- 
+-- derive instance Newtype (UseLoadingOverlay hooks) _
+-- 
+-- -- You can use this render to wrap a single element. Every element should have different key.
+-- useLoadingOverlay :: forall props. NoProblem.Coerce props LoadingOverlayProps => Hook UseLoadingOverlay (props -> Array JSX -> JSX)
+-- useLoadingOverlay = React.coerceHook React.do
+--   possibleHeight /\ setHeight <- useState' Nothing
+--   possibleNode /\ setNode <- useState' Nothing
+--   wrapperRef <- useRef null
+-- 
+--   useLayoutEffect unit do
+--     possibleRenderedNode <- readRefMaybe wrapperRef
+--     setNode possibleRenderedNode
+--     let
+--       possibleElement = do
+--         node <- possibleRenderedNode
+--         DOM.Element.fromNode node
+--     case possibleElement of
+--       Just elem -> do
+--         domRect <- DOM.Element.getBoundingClientRect elem
+--         setHeight $ Just domRect.height
+--       Nothing -> pure unit
+--     pure $ pure unit
+-- 
+--   useResizeObserver $ { target: toNullable possibleNode, callback: _ } \entry -> do
+--     setHeight $ Just entry.contentRect.height
+-- 
+--   pure $ \props body -> renderOverlay possibleHeight wrapperRef props body
+-- 
+-- -- --     setHeight(target.current.getBoundingClientRect())
+-- -- --   }, [target])
+-- -- 
+-- -- 
+-- -- 
+-- -- -- import * as React from 'react'
+-- -- -- import useResizeObserver from '@react-hook/resize-observer'
+-- -- -- 
+-- -- -- const useSize = (target) => {
+-- -- --   const [size, setHeight] = React.useState()
+-- -- -- 
+-- -- --   React.useLayoutEffect(() => {
+-- -- --     setHeight(target.current.getBoundingClientRect())
+-- -- --   }, [target])
+-- -- -- 
+-- -- --   // Where the magic happens
+-- -- --   useResizeObserver(target, (entry) => setHeight(entry.contentRect))
+-- -- --   return size
+-- -- -- }
+-- -- -- 
+-- -- -- const App = () => {
+-- -- --   const target = React.useRef(null)
+-- -- --   const size = useSize(target)
+-- -- --   return (
+-- -- --     <pre ref={target}>
+-- -- --       {JSON.stringify({width: size.width, height: size.height}, null, 2)}
+-- -- --     </pre>
+-- -- --   )
+-- -- -- }
+-- -- 

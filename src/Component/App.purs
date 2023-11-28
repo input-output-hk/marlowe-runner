@@ -18,7 +18,6 @@ import Component.Types.ContractInfo (ContractCreated(..), ContractUpdated(..)) a
 import Component.Types.ContractInfo (SomeContractInfo)
 import Component.Types.ContractInfoMap as ContractInfoMap
 import Component.Widgets (linkWithIcon)
-import Component.Widgets as Widgets
 import Contrib.React.Svg (svgImg)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Loops (untilJust)
@@ -39,7 +38,6 @@ import Data.String.Extra (upperCaseFirst) as String
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple.Nested (type (/\), (/\))
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, delay, forkAff, launchAff_, supervise)
 import Effect.Class (liftEffect)
@@ -49,7 +47,7 @@ import Marlowe.Runtime.Web.Streaming (ContractWithTransactionsStream(..), Pollin
 import Marlowe.Runtime.Web.Streaming as Streaming
 import Marlowe.Runtime.Web.Types (Runtime(..), ContractsQueryParams)
 import Marlowe.Runtime.Web.Types as Runtime
-import React.Basic (JSX)
+import React.Basic (JSX, fragment)
 import React.Basic as ReactContext
 import React.Basic.DOM (img, text) as DOOM
 import React.Basic.DOM.Simplified.Generated (a, div, li, span, ul) as DOM
@@ -63,7 +61,7 @@ import ReactBootstrap.Modal (modal, modalBody, modalHeader)
 import ReactBootstrap.Offcanvas (offcanvas)
 import ReactBootstrap.Offcanvas as Offcanvas
 import Record as Record
-import Runner.Contrib.Effect.Aff (withTimeout, withTimeout_)
+import Runner.Contrib.Effect.Aff (withTimeout)
 import Type.Prelude (Proxy(..))
 import Utils.React.Basic.Hooks (useLoopAff, useStateRef, useStateRef')
 import Wallet as Wallet
@@ -280,9 +278,7 @@ mkApp = do
           liftEffect $ setWalletContext Nothing
         Just (WalletInfo walletInfo), _ -> do
           res <- withTimeout (Milliseconds 7000.0) do
-            traceM "TRYING TO FETCH WALLET CONTEXT"
             walletContext <- WalletContext.walletContext cardanoMultiplatformLib walletInfo.wallet
-            traceM "FAILED"
             liftEffect $ setWalletContext walletContext
             -- FIXME: Another work around the rounting issue.
             when (isNothing pwc) do
@@ -432,7 +428,6 @@ mkApp = do
                 ]
             ]
         ]
-
     pure $ case possibleWalletInfo, possibleWalletContext of
       Just walletInfo, Just walletContext -> provider walletInfoCtx ((/\) <$> possibleWalletInfo <*> possibleWalletContext) $
         [ DOM.div { className: "container" } $ DOM.div { className: "row position-relative" } $ DOM.div { className: "col-6 mx-auto position-absolute top-10px start-50 translate-middle-x z-index-popover" }
@@ -485,12 +480,10 @@ mkApp = do
             }
         , footer
         ]
-      _, _ ->
-        Widgets.loadingOverlay { active: isJust possibleWalletInfo, showSpinner: false }
-          [ DOM.div {} $
-              [ topNavbar
-              , appError
-              , landingPage { setWalletInfo: setWalletInfo <<< Just }
-              ]
-          ]
+      _, _ -> fragment
+        [ topNavbar
+        , appError
+        , landingPage { setWalletInfo: setWalletInfo <<< Just, overlay: isJust possibleWalletInfo }
+        , footer
+        ]
 

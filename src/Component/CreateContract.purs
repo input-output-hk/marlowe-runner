@@ -10,8 +10,9 @@ import Component.BodyLayout as BodyLayout
 import Component.CreateContract.Machine as Machine
 import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (OutlineColoring(..), SpinnerOverlayHeight(..), backToContractListLink, buttonOutlinedClassNames, spinnerOverlay)
+import Component.Widgets (OutlineColoring(..), backToContractListLink, buttonOutlinedClassNames)
 import Component.Widgets (submitButton) as DOM
+import Component.Widgets as Widgets
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
@@ -30,6 +31,7 @@ import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.Argonaut (decodeJson, encodeJson, jsonParser, parseJson, stringifyWithIndent)
 import Data.Argonaut as A
+import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Bifunctor (lmap)
@@ -43,7 +45,6 @@ import Data.Identity (Identity)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
-import Data.Monoid as Monoid
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (un)
 import Data.Nullable (Nullable)
@@ -166,12 +167,6 @@ mkContractFormSpec (changeAddress /\ possibleInitialContract /\ (AutoRun _)) = F
       , name: Just tagFieldId
       }
 
-    -- autoRun <- map AutoRun $ labelSubform autoRunFieldId $ booleanField
-    --   { label: DOOM.text ""
-    --   , helpText: DOOM.text "Auto-run contract"
-    --   , initial: initialAutoRun
-    --   , name: autoRunFieldId
-    --   }
     in
       contract /\ tags /\ (AutoRun true)
 
@@ -385,7 +380,6 @@ mkComponent = do
             Nothing -> pure unit
         _ -> pure unit
       pure (pure unit)
-
     let
       fields = StatelessFormSpec.renderFormSpec formSpec formState
       lookupSubform fieldId = fromMaybe mempty do
@@ -416,7 +410,6 @@ mkComponent = do
         , lookupSubform contractFieldId
         , DOOM.hr {}
         , lookupSubform tagFieldId
-        -- , lookupSubform autoRunFieldId
         ]
       formActions = fragment
         [ DOM.div { className: "row mt-5" }
@@ -449,29 +442,32 @@ mkComponent = do
                 [ formBody
                 , formActions
                 ]
-            ] <> Monoid.guard useSpinner [ spinnerOverlay Spinner100VH ]
-          content = tabs { fill: false, justify: false, defaultActiveKey: "code", variant: Tabs.variant.pills } do
-            [ tab
-                { eventKey: eventKey "graph"
-                , title: DOOM.text " Source graph"
-                , disabled: case result of
-                    Just (V (Right _) /\ _) -> false
-                    _ -> true
-                }
-                $ DOM.div { className: "w-100 mt-4 h-vh50 border border-1 rounded p-1" }
-                $ case result of
-                    Just (V (Right (contract /\ _ /\ _)) /\ _) -> do
-                      [ marloweGraph { contract: contract } ]
-                    _ ->
-                      [ DOM.div { className: "text-center" } $ DOOM.text "Please fill in the form and submit to see the source graph" ]
-            , tab
-                { eventKey: eventKey "code"
-                , disabled: false
-                , title: DOOM.text "Code"
-                }
-                $ DOM.div { className: "w-100 mt-4 h-vh50" }
-                $ formContent
             ]
+
+          content =
+            Widgets.renderOverlay { active: useSpinner, top: -2 } $ Array.singleton $
+              tabs { fill: false, justify: false, defaultActiveKey: "code", variant: Tabs.variant.pills } do
+                [ tab
+                    { eventKey: eventKey "graph"
+                    , title: DOOM.text " Source graph"
+                    , disabled: case result of
+                        Just (V (Right _) /\ _) -> false
+                        _ -> true
+                    }
+                    $ DOM.div { className: "w-100 mt-4 h-vh50 border border-1 rounded p-1" }
+                    $ case result of
+                        Just (V (Right (contract /\ _ /\ _)) /\ _) -> do
+                          [ marloweGraph { contract: contract } ]
+                        _ ->
+                          [ DOM.div { className: "text-center" } $ DOOM.text "Please fill in the form and submit to see the source graph" ]
+                , tab
+                    { eventKey: eventKey "code"
+                    , disabled: false
+                    , title: DOOM.text "Code"
+                    }
+                    $ DOM.div { className: "w-100 mt-4" }
+                    $ formContent
+                ]
         BodyLayout.component
           { title
           , description

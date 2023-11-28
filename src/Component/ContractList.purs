@@ -2,7 +2,6 @@ module Component.ContractList where
 
 import Prelude
 
-import Cardano (AssetId)
 import Cardano as Cardano
 import CardanoMultiplatformLib (CborHex, bech32ToString)
 import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
@@ -30,30 +29,26 @@ import Contrib.React.Svg (loadingSpinnerLogo)
 import Contrib.ReactBootstrap.DropdownButton (dropdownButton)
 import Contrib.ReactBootstrap.DropdownItem (dropdownItem)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (StatelessBootstrapFormSpec, textInput)
-import Contrib.Web.Clipboard as Contrib.Web.Clipboard
 import Control.Alt ((<|>))
 import Control.Alternative as Alternative
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader.Class (asks)
-import Data.Argonaut (decodeJson, encodeJson, stringify)
+import Data.Argonaut (decodeJson)
 import Data.Array (catMaybes, elem, filter)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
-import Data.DateTime.Instant (Instant, instant, unInstant)
+import Data.DateTime.Instant (Instant, unInstant)
 import Data.DateTime.Instant as Instant
 import Data.Either (Either, hush)
 import Data.Foldable (fold, for_, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
-import Data.Functor.Variant (case_)
 import Data.JSDate (fromDateTime) as JSDate
 import Data.List (intercalate)
-import Data.List as List
 import Data.Map (Map, lookup)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Set as Set
 import Data.String (contains, length)
 import Data.String as String
 import Data.String.Pattern (Pattern(..))
@@ -93,10 +88,7 @@ import ReactBootstrap.Types (placement)
 import Utils.React.Basic.Hooks (useMaybeValue, useStateRef')
 import Wallet as Wallet
 import WalletContext (WalletContext(..))
-import Web.Clipboard (clipboard)
 import Web.Clipboard as Clipboard
-import Web.HTML (window)
-import Web.HTML.Window (navigator)
 
 type ContractId = TxOutRef
 
@@ -292,7 +284,7 @@ mkContractList = do
           liftEffect $ mkEnvironment >>= setEnvironment
           liftEffect $ setCurrTimeout $ Just timeout
 
-    pure $ DOM.div { className: "min-height-100vh" } do
+    pure do
       let
         onError error = do
           msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission: " <> error ]
@@ -442,7 +434,7 @@ mkContractList = do
                   , tbody
                   ]
 
-              DOM.div { className: "container" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" } $ DOM.div { className: "p-3 shadow-sm rounded my-3" } $ case possibleContracts'', contractMapInitialized of
+              DOM.div { className: "container flex-grow-1" } $ DOM.div { className: "row" } $ DOM.div { className: "col-12" } $ DOM.div { className: "p-3 shadow-sm rounded my-3" } $ case possibleContracts'', contractMapInitialized of
                 -- Pre search no started
                 Nothing, _ -> fragment [ mkTable mempty, spinner ]
                 -- Searching but nothing was found, still searching
@@ -452,9 +444,9 @@ mkContractList = do
                   [ mkTable mempty
                   , DOM.div { className: "container" }
                       $ DOM.div { className: "row" }
-                      $ DOM.div { className: "col-12 text-center py-3 fw-bold" }
+                      $ DOM.div { className: "col-12 text-center py-3 fw-bold mute" }
                       $
-                        DOOM.text "No contracts found"
+                        DOOM.text "No contracts associated with your wallets were found."
                   ]
                 -- Searching and something was found
                 Just contracts, _ -> DOM.div { className: "col-12 px-0" } do

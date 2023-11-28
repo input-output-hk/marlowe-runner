@@ -8,13 +8,14 @@ import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
 import Component.ApplyInputs.Forms (mkApplyInputForm)
 import Component.ApplyInputs.Machine (AutoRun(..), InputChoices(..), mkEnvironment)
 import Component.ApplyInputs.Machine as Machine
-import Component.BodyLayout (descriptionLink, wrappedContentWithFooter)
+import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.InputHelper (ChoiceInput, DepositInput(..), ExecutionPath, NotifyInput, StartPathSelection(..), toIDeposit)
 import Component.InputHelper as InputHelper
 import Component.Types (ContractInfo, MkComponentM, WalletInfo(..))
 import Component.Types.ContractInfo as ContractInfo
-import Component.Widgets (SpinnerOverlayHeight(..), backToContractListLink, link, marlowePreview, marloweStatePreview, spinnerOverlay)
+import Component.Widgets (backToContractListLink, link, marlowePreview, marloweStatePreview)
+import Component.Widgets as Widgets
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
 import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
@@ -24,9 +25,7 @@ import Contrib.React.Basic.Hooks.UseMooreMachine (MooreMachineSpec, useMooreMach
 import Contrib.React.Basic.Hooks.UseMooreMachine as Moore
 import Contrib.React.Basic.Hooks.UseStatefulFormSpec (useStatefulFormSpec)
 import Contrib.React.MarloweGraph (marloweGraph)
-import Contrib.React.Svg (loadingSpinnerLogo)
-import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), FieldLayout(..), LabelSpacing(..), booleanField, choiceField, radioFieldChoice)
-import Contrib.ReactSyntaxHighlighter (jsonSyntaxHighlighter)
+import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), choiceField, radioFieldChoice)
 import Control.Monad.Reader.Class (asks)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
@@ -41,7 +40,6 @@ import Data.Int as Int
 import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
-import Data.Monoid as Monoid
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Data.Traversable (for)
 import Data.Undefined.NoProblem as NoProblem
@@ -50,7 +48,6 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics (computeTransaction) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Ada(..), Case(..), Contract(..), Environment(..), Input(..), InputContent(..), Party(..), State, TimeInterval, Token(..), TransactionInput(..), TransactionOutput(..), Value(..)) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Input(..))
@@ -434,232 +431,6 @@ type ContractDetailsProps =
   , onSuccess :: AutoRun -> Effect Unit
   }
 
-mkContractDetailsComponent :: MkComponentM (ContractDetailsProps -> JSX)
-mkContractDetailsComponent = do
-  let
-    autoRunFormSpec = evalBuilder' $ AutoRun <$> booleanField
-      { label: DOOM.text "Auto run"
-      , layout: MultiColumn { sm: Col3Label, md: Col2Label, lg: Col2Label }
-      , helpText: fragment
-          [ DOOM.text "Whether to run some of the steps automatically."
-          , DOOM.br {}
-          , DOOM.text "In non-auto mode, we provide technical details about the requests and responses"
-          , DOOM.br {}
-          , DOOM.text "which deal with during the contract execution."
-          ]
-      , initial: true
-      , touched: true
-      }
-  liftEffect $ component "ApplyInputs.ContractDetailsComponent" \{ marloweContext: { contract, state }, onSuccess, onDismiss } -> React.do
-    { formState, onSubmit: onSubmit' } <- useStatelessFormSpec
-      { spec: autoRunFormSpec
-      , onSubmit: _.result >>> case _ of
-          Just (V (Right autoRun) /\ _) -> onSuccess autoRun
-          _ -> pure unit
-      , validationDebounce: Seconds 0.5
-      }
-
-    let
-      fields = StatelessFormSpec.renderFormSpec autoRunFormSpec formState
-      body = fragment $
-        [ contractSection contract state Nothing
-        , DOOM.hr {}
-        ]
-          <> fields
-      footer = fragment
-        [ DOM.div { className: "row" } $
-            [ DOM.div { className: "col-6 text-start" } $
-                [ link
-                    { label: DOOM.text "Cancel"
-                    , onClick: onDismiss
-                    , showBorders: true
-                    , extraClassNames: "me-3"
-                    }
-                ]
-            , DOM.div { className: "col-6 text-end" } $
-                [ DOM.button
-                    { className: "btn btn-primary"
-                    , onClick: onSubmit'
-                    , disabled: false
-                    }
-                    [ R.text "Submit" ]
-                ]
-            ]
-        ]
-    pure $ BodyLayout.component
-      { title: DOM.div { className: "px-3 mx-3 fw-bold" }
-          [ DOOM.img { src: "/images/magnifying_glass.svg" }
-          , DOM.h3 { className: "fw-bold" } $ DOOM.text "Advance the contract"
-          ]
-      , description: DOM.div { className: "px-3 mx-3" }
-          [ DOM.p {} [ DOOM.text "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details." ]
-          ]
-      , content: wrappedContentWithFooter body footer
-      }
-
--- Now we want to to describe the interaction with the API where runtimeRequest is
--- a { headers: Map String String, body: JSON }.
--- We really want to provide the detailed informatin (headers and payoload)
-creatingTxDetails :: forall a1531 a1573. Maybe (Effect Unit) -> Effect Unit -> a1531 -> Maybe a1573 -> JSX
-creatingTxDetails possibleOnNext onDismiss runtimeRequest possibleRuntimeResponse = do
-  let
-    body = DOM.div { className: "row" }
-      [ DOM.div { className: "col-6" }
-          [ DOM.p { className: "h3" } $ DOOM.text "API request:"
-          , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeRequest
-          ]
-      , DOM.div { className: "col-6" } $ case possibleRuntimeResponse of
-          Nothing -> -- FIXME: loader
-
-            DOM.p {} $ DOOM.text "No response yet."
-          Just runtimeResponse -> fragment
-            [ DOM.p { className: "h3" } $ DOOM.text "API response:"
-            , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeResponse
-            ]
-      ]
-    footer = fragment
-      [ DOM.div { className: "row" } $
-          [ DOM.div { className: "col-6 text-start" } $
-              [ link
-                  { label: DOOM.text "Cancel"
-                  , onClick: onDismiss
-                  , showBorders: true
-                  , extraClassNames: "me-3"
-                  }
-              ]
-          , DOM.div { className: "col-6 text-end" } $
-              [ case possibleOnNext of
-                  Nothing -> DOM.button
-                    { className: "btn btn-primary"
-                    , disabled: true
-                    }
-                    [ R.text "Dismiss" ]
-                  Just onNext -> DOM.button
-                    { className: "btn btn-primary"
-                    , onClick: handler_ onNext
-                    , disabled: false
-                    }
-                    [ R.text "Next" ]
-              ]
-          ]
-      ]
-  DOM.div { className: "row" } $ BodyLayout.component
-    { title: DOM.h3 {} $ DOOM.text "Creating Transaction"
-    , description: DOOM.div_
-        [ DOM.p {} [ DOOM.text "We use the Marlowe Runtime to request a transaction that will apply the chosen input." ]
-        , DOM.p {} [ DOOM.text "In order to build the required transaction we use Marlowe Runtime REST API. We encode the input which we wish to apply and also provide the addresses which we were able to collect in the previous step from the wallet. The addresses are re-encoded from the lower-level Cardano CBOR hex format into Bech32 format (", DOM.code {} [ DOOM.text "addr_test..." ], DOOM.text ") and sent to the backend as part of the request." ]
-        , DOM.p {} [ DOOM.text "On the transction level this application of input is carried out by providing a redeemer, which encodes the chosen input and supplies it to the Marlowe script to execute the contract step(s). The transaction outputs must fulfill the requirements of the effects of this input application. Specifically, they need to handle all payouts if any are made, or deposit the required deposit, or finalize the contract and payout all the money according to the accounting state." ]
-        ]
-    , content: wrappedContentWithFooter body footer
-    }
-
-type Href = String
-
--- DOM.a { href: "https://preview.marlowescan.com/contractView?tab=info&contractId=09127ec2bd83d20dc108e67fe73f7e40280f6f48ea947606a7b73ac5268985a0%231", target: "_blank", className: "white-color" } [ DOOM.i { className: "ms-1 h6 bi-globe2" }, DOOM.text "  Marlowe Explorer" ]
-
-signingTransaction :: forall res. Maybe (Effect Unit) -> Effect Unit -> Maybe res -> JSX
-signingTransaction possibleOnNext onDismiss possibleWalletResponse = do
-  let
-    body = DOM.div { className: "row" }
-      [ DOM.div { className: "col-6" } $ case possibleWalletResponse of
-          Nothing ->
-            DOM.div
-              { className: "col-12 position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center blur-bg z-index-sticky"
-              }
-              $ loadingSpinnerLogo
-                  {}
-          Just runtimeResponse -> fragment
-            [ DOM.p { className: "h3" } $ DOOM.text "API response:"
-            , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeResponse
-            ]
-      ]
-    footer = fragment
-      [ link
-          { label: DOOM.text "Cancel"
-          , onClick: onDismiss
-          , showBorders: true
-          , extraClassNames: "me-3"
-          }
-      , case possibleOnNext of
-          Nothing -> DOM.button
-            { className: "btn btn-primary"
-            , disabled: true
-            }
-            [ R.text "Dismiss" ]
-          Just onNext -> DOM.button
-            { className: "btn btn-primary"
-            , onClick: handler_ onNext
-            , disabled: false
-            }
-            [ R.text "Next" ]
-      ]
-  DOM.div { className: "row" } $ BodyLayout.component
-    { title: DOM.h3 {} $ DOOM.text "Signing transaction"
-    , description: fragment
-        [ DOM.p {} [ DOOM.text "We are now signing the transaction with the wallet. While the wallet currently does not provide detailed information about the Marlowe contract within the transaction, all transaction details, including the contract, are readily accessible and can be decoded for verification:" ]
-        , DOM.ul {}
-            [ DOM.li {}
-                [ DOOM.text "A consistent Marlowe validator is used across all transactions. As the UTxO with Marlowe is available on the chain, it can be cheaply referenced - please check "
-                , descriptionLink { icon: "bi-github", href: "https://github.com/cardano-foundation/CIPs/tree/master/CIP-0031", label: "CIP-0031" }
-                , DOOM.text " for more details."
-                ]
-            , DOM.li {}
-                [ DOOM.text "The Marlowe contract, along with its state, is encoded in the datum of the UTxO with the validator."
-                ]
-            , DOM.li {}
-                [ DOOM.text "The value on the UTxO should represent the amount of money that is locked in the contract."
-                ]
-            ]
-        ]
-    , content: wrappedContentWithFooter body footer
-    }
-
-submittingTransaction :: forall req res. Effect Unit -> req -> Maybe res -> JSX
-submittingTransaction onDismiss runtimeRequest possibleRuntimeResponse = do
-  let
-    body = DOM.div { className: "row" }
-      [ DOM.div { className: "col-6" }
-          [ DOM.p { className: "h3" } $ DOOM.text "We are submitting the final transaction"
-          , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeRequest
-          ]
-      , DOM.div { className: "col-6" } $ case possibleRuntimeResponse of
-          Nothing -> -- FIXME: loader
-
-            DOM.p {} $ DOOM.text "No response yet."
-          Just runtimeResponse -> fragment
-            [ DOM.p { className: "h3" } $ DOOM.text "API response:"
-            , DOM.p {} $ jsonSyntaxHighlighter $ unsafeStringify runtimeResponse
-            ]
-      ]
-    footer = fragment
-      [ link
-          { label: DOOM.text "Cancel"
-          , onClick: onDismiss
-          , showBorders: true
-          , extraClassNames: "me-3"
-          }
-      ]
-  DOM.div { className: "row" } $ BodyLayout.component
-    { title: fragment [ DOM.h3 {} $ DOOM.text "Submitting transaction signatures" ]
-    , description: fragment
-        [ DOM.p {} [ DOOM.text "We are submitting the signatures for the transaction to the Marlowe Runtime now using its REST API." ]
-        , DOM.p {} [ DOOM.text "Marlowe Runtime will verify the signatures and if they are correct, it will attach them to the transaction and submit the transaction to the blockchain." ]
-        ]
-    , content: wrappedContentWithFooter body footer
-    }
-
-data PreviewMode
-  = DetailedFlow { showPrevStep :: Boolean }
-  | SimplifiedFlow
-
-setShowPrevStep :: PreviewMode -> Boolean -> PreviewMode
-setShowPrevStep (DetailedFlow _) showPrevStep = DetailedFlow { showPrevStep }
-setShowPrevStep SimplifiedFlow _ = SimplifiedFlow
-
-shouldShowPrevStep :: PreviewMode -> Boolean
-shouldShowPrevStep (DetailedFlow { showPrevStep }) = showPrevStep
-shouldShowPrevStep SimplifiedFlow = false
-
 type Props =
   { onDismiss :: Effect Unit
   , onSuccess :: ContractInfo.ContractUpdated -> Effect Unit
@@ -680,9 +451,7 @@ applyInputBodyLayout (UseSpinnerOverlay useSpinnerOverlay) content = do
       , DOM.div { className: "mb-3" } $ DOOM.text "Advance the contract"
       ]
     description = DOM.p { className: "mb-3" } "Progress through the contract by delving into its specifics. Analyse the code, evaluate the graph and apply the required inputs. This stage is crucial for ensuring the contract advances correctly so take a moment to confirm all details."
-    content' = fragment $
-      [ content ]
-        <> Monoid.guard useSpinnerOverlay [ spinnerOverlay Spinner100VH ]
+    content' = Widgets.renderOverlay { active: useSpinnerOverlay } [ content ]
   BodyLayout.component { title, description, content: content' }
 
 mkOnStateTransition
@@ -718,7 +487,6 @@ mkComponent = do
   runtime <- asks _.runtime
   cardanoMultiplatformLib <- asks _.cardanoMultiplatformLib
 
-  -- contractDetailsComponent <- mkContractDetailsComponent
   depositFormComponent <- mkDepositFormComponent
   choiceFormComponent <- mkChoiceFormComponent
   notifyFormComponent <- mkNotifyFormComponent

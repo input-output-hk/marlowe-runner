@@ -2,20 +2,17 @@ module Component.LandingPage where
 
 import Prelude
 
-import Component.BodyLayout as BodyLayout
 import Component.ConnectWallet (mkConnectWallet)
 import Component.ConnectWallet as ConnectWallet
 import Component.MessageHub (mkMessageBox)
 import Component.Types (ContractInfo, MessageHub(..), MkComponentMBase, WalletInfo)
 import Component.Types as MessageHub
-import Contrib.React.Svg (SvgUrl(..))
 import Control.Monad.Reader.Class (asks)
 import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Variant (Variant)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import JS.Unsafe.Stringify (unsafeStringify)
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX)
 import React.Basic.DOM (text, img) as DOOM
@@ -41,6 +38,7 @@ newtype AppContractInfoMap = AppContractInfoMap
 
 type Props =
   { setWalletInfo :: WalletInfo Wallet.Api -> Effect Unit
+  , overlay :: Boolean
   }
 
 data ConnectionErrors
@@ -52,7 +50,7 @@ mkLandingPage = do
   connectWallet <- mkConnectWallet
   msgHub@(MessageHub msgHubProps) <- asks _.msgHub
   messageBox <- liftEffect $ mkMessageBox
-  liftEffect $ component "LandingPage" \{ setWalletInfo } -> React.do
+  liftEffect $ component "LandingPage" \{ setWalletInfo, overlay } -> React.do
     let
       title =
         DOM.div { className: "pe-4 fw-bold" }
@@ -77,21 +75,19 @@ mkLandingPage = do
                   ConnectWallet.TimeoutReached ->
                     msgHubProps.add $ MessageHub.Error $ DOOM.text "Timeout reached while connecting to wallet"
               , onDismiss: pure unit
+              , overlay
               }
 
-    pure $ DOM.div { className: "container" } $ do
-      [ DOM.div { className: "row justify-content-center" }
-          [ DOM.div { className: "col-3 background-color-primary-light" } ([] :: Array JSX)
-          , DOM.div { className: "col-9 overflow-auto bg-white" }
-              $ DOM.div { className: "mx-5" }
-              $ messageBox msgHub
-          ]
-      , DOM.div { className: "row min-height-100vh d-flex flex-row align-items-stretch no-gutters" } $
+    pure $ DOM.div { className: "container flex-grow-1 d-flex" } $ do
+      [ DOM.div { className: "row flex-grow-1 d-flex flex-row align-items-stretch no-gutters" } $
           [ DOM.div { className: "pe-3 col-3 background-color-primary-light overflow-auto d-flex flex-column justify-content-center mb-3 pb-3" } $
               [ DOM.div { className: "fw-bold font-size-2rem my-3" } $ title
               , DOM.div { className: "font-size-1rem" } $ description
               ]
-          , DOM.div { className: "ps-3 col-9 bg-white position-relative" } content
+          , DOM.div { className: "ps-3 col-9 bg-white position-relative" }
+              [ DOM.div { className: "mx-5" } $ messageBox msgHub
+              , content
+              ]
           ]
       ]
 
