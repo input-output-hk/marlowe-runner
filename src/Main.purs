@@ -20,9 +20,11 @@ import Data.BigInt.Argonaut as BigInt
 import Data.Either (Either(..), hush)
 import Data.Foldable as Foldable
 import Data.Maybe (Maybe(..), fromJust, fromMaybe, maybe)
+import Data.String as String
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
 import Data.Undefined.NoProblem as NoProblem
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
@@ -137,7 +139,7 @@ mkSetPage origClasses appContainer = do
     setPageClass LoginPage =
       setAttribute "class" (origClasses <> " login-page") appContainer
     setPageClass OtherPage =
-      setAttribute "class" "" appContainer
+      setAttribute "class" origClasses appContainer
 
     setPage :: Page -> Effect Unit
     setPage page = do
@@ -226,7 +228,12 @@ main configJson = do
 
         origClasses <- liftEffect $ fromMaybe "" <$> getAttribute "class" appContainer
         let
-          { setPage, setPageClass } = mkSetPage origClasses appContainer
+          origClasses' = do
+            let
+              classes = String.split (String.Pattern " ") origClasses
+              classes' = Array.filter (_ /= "empty") $ classes
+            String.joinWith " " classes'
+          { setPage, setPageClass } = mkSetPage origClasses' appContainer
 
         liftEffect $ setPageClass LoginPage
 

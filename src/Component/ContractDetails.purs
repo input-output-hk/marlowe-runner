@@ -90,25 +90,10 @@ mkComponent = do
       --  , href: "http://marlowe.palas87.es:8002/contractView?tab=info&contractId=" <> (txOutRefToUrlEncodedString contractId)
       --  }
       body = do
-        let
-          defaultActiveKey = case contract of
-            Nothing -> "graph"
-            Just _ -> "source"
-        tabs { fill: false, justify: false, defaultActiveKey, variant: Tabs.variant.pills } do
+        tabs { fill: false, justify: false, defaultActiveKey: "graph", variant: Tabs.variant.pills } do
           let
             renderTab props children = tab props $ DOM.div { className: "mt-4 h-vh50 d-flex align-items-stretch" } children
-          [ case contract of
-              Nothing -> mempty
-              Just contract' ->
-                renderTab
-                  { eventKey: eventKey "source"
-                  , title: DOOM.span_
-                      -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
-                      [ DOOM.text " Source code"
-                      ]
-                  }
-                  $ marlowePreview contract'
-          , renderTab
+          [ renderTab
               { eventKey: eventKey "graph"
               , title: DOOM.span_
                   -- [ Icons.toJSX $ unsafeIcon "diagram-2"
@@ -120,6 +105,17 @@ mkComponent = do
                   , executionPath: NoProblem.fromMaybe possibleExecutionPath
                   , onInit: (\_ -> setGraphLoaded true)
                   }
+          , case contract of
+              Nothing -> mempty
+              Just contract' ->
+                renderTab
+                  { eventKey: eventKey "source"
+                  , title: DOOM.span_
+                      -- [ Icons.toJSX $ unsafeIcon "filetype-yml"
+                      [ DOOM.text " Source code"
+                      ]
+                  }
+                  $ marlowePreview contract'
           , case state of
               Nothing -> mempty
               Just st ->

@@ -84,6 +84,7 @@
   , "web-dom"
   , "web-file"
   , "web-html"
+  , "web-resize-observer"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

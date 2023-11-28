@@ -99,7 +99,8 @@ $link-color: #511CF7;
 #app-root {
   background: linear-gradient(to right, #F8F6FF 0%, #F8F6FF 50%,  white 50%, white 100%)
 }
-#app-root.contract-list-page {
+
+#app-root.contract-list-page, #app-root.empty {
   background: white;
 }
 
@@ -201,8 +202,16 @@ $link-color: #511CF7;
 
 /***************************************************************/
 
+.height-100dvh {
+  height: 100dvh;
+}
+
 .min-height-100vh {
   min-height: 100vh;
+}
+
+.min-height-100dvh {
+  min-height: 100dvh;
 }
 
 .min-height-100-percent {

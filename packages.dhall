@@ -426,4 +426,18 @@ in  upstream
         ]
         "https://github.com/CarstenKoenig/purescript-errors.git"
         "edfd8b1a285920e725a7fec32e736c5d59561772"
-
+  with
+    web-resize-observer = mkPackage
+      [ "arrays"
+      , "control"
+      , "effect"
+      , "either"
+      , "foldable-traversable"
+      , "foreign"
+      , "prelude"
+      , "record"
+      , "transformers"
+      , "web-dom"
+      ]
+      "https://github.com/paluh/purescript-web-resize-observer.git"
+      "f941993a7d22ec19196e8e5bf7ac924502d5dc7e"
