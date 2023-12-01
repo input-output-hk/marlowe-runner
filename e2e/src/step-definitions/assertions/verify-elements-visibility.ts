@@ -8,13 +8,10 @@ import { expect } from '@playwright/test';
 Then(
   /^I should (not |)see a "([^"]*)" with "([^"]*)" text$/,
   async function(this: ScenarioWorld, negate: string, role: ValidAccessibilityRoles, name: string) {
-
-    const {
-      screen: { page },
-    } = this;
+    const { page } = this.getScreen();
 
     await waitFor(async () => {
-        const locator = await page.getByRole(role, { name, exact: true });
+      const locator = page.getByRole(role, { name, exact: true });
       if (negate === "not") {
         // TODO: need to figure out how to assert that an element is not visible
         return expect(locator.count()).toEqual(0);
@@ -22,17 +19,14 @@ Then(
         const isElementVisible = await locator.isVisible();
         return isElementVisible;
       }
-    });
+    }, { label: `I should ${negate}see a ${role} with ${name} text` });
   }
 );
 
 Then(
   /^I should see the first "([^"]*)" showing "([^"]*)" text$/,
   async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string) {
-
-    const {
-      screen: { page },
-    } = this;
+    const { page } = this.getScreen();
 
     await waitFor(async () => {
       const tableLocator = page.locator('table');
@@ -55,16 +49,12 @@ function sleep(seconds: number): Promise<void> {
 Then(
   /^I should see a "([^"]*)" with "([^"]*)" text within the "([^"]*)" "([^"]*)"$/,
   async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string, parentName: string, parentRole: ValidAccessibilityRoles) {
-
-    const {
-      screen: { page },
-    } = this;
-
+    const { page } = this.getScreen();
 
     // NOTE: This locator uses html accessibility roles and names to find elements.
     // If your test is not finding an element, please verify that the role and name are correct.
     await waitFor(async () => {
-      const locator = await page.getByRole(parentRole, {name: parentName, exact: true}).getByRole(role, { name, exact: true });
+      const locator = page.getByRole(parentRole, {name: parentName, exact: true}).getByRole(role, { name, exact: true });
       const isElementVisible = await locator.isVisible();
       return isElementVisible;
     });
@@ -74,11 +64,7 @@ Then(
 Then(
   /^I should see "([^"]*)" text$/,
   async function(this: ScenarioWorld, text:string) {
-
-    const {
-      screen: { page },
-    } = this;
-
+    const { page } = this.getScreen();
 
     // NOTE: This locator uses html accessibility roles and names to find elements.
     // If your test is not finding an element, please verify that the role and name are correct.

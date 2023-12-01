@@ -9,10 +9,8 @@ import {
 Then(
   /^I should be on the "([^"]*)" page$/,
   async function(this: ScenarioWorld, pageId: PageId) {
-    const {
-      screen: { page },
-      globalConfig,
-    } = this;
+    const { page } = this.getScreen();
+    const { globalConfig, } = this;
 
   await waitFor(() => currentPathMatchesPageId(page, pageId, globalConfig))
 });

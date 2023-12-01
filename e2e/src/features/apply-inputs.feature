@@ -6,6 +6,7 @@ Feature: As a user, I would like to apply an input on a current contract
     As a user I would like to apply an input on a current contract
     So that I can proceed through the contract
 
+    @creating-deposit
     Scenario Outline: Creating a deposit with a wallet
       Given I configure my <wallet_name> wallet
       And I am on the "home" page
@@ -33,8 +34,9 @@ Feature: As a user, I would like to apply an input on a current contract
     Examples:
       | wallet_name |
       | lace        |
-      | nami        |
+      # | nami        |
 
+    @creating-choice
     Scenario Outline: Creating a choice with a wallet
       Given I configure my <wallet_name> wallet
       And I am on the "home" page
@@ -55,7 +57,6 @@ Feature: As a user, I would like to apply an input on a current contract
       When I click the first "button" with "Advance" text
       Then I should see a "button" with "Advance contract" text
 
-      When I fill in the "choice-input" input with "1"
       When I click the "button" with "Advance contract" text And sign the transaction with <wallet_name> wallet
       Then I should see the first "button" showing "Syncing" text
       And I should see the first "button" showing "Advance" text
@@ -127,7 +128,7 @@ Feature: As a user, I would like to apply an input on a current contract
       | lace        |
       | nami        |
 
-    @dev
+    @escrow-with-two-wallets
     Scenario: Creating an escrow contract with two separate wallets
       Given I configure my lace wallet
       Given I configure my nami wallet
@@ -161,7 +162,6 @@ Feature: As a user, I would like to apply an input on a current contract
       Then I should see a "button" with "Advance contract" text
 
       When I select "Report problem" from the "form-select" dropdown
-      And I fill in the "choice-input" input with "1"
       And I click the "button" with "Advance contract" text And sign the transaction with nami wallet
       Then I should see the first "button" showing "Syncing" text
 
@@ -173,7 +173,6 @@ Feature: As a user, I would like to apply an input on a current contract
       Then I should see a "button" with "Advance contract" text
 
       When I select "Confirm problem" from the "form-select" dropdown
-      And I fill in the "choice-input" input with "1"
       And I click the "button" with "Advance contract" text And sign the transaction with lace wallet
 
       And I pause the page

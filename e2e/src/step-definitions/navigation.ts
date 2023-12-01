@@ -12,20 +12,19 @@ Given(
   /^I am on the "([^"]*)" page$/,
   async function(this: ScenarioWorld, pageId: PageId) {
     // Anything we pull off from `this` variable is defined in cucumber world
-    const {
-      screen: { page },
-      globalConfig,
-    } = this;
-    console.log(`I am on the ${pageId} page application`);
+    const { page } = this.getScreen();
+    const { globalConfig } = this;
 
     await navigateToPage(page, pageId, globalConfig);
 
-    await waitFor(() => currentPathMatchesPageId(page, pageId, globalConfig))
+    await waitFor(() =>
+      currentPathMatchesPageId(page, pageId, globalConfig)
+    , { label: `I am on the ${pageId} page application` });
   }
 );
 
 Then('a new browser tab should open for {string} at {string} url', async function (this: ScenarioWorld, name: string, expectedUrl: string) {
-    const { globalStateManager } = this;
+  const { globalStateManager } = this;
   const newPage: playwright.Page = globalStateManager.getValue(name);
 
   await waitFor(async() => {
@@ -46,9 +45,7 @@ Then('a new browser tab should open for {string} at {string} url', async functio
 When(
   /^I pause the page$/,
   async function(this: ScenarioWorld) {
-    const {
-      screen: { page },
-    } = this;
+    const { page } = this.getScreen();
     await page.pause();
   }
 )
@@ -56,9 +53,7 @@ When(
 When(
   /^I reload the page$/,
   async function(this: ScenarioWorld) {
-    const {
-      screen: { page },
-    } = this;
+    const { page } = this.getScreen();
     await waitFor(async() => {
       await page.reload();
       return true;
