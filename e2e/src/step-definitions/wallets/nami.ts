@@ -1,5 +1,5 @@
-import playwright, { Page } from 'playwright';
-import { waitFor } from "../../support/wait-for-behavior.js";
+import { Locator, Page } from 'playwright';
+import { waitFor, waitForRoleVisible } from "../../support/wait-for-behavior.js";
 import { inputValue } from '../../support/html-behavior.js';
 import { sleep } from '../../promise.js';
 import { Bech32 } from '../../cardano.js';
@@ -22,137 +22,59 @@ export const configure = async function (page: Page, mnemonic: string[], walletU
   }, { label: "Wallet Address visible" });
 
   // Check if we are already logged in
-  var buttonNew = page.getByRole("button", { name: "New Wallet", exact: true });
-  var buttonNewVisible = await buttonNew.isVisible();
+  const buttonNewVisible = await waitFor(async () => {
+    const locator = page.getByRole("button", { name: "New Wallet", exact: true });
+    return await locator.isVisible();
+  }, { timeout: 1000, onTimeout: () => { return false; }});
   if(!buttonNewVisible) {
     return await readAddress();
   }
 
   await page.goto(`${walletURL}/createWalletTab.html?type=import&length=24`);
 
+  let locator:Locator;
   for (let i = 0; i < 24; i++) {
     const name = `Word ${i+1}`;
-    await waitFor(async () => {
-      const locator = page.getByRole("textbox", { name: name, exact: true });
-        const result = await locator.isVisible();
-
-        if (result) {
-          await inputValue(locator, mnemonic[i]);
-          return result;
-        }
-      }, { label: "Word " + i });
+    locator = await waitForRoleVisible(page, "textbox", name);
+    await inputValue(locator, mnemonic[i]);
   }
 
-  await waitFor(async () => {
-    const buttonName = "Next"
-    const locator = page.getByRole("button", { name: buttonName, exact: true });
-    const result = await locator.isVisible();
-    if (result) {
-      await locator.click();
-      return result;
-    }
-  }, { label: "Next 1 Button" });
+  locator = await waitForRoleVisible(page, "button", "Next");
+  await locator.click();
 
-  await waitFor(async () => {
-    const name = "Enter account name";
-    const locator = page.getByRole("textbox", { name: name, exact: true });
-    const result = await locator.isVisible();
+  locator = await waitForRoleVisible(page, "textbox", "Enter account name");
+  await inputValue(locator, "Runner test");
 
-    if (result) {
-      await inputValue(locator, "Runner test");
-      return result;
-    }
-  }, { label: "Enter account name" });
+  locator = await waitForRoleVisible(page, "textbox", "Enter password");
+  await inputValue(locator, "Runner test");
 
-  await waitFor(async () => {
-    const name = "Enter password";
-    const locator = page.getByRole("textbox", { name: name, exact: true });
-    const result = await locator.isVisible();
+  locator = await waitForRoleVisible(page, "textbox", "Confirm password");
+  await inputValue(locator, "Runner test");
 
-    if (result) {
-      await inputValue(locator, "Runner test");
-      return result;
-    }
-  }, { label: "Enter password" });
+  locator = await waitForRoleVisible(page, "button", "Create");
+  await locator.click();
 
-  await waitFor(async () => {
-    const name = "Confirm password";
-    const locator = page.getByRole("textbox", { name: name, exact: true });
-    const result = await locator.isVisible();
-
-    if (result) {
-      await inputValue(locator, "Runner test");
-      return result;
-    }
-  }, { label: "Confirm password" });
-
-  await waitFor(async () => {
-    const buttonName = "Create"
-    const locator = page.getByRole("button", { name: buttonName, exact: true });
-    const result = await locator.isVisible();
-    if (result) {
-      await locator.click();
-      return result;
-    }
-  }), { label: "Create Button" };
-
-  await waitFor(async () => {
-    const buttonName = "Close"
-    const locator = page.getByRole("button", { name: buttonName, exact: true });
-    const result = await locator.isVisible();
-    if (result) {
-      return result;
-    }
-  }, { label: "Close Button" });
-
+  await waitForRoleVisible(page, "button", "Close");
   await page.goto(`${walletURL}/mainPopup.html`);
 
-  const clickEmptyButton = async () => waitFor(async () => {
-    const buttonName = ""
-    const locator = page.getByRole("button", { name: buttonName, exact: true });
-    const result = await locator.isVisible();
-    if (result) {
-      await locator.click();
-      return result;
-    }
-  });
-
+  const clickEmptyButton = async () => {
+    const locator = await waitForRoleVisible(page, "button", "");
+    await locator.click();
+  };
   await clickEmptyButton();
 
-  // await page.reload();
+  locator = await waitForRoleVisible(page, "menuitem", "Settings");
+  await locator.click();
 
-  await waitFor(async () => {
-    const buttonName = "Settings"
-    const locator = page.getByRole("menuitem", { name: buttonName, exact: true });
-    const result = await locator.isVisible();
-    if (result) {
-      await locator.click();
-      return result;
-    }
-  }, { label: "Settings Button" });
+  locator = await waitForRoleVisible(page, "button", "Network");
+  await locator.click();
 
-  await waitFor(async () => {
-    const buttonName = "Network"
-    const locator = page.getByRole("button", { name: buttonName, exact: true });
-    const result = await locator.isVisible();
-    if (result) {
-      await locator.click();
-      return result;
-    }
-  }, { label: "Network Button" });
+  locator = await waitForRoleVisible(page, "combobox");
+  await locator.selectOption("Preprod");
 
+  locator = page.locator(".chakra-text").last();
+  await locator.waitFor({ state: "visible" });
   await waitFor(async () => {
-    const network = "Preprod"
-    const locator = page.getByRole("combobox");
-    const result = await locator.isVisible();
-    if (result) {
-      await locator.selectOption(network);
-      return result;
-    }
-  }, { label: "Preprod network" });
-
-  await waitFor(async () => {
-    const locator = page.locator(".chakra-text").last();
     const innerText = await locator.innerText();
     return (innerText === "Preprod");
   }, { label: "Preprod network text" });
@@ -160,12 +82,9 @@ export const configure = async function (page: Page, mnemonic: string[], walletU
   // Nami is BUGGY. Jumping directly or indirectly to subpages
   // is error prone. We need to do it step by step by slowly clicking.
   // await page.goto(`${walletURL}/wallet`); // this doesn't work
-
+  // TODO: Replace `sleep` with proper sub-pages element visibility checks.
   await sleep(1);
-  // back button in this case
   await clickEmptyButton();
-
-  // back button in this case
   await sleep(1);
   await clickEmptyButton();
 
@@ -183,15 +102,9 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
   const grantAccess:Promise<boolean> = (async () => {
     const page = await walletPopupPromise;
     await page.reload();
-    return await waitFor(async ():Promise<boolean> => {
-      const accessButton = page.getByText("Access")
-      const accessButtonVisible = await accessButton.isVisible();
-      if (accessButtonVisible) {
-        await accessButton.click();
-        return true;
-      }
-      return false;
-    }, { label: "Access button" });
+    const locator = await waitForRoleVisible(page, "button", "Access");
+    await locator.click();
+    return true;
   })();
 
   const isAuthorized: () => Promise<boolean> = async () => waitFor(async () => {
@@ -203,12 +116,3 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
   await isAuthorized();
 }
 
-// await waitFor(async () => {
-//   const locator = page.getByTestId("wallet-info");
-//   const result = await locator.isVisible();
-//   if (result) {
-//     const address = await locator.getAttribute("data-wallet-address");
-//     globalStateManager.appendValue("wallet-address", address);
-//     return result;
-//   }
-// }, { label: "Wallet Address visible" });

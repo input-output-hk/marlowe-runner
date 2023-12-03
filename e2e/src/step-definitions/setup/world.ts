@@ -14,19 +14,14 @@ import { GlobalConfig } from '../../env/global.js';
 import GlobalStateManager from "../../support/globalStateManager.js";
 import { Bech32 } from '../../cardano.js';
 
-type WalletBrowser =
-  { context: BrowserContext
-  , laceURL: string
-  , namiURL: string
-  , getDefaultPage: () => Promise<Page>
-  , getNewPage: () => Promise<Page>
-  }
-
 export type WalletType = "nami" | "lace";
 
 type Screen = {
   page: Page
-  context: BrowserContext
+  // TODO: Hide contect and expose only page related methods
+  context: BrowserContext,
+  // getDefaultPage: () => Promise<Page>
+  // getNewPage: () => Promise<Page>
   wallet: {
     address: Bech32,
     name: string,
@@ -130,16 +125,20 @@ export class ScenarioWorld extends World {
 
       const { laceURL, namiURL } = await walletURLs(context);
       const page = await getDefaultPage();
+      console.log("PAGE FETCHED")
 
       const walletURL = walletType == "lace"?laceURL:namiURL;
       const mnemonic = fs.readFileSync('artifacts/mnemonics/' + walletName, 'utf-8').trim().split(' ');
       let address:null|Bech32 = null;
+      console.log("MNEMONIC READ")
       switch (walletType) {
         case "lace":
           address = await lace.configure(page, mnemonic, walletURL);
           break;
         case "nami":
+          console.log("NAMI CONFIGURE")
           address = await nami.configure(page, mnemonic, walletURL);
+          console.log("NAMI CONFIGURED")
           break;
       }
       if(address == null) {
