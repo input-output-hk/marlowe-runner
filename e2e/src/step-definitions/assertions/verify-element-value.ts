@@ -1,6 +1,6 @@
 import { Then } from '@cucumber/cucumber';
 import { ElementKey, ValidAccessibilityRoles } from '../../env/global.js';
-import { ScenarioWorld } from '../setup/world.js'
+import { ScenarioWorld } from '../world.js'
 import { waitFor } from '../../support/wait-for-behavior.js';
 import { getElementLocator } from '../../support/web-element-helper.js';
 import moment from 'moment';

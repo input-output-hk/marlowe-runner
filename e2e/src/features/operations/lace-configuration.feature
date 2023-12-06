@@ -16,5 +16,5 @@ Feature: As a user, I would like to initialize a lace wallet and use it
       And I am on the "home" page
       Then I should see a "heading" with "Choose a wallet" text
 
-      When I authorize the wallet
+      When I authorize the app
       Then I should see a "button" with "Create a contract" text

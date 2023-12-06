@@ -1,5 +1,5 @@
 import { When } from '@cucumber/cucumber';
-import { ScenarioWorld } from './setup/world.js';
+import { ScenarioWorld } from './world.js';
 import { waitFor } from '../support/wait-for-behavior.js';
 import moment from 'moment';
 

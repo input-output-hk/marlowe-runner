@@ -1,6 +1,6 @@
 import { Before, After, setDefaultTimeout } from '@cucumber/cucumber';
 import { ScenarioWorld } from './world.js';
-import { env, envNumber } from '../../env/parseEnv.js'
+import { env, envNumber } from '../env/parseEnv.js'
 
 setDefaultTimeout(envNumber('SCRIPT_TIMEOUT'));
 
@@ -34,7 +34,6 @@ After(async function(this: ScenarioWorld, scenario) {
   for (const walletType in screensCache) {
     for (const walletName in screensCache[walletType]) {
       const screen = screensCache[walletType][walletName];
-      console.log("FINISHING", screen.wallet.name);
       await screen.context.close();
     }
   }

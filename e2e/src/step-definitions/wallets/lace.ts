@@ -3,6 +3,8 @@ import { waitFor, waitForRoleVisible, waitForSelectorVisible, waitForTestIdVisib
 import { inputValue } from '../../support/html-behavior.js';
 import { Bech32 } from '../../cardano.js';
 
+var SPENDING_PASSWORD: string = "Runner test";
+
 export const configure = async function(page: Page, mnemonic: string[], walletURL: string):Promise<Bech32> {
   await page.goto(`${walletURL}/app.html`);
 
@@ -11,12 +13,7 @@ export const configure = async function(page: Page, mnemonic: string[], walletUR
     await button.click();
     const addressContainer = await waitForTestIdVisible(page, "address-card-address");
     const address:string = await addressContainer.innerText();
-    try {
-      return Bech32.fromString(address);
-    } catch (error) {
-      console.log(`Address ${address} is not a valid bech32 address`);
-      throw error;
-    }
+    return Bech32.fromString(address);
   };
   const buttonRestore = page.getByRole("button", { name: "Restore", exact: true });
   const buttonRestoreVisible = await waitFor(async () => {
@@ -50,10 +47,10 @@ export const configure = async function(page: Page, mnemonic: string[], walletUR
   await locator.click();
 
   locator = await waitForTestIdVisible(page, "wallet-setup-password-step-password");
-  await inputValue(locator, "RunnerE2ETest");
+  await inputValue(locator, SPENDING_PASSWORD);
 
   locator = await waitForTestIdVisible(page, "wallet-setup-password-step-confirm-password");
-  await inputValue(locator, "RunnerE2ETest");
+  await inputValue(locator, SPENDING_PASSWORD);
 
   locator = await waitForRoleVisible(page, "button", "Next");
   await locator.click();
@@ -114,7 +111,6 @@ export const configure = async function(page: Page, mnemonic: string[], walletUR
   return await readAddress();
 };
 
-
 export const authorizeApp = async function (page: Page, triggerAuthorization: () => Promise<void>, isAuthorizedCheck: (page: Page) => Promise<boolean>) {
   const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
   await triggerAuthorization();
@@ -129,7 +125,7 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
         return result;
       }
       return true
-    }, { label: "Access button" });
+    }, { label: "Authorize button" });
 
     await waitFor(async() => {
       const locator = page.getByRole("button", { name: "Always", exact: true });
@@ -143,4 +139,36 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
 
   await Promise.any([isAuthorizedCheck(page), grantAccess]);
   await isAuthorizedCheck(page);
+}
+
+export const signTx = async (page: Page, triggerSign: () => Promise<void>): Promise<void> => {
+  var locator: Locator;
+  const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
+  await triggerSign();
+  const walletPopup = await walletPopupPromise;
+  await walletPopup.reload();
+
+  locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
+  await locator.click();
+
+  locator = await waitForTestIdVisible(walletPopup, "password-input");
+  await inputValue(locator, SPENDING_PASSWORD);
+
+  locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
+  await locator.click();
+
+  locator = await waitForRoleVisible(walletPopup, "button", "Close");
+  await locator.click();
+}
+
+// The same as the signTx but we are rejecting the tx
+export const rejectTx = async function(page: Page, triggerSign: () => Promise<void>): Promise<void> {
+  var locator: Locator;
+  const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
+  await triggerSign();
+  const walletPopup = await walletPopupPromise;
+  await walletPopup.reload();
+
+  locator = await waitForRoleVisible(page, "button", "Cancel");
+  await locator.click();
 }

@@ -4,6 +4,8 @@ import { inputValue } from '../../support/html-behavior.js';
 import { sleep } from '../../promise.js';
 import { Bech32 } from '../../cardano.js';
 
+var SPENDING_PASSWORD: string = "Runner test";
+
 // Configure a nami wallet spcified by the mnemonic if it is not already configured.
 export const configure = async function (page: Page, mnemonic: string[], walletURL: string): Promise<Bech32> {
   await page.goto(`${walletURL}/mainPopup.html`);
@@ -46,10 +48,10 @@ export const configure = async function (page: Page, mnemonic: string[], walletU
   await inputValue(locator, "Runner test");
 
   locator = await waitForRoleVisible(page, "textbox", "Enter password");
-  await inputValue(locator, "Runner test");
+  await inputValue(locator, SPENDING_PASSWORD);
 
   locator = await waitForRoleVisible(page, "textbox", "Confirm password");
-  await inputValue(locator, "Runner test");
+  await inputValue(locator, SPENDING_PASSWORD);
 
   locator = await waitForRoleVisible(page, "button", "Create");
   await locator.click();
@@ -96,7 +98,7 @@ export const configure = async function (page: Page, mnemonic: string[], walletU
 // This function helps to handle both cases by accepting a callback that checks if we are already
 // authorized.
 // It should be called after connect action.
-export const authorizeApp = async function (page: Page, triggerAuthorization: () => Promise<void>, isAuthorizedCheck: (page: Page) => Promise<boolean>) {
+export const authorizeApp = async function (page: Page, triggerAuthorization: () => Promise<void>, isAuthorizedCheck: (page: Page) => Promise<boolean>): Promise<void> {
   const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
   await triggerAuthorization();
   const grantAccess:Promise<boolean> = (async () => {
@@ -114,5 +116,33 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
 
   await Promise.any([isAuthorized(), grantAccess]);
   await isAuthorized();
+}
+
+export const signTx = async (page: Page, triggerSign: () => Promise<void>): Promise<void> => {
+  var locator: Locator;
+  const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
+  await triggerSign();
+  const walletPopup = await walletPopupPromise;
+  await walletPopup.reload();
+
+  locator = await waitForRoleVisible(walletPopup, "button", "Sign");
+  await locator.click();
+
+  locator = await waitForRoleVisible(walletPopup, "textbox", "Enter password");
+  await inputValue(locator, SPENDING_PASSWORD);
+
+  locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
+  await locator.click();
+}
+
+export const rejectTx = async function(page: Page, triggerSign: () => Promise<void>): Promise<void> {
+  var locator: Locator;
+  const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
+  await triggerSign();
+  const walletPopup = await walletPopupPromise;
+  await walletPopup.reload();
+
+  locator = await waitForRoleVisible(page, "button", "Cancel");
+  await locator.click();
 }
 

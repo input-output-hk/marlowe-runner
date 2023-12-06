@@ -1,18 +1,18 @@
-
 import playwright, {
   BrowserContextOptions,
   Page,
   BrowserContext,
   BrowserType
 } from 'playwright';
-import { env } from '../../env/parseEnv.js'
+import { env } from '../env/parseEnv.js'
 import * as fs from 'fs';
-import * as nami from '../wallets/nami.js';
-import * as lace from '../wallets/lace.js';
+import * as nami from './wallets/nami.js';
+import * as lace from './wallets/lace.js';
 import { World, IWorldOptions, setWorldConstructor } from "@cucumber/cucumber";
-import { GlobalConfig } from '../../env/global.js';
-import GlobalStateManager from "../../support/globalStateManager.js";
-import { Bech32 } from '../../cardano.js';
+import { GlobalConfig } from '../env/global.js';
+import GlobalStateManager from "../support/globalStateManager.js";
+import { Bech32, ContractId } from '../cardano.js';
+import { Contract } from '@marlowe.io/language-core-v1';
 
 export type WalletType = "nami" | "lace";
 
@@ -32,20 +32,23 @@ type Screen = {
 };
 
 type Screens = (walletType: WalletType, walletName:string) => Promise<Screen>;
+// FIXME: Currently we are fetching addresses from the wallet UI and not by
+// precomputing those or by transforming mnemonic to an addresses.
+type Addresses = (walletName:string) => Promise<Bech32>;
 
-const walletURLs = async (context: BrowserContext) => {
+type ContractInfo = {
+  contractId: ContractId | undefined,
+  contract: Contract,
+}
+
+const getWalletURL = async (context: BrowserContext) => {
   let background = context.serviceWorkers();
-  while (background.length != 2) {
+  while (background.length !== 1) {
     await context.waitForEvent('serviceworker');
     background = context.serviceWorkers();
   };
-  const laceId = background[0].url().split('/')[2];
-  const laceURL = 'chrome-extension://' + laceId;
-
-  const namiId = background[1].url().split('/')[2];
-  const namiURL = 'chrome-extension://' + namiId;
-
-  return { laceURL, namiURL };
+  const walletId = background[0].url().split('/')[2];
+  return 'chrome-extension://' + walletId;
 }
 
 export class ScenarioWorld extends World {
@@ -59,18 +62,41 @@ export class ScenarioWorld extends World {
 
   screen: Screen | null = null;
   screens!: Screens;
+  addresses!: Addresses;
+  contracts: { [key: string]: ContractInfo } = {};
+
   globalStateManager = new GlobalStateManager();
+
   screensCache = {
     lace: {},
     nami: {}
   };
 
   async init(contextOptions?: BrowserContextOptions): Promise<void> {
-    this.screens = await this.mkLazyScreens();
-    // I used this default to simplify migration
-    // FIXME: we should start here with null
-    // this.screen = await this.screens("nami", "alice");
-    // return this.screen;
+    const screens = await this.mkLazyBrowsers();
+    this.screens = screens;
+  }
+
+  public getContractInfo(contractName: string): ContractInfo {
+    const contractInfo = this.contracts[contractName];
+    if (contractInfo === undefined) {
+      throw new Error(`Contract ${contractName} is not defined`);
+    }
+    return contractInfo;
+  }
+
+  public setContractInfo(contractName: string, contractInfo: ContractInfo): void {
+    this.contracts[contractName] = contractInfo;
+  }
+
+  public async getWalletAddress(walletName?:string): Promise<Bech32> {
+    // Just check if there is any wallet configured in the cache for a given user and grab the address
+    if(walletName === undefined) {
+      const { wallet } = this.getScreen();
+      return wallet.address;
+    }
+    const fileContent = await fs.promises.readFile('artifacts/wallets/' + walletName + '/testnet.bech32', 'utf-8');
+    return Bech32.fromString(fileContent.trim());
   }
 
   public getScreen(): Screen {
@@ -80,7 +106,7 @@ export class ScenarioWorld extends World {
     return this.screen;
   }
 
-  private mkLazyScreens = async (): Promise<Screens> => {
+  private mkLazyBrowsers = async (): Promise<Screens> => {
     // This was probably copied - currenltly we use chromium only.
     const automationBrowsers = ['chromium', 'firefox', 'webkit']
     type AutomationBrowser = typeof automationBrowsers[number]
@@ -95,6 +121,7 @@ export class ScenarioWorld extends World {
         return cache[walletType][walletName];
       }
       const persistentContextName = '/tmp/' + walletName + '-' + walletType;
+      const pathToExtension = walletType == "lace"?pathToLaceExtension:pathToNamiExtension;
       const context = await browserType.launchPersistentContext(persistentContextName, {
         devtools: process.env.DEVTOOLS !== 'false',
         headless: process.env.HEADLESS !== 'false',
@@ -105,7 +132,7 @@ export class ScenarioWorld extends World {
             '--enable-automation',
             '--no-first-run',
             '--no-default-browser-check',
-            `--disable-extensions-except=${pathToLaceExtension},${pathToNamiExtension}`,
+            `--disable-extensions-except=${pathToExtension}`,
             '--disable-web-security',
             '--allow-insecure-localhost',
             '--window-size=1920,1080',
@@ -123,26 +150,22 @@ export class ScenarioWorld extends World {
         return pages[0];
       }
 
-      const { laceURL, namiURL } = await walletURLs(context);
+      const walletURL = await getWalletURL(context);
       const page = await getDefaultPage();
-      console.log("PAGE FETCHED")
 
-      const walletURL = walletType == "lace"?laceURL:namiURL;
-      const mnemonic = fs.readFileSync('artifacts/mnemonics/' + walletName, 'utf-8').trim().split(' ');
+      const mnemonic = fs.readFileSync('artifacts/wallets/' + walletName + '/mnemonic', 'utf-8').trim().split(' ');
+      const expectedAddress:Bech32 = Bech32.fromString(fs.readFileSync('artifacts/wallets/' + walletName + '/testnet.bech32', 'utf-8').trim());
       let address:null|Bech32 = null;
-      console.log("MNEMONIC READ")
       switch (walletType) {
         case "lace":
           address = await lace.configure(page, mnemonic, walletURL);
           break;
         case "nami":
-          console.log("NAMI CONFIGURE")
           address = await nami.configure(page, mnemonic, walletURL);
-          console.log("NAMI CONFIGURED")
           break;
       }
-      if(address == null) {
-        throw new Error("Wallet configuration failed - provided address is null!");
+      if(address === null || address.toString() != expectedAddress.toString()) {
+        throw new Error("Wallet configuration failed - wallet address is not the same as expected: given " + address + " != expected " + expectedAddress);
       }
       const wallet = { address, name: walletName, mnemonic, url: walletURL, type: walletType };
       const screen = { context, page, wallet };

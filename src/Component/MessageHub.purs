@@ -110,9 +110,9 @@ mkMessageBox = component "MessageBox" \(MessageHub { ctx, remove }) -> R.do
 data Action
   = Add MessageContent
   | Remove MessageId
+  | RemoveAll
 
 -- | Slightly unsafe (you have to wrap your app in the hub component) but convenient API.
-
 mkMessageHub :: Effect ((Array JSX -> JSX) /\ MessageHub)
 mkMessageHub = do
   { emitter, listener } <- Subscription.create
@@ -135,6 +135,8 @@ mkMessageHub = do
         updateMessages $ List.Cons msg'
       Remove id -> do
         updateMessages $ List.filter (\{ id: id' } -> id /= id')
+      RemoveAll -> do
+        updateMessages $ const List.Nil
 
     pure
       $ provider msgCtx messages

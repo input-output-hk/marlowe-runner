@@ -36,7 +36,7 @@ const worldParameters: GlobalConfig = {
 };
 
 export const common = {
-  import: ['./src/step-definitions/**/**/*.js'],
+  import: ['./src/step-definitions/**/*.js'],
   paths: ['./src/features/**/*.feature'],
   worldParameters
 }

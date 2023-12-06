@@ -1,6 +1,6 @@
 import { Then } from '@cucumber/cucumber';
 import { ValidAccessibilityRoles } from '../../env/global.js';
-import { ScenarioWorld } from '../setup/world.js'
+import { ScenarioWorld } from '../world.js'
 import { waitFor } from '../../support/wait-for-behavior.js';
 import { expect } from '@playwright/test';
 
@@ -36,9 +36,7 @@ Then(
       if (!!textContent) {
         return textContent.includes(name);
       }
-    }, {
-      timeout: 240000,
-    });
+    }, { timeout: 440000, label: `I should see the first ${role} showing ${name} text` });
   }
 );
 

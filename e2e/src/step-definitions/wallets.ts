@@ -1,6 +1,6 @@
 import { When } from '@cucumber/cucumber';
-import { ScenarioWorld, WalletType } from './setup/world.js';
-import { waitFor } from "../support/wait-for-behavior.js";
+import { ScenarioWorld, WalletType } from './world.js';
+import { AccessibilityRole, waitForRoleVisible } from "../support/wait-for-behavior.js";
 import * as nami from "./wallets/nami.js";
 import * as lace from "./wallets/lace.js";
 import { Page } from 'playwright';
@@ -33,21 +33,12 @@ const mkTriggerAuthorization = (page: Page, walletType: WalletType) => async () 
     default:
       throw new Error('Unknown wallet type');
   }
-
-  await waitFor(async() => {
-    const locator = page.getByRole("button", { name: buttonName, exact: true });
-    const result = await locator.isVisible();
-    if (result) {
-      await locator.click();
-      return result;
-    }
-  }, { label: `${buttonName} button` });
+  const locator = await waitForRoleVisible(page, "button", buttonName);
+  await locator.click();
 }
 
-
-
 When(
-  /^I authorize the wallet$/,
+  /^I authorize the app$/,
   async function(this: ScenarioWorld) {
     const { page, wallet } = this.getScreen();
     const isAuthorizedCheck = (page: Page) => {
@@ -65,18 +56,27 @@ When(
       default:
         throw new Error('Unknown wallet type');
     }
-
-
-    // await nami.authorizeApp(page, (page) => { return page.getByTestId("wallet-info").isVisible() });
-
-    // await waitFor(async() => {
-    //   const locator = page.getByTestId("wallet-info");
-    //   const result = await locator.isVisible();
-    //   if (result) {
-    //     const address = await locator.getAttribute("data-wallet-address");
-    //     globalStateManager.appendValue("wallet-address", address);
-    //     return result;
-    //   }
-    // }, { label: "Wallet Address visible" });
   }
 );
+
+When(
+  /^I click the "([^"]*)" with "([^"]*)" text And sign the transaction$/,
+  async function(this: ScenarioWorld, role: AccessibilityRole,  name: string) {
+    const { page, wallet } = this.getScreen();
+    const triggerSign = async () => {
+      const locator = await waitForRoleVisible(page, role, name);
+      await locator.click();
+    }
+    switch (wallet.type) {
+      case 'nami':
+        await nami.signTx(page, triggerSign);
+        break;
+      case 'lace':
+        await lace.signTx(page, triggerSign);
+        break;
+      default:
+        throw new Error('Unknown wallet type');
+    }
+  }
+);
+

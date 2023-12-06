@@ -6,12 +6,13 @@ Feature: As a user, I would like to create a default contract with my lace walle
     As a user I would like to log into runner with my lace wallet
     And create a default contract
 
+    @create-default-contract
     Scenario Outline: Creating default escrow contract with Lace wallet
-      Given I configure my <wallet_name> wallet
+      Given I use alice <wallet_name> browser
       And I am on the "home" page
       Then I should see a "heading" with "Choose a wallet" text
 
-      When I authorize my <wallet_name> wallet
+      When I authorize the app
       Then I should see a "button" with "Create a contract" text
 
       When I click the "button" with "Create a contract" text
@@ -21,7 +22,7 @@ Feature: As a user, I would like to create a default contract with my lace walle
       And I should see a "button" with "Submit contract" text
       And I should see a "button" with "Back to contract list" text
 
-      When I click the "button" with "Submit contract" text And sign the transaction with <wallet_name> wallet
+      When I click the "button" with "Submit contract" text And sign the transaction
       Then I should see "Successfully created and submitted the contract. Contract transaction awaits to be included in the blockchain." text
       And I should see the first "button" showing "Syncing" text
       And I should see the first "button" showing "Advance" text

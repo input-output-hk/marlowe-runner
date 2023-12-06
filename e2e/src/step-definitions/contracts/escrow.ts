@@ -1,17 +1,19 @@
 import { When } from '@cucumber/cucumber';
-import { ScenarioWorld } from './setup/world.js';
+import { ScenarioWorld } from '../world.js';
 import {
   Contract,
   datetoTimeout,
 } from "@marlowe.io/language-core-v1";
 import { MarloweJSON } from "@marlowe.io/adapter/codec";
+import { Bech32 } from '../../cardano.js';
 
-type ContractName = "SimpleDeposit" | "SimpleChoice" | "TimedOutSimpleChoice" | "SimpleNotify" | "Escrow";
-
-const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {  
+const mkAddressBasedEscrow = (buyerAddress: Bech32, sellerAddress: Bech32, mediatorAddress: Bech32): Contract => {
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
   const inTwentyMinutes = datetoTimeout(new Date(Date.now() + twentyMinutesInMilliseconds));
- 
+  const buyerAddressStr = buyerAddress.toString();
+  const sellerAddressStr = sellerAddress.toString();
+  const mediatorAddressStr = mediatorAddress.toString();
+
   return {
     timeout: inTwentyMinutes,
     timeout_continuation: "close",
@@ -24,7 +26,7 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
               case: {
                 for_choice: {
                   choice_owner: {
-                    address: buyerAddress
+                    address: buyerAddressStr
                   },
                   choice_name: "Everything is alright"
                 },
@@ -44,7 +46,7 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
                 },
                 to: {
                   account: {
-                    address: buyerAddress
+                    address: buyerAddressStr
                   }
                 },
                 then: {
@@ -54,7 +56,7 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
                       case: {
                         for_choice: {
                           choice_owner: {
-                            address: sellerAddress
+                            address: sellerAddressStr
                           },
                           choice_name: "Confirm problem"
                         },
@@ -77,19 +79,19 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
                               },
                               to: {
                                 party: {
-                                  address: sellerAddress
+                                  address: sellerAddressStr
                                 }
                               },
                               then: "close",
                               pay: 10000000n,
                               from_account: {
-                                address: buyerAddress
+                                address: buyerAddressStr
                               }
                             },
                             case: {
                               for_choice: {
                                 choice_owner: {
-                                  address: sellerAddress
+                                  address: mediatorAddressStr
                                 },
                                 choice_name: "Dismiss claim"
                               },
@@ -106,7 +108,7 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
                             case: {
                               for_choice: {
                                 choice_owner: {
-                                  address: sellerAddress
+                                  address: mediatorAddressStr
                                 },
                                 choice_name: "Confirm problem"
                               },
@@ -125,7 +127,7 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
                       case: {
                         for_choice: {
                           choice_owner: {
-                            address: sellerAddress
+                            address: sellerAddressStr
                           },
                           choice_name: "Dispute problem"
                         },
@@ -143,13 +145,13 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
                 },
                 pay: 10000000n,
                 from_account: {
-                  address: sellerAddress
+                  address: sellerAddressStr
                 }
               },
               case: {
                 for_choice: {
                   choice_owner: {
-                    address: buyerAddress
+                    address: buyerAddressStr
                   },
                   choice_name: "Report problem"
                 },
@@ -167,14 +169,14 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
         },
         case: {
           party: {
-            address: buyerAddress
+            address: buyerAddressStr
           },
           of_token: {
             token_name: "",
             currency_symbol: ""
           },
           into_account: {
-            address: sellerAddress
+            address: sellerAddressStr
           },
           deposits: 10000000n
         }
@@ -183,119 +185,15 @@ const mkEscrow = (buyerAddress: string, sellerAddress: string): Contract => {
   }
 }
 
-const mkSimpleDeposit = (address: string): Contract => {
-  const twentyMinutesInMilliseconds = 20 * 60 * 1000;
-  const inTwentyMinutes = datetoTimeout(new Date(Date.now() + twentyMinutesInMilliseconds));
-  return {
-    timeout: inTwentyMinutes,
-    timeout_continuation: "close",
-    when: [
-      { case: {
-          party: {address: address},
-          deposits: 1n,
-          of_token: { currency_symbol: "", token_name: "" },
-          into_account: {address: address}
-        },
-        then: "close",
-      },
-    ]
-  };
-}
-
-const mkSimpleChoice = (address: string): Contract => {
-  const twentyMinutesInMilliseconds = 20 * 60 * 1000;
-  const inTwentyMinutes = datetoTimeout(new Date(Date.now() + twentyMinutesInMilliseconds));
-  return {
-    timeout: inTwentyMinutes,
-    timeout_continuation: "close",
-    when: [
-      { case: {
-          choose_between:
-            [{
-              from: 1n,
-              to: 2n
-            }],
-          for_choice: {
-            choice_owner: {address: address},
-            choice_name: "simpleChoice",
-          }
-        },
-        then: "close",
-      },
-    ]
-  };
-}
-
-const mkTimedOutSimpleChoice = (address: string): Contract => {
-  const twentyMinutesInMilliseconds = 20 * 60 * 1000;
-  const inTwentyMinutes = datetoTimeout(new Date(Date.now() - twentyMinutesInMilliseconds));
-  return {
-    timeout: inTwentyMinutes,
-    timeout_continuation: "close",
-    when: [
-      { case: {
-          choose_between:
-            [{
-              from: 1n,
-              to: 2n
-            }],
-          for_choice: {
-            choice_owner: {address: address},
-            choice_name: "simpleChoice",
-          }
-        },
-        then: "close",
-      },
-    ]
-  };
-}
-const mkSimpleNotify = (address: string): Contract => {
-  const twentyMinutesInMilliseconds = 20 * 60 * 1000;
-  const inTwentyMinutes = datetoTimeout(new Date(Date.now() - twentyMinutesInMilliseconds));
-  return {
-    timeout: inTwentyMinutes,
-    timeout_continuation: "close",
-    when: [
-      { case: {
-          notify_if: true,
-        },
-        then: "close",
-      },
-    ]
-  };
-}
-
-
-// // And I generate the contract "SimpleDeposit" and write it to "/tmp/deposit.json"
 When(
-  /^I generate the contract "([^"]*)" and write it to "([^"]*)"/,
-  async function(this: ScenarioWorld, contractName: ContractName, fileName: string) {
-    const {
-      globalStateManager
-    } = this;
-    const walletAddress = globalStateManager.popValue("wallet-address");
-    switch (contractName) {
-      case "SimpleDeposit":
-        const contract1 = mkSimpleDeposit(walletAddress);
-        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract1, null, 4))
-        break;
-      case "SimpleChoice":
-        const contract2 = mkSimpleChoice(walletAddress);
-        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract2, null, 4))
-        break;
-      case "TimedOutSimpleChoice":
-        const contract3 = mkTimedOutSimpleChoice(walletAddress);
-        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract3, null, 4))
-        break;
-      case "SimpleNotify":
-        const contract4 = mkSimpleNotify(walletAddress);
-        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract4, null, 4))
-        break;
-      case "Escrow": 
-        const walletAddress2 = globalStateManager.getValue("wallet-address");
-        const contract5 = mkEscrow(walletAddress, walletAddress2);
-        globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract5, null, 4))
-        break;
-    }
+  /^I generate Escrow contract with "([^"]*)" as a buyer and "([^"]*)" as a seller and "([^"]*)" as a mediator and call it "([^"]*)"$/,
+  async function(this: ScenarioWorld, buyer: string, seller: string, mediator: string, contractNickname: string) {
+    const buyerAddress = await this.getWalletAddress(buyer);
+    const sellerAddress = await this.getWalletAddress(seller);
+    const mediatorAddress = await this.getWalletAddress(mediator);
+
+    const contract = mkAddressBasedEscrow(buyerAddress, sellerAddress, mediatorAddress);
+    this.setContractInfo(contractNickname, { contract: contract, contractId: undefined });
   }
 );
+

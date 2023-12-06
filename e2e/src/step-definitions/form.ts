@@ -1,10 +1,11 @@
 import { When } from "@cucumber/cucumber";
-import { ScenarioWorld } from './setup/world.js';
+import { ScenarioWorld } from './world.js';
 import { getElementLocator } from '../support/web-element-helper.js';
 import { ElementKey } from '../env/global.js';
 import { ValidAccessibilityRoles } from '../env/global.js';
-import { waitFor } from "../support/wait-for-behavior.js";
+import { waitFor, waitForRoleVisible } from "../support/wait-for-behavior.js";
 import { inputValue } from '../support/html-behavior.js';
+import { MarloweJSON } from "@marlowe.io/adapter/codec";
 
 When(
   /^I fill in the "([^"]*)" input with "([^"]*)"$/,
@@ -69,6 +70,17 @@ When('I press {string} on the keyboard {string} times', async function (this: Sc
   });
 });
 
+When(
+  /^I enter the json of the contract "([^"]*)" into the "([^"]*)" field$/,
+  async function (this: ScenarioWorld, contractName: string, name: string) {
+    const { page } = this.getScreen();
+    const contractInfo = this.getContractInfo(contractName);
+    const locator = await waitForRoleVisible(page, "textbox", name);
+    const json = MarloweJSON.stringify(contractInfo.contract);
+    await inputValue(locator, json);
+});
+
+// Generic step - should we keep it?
 When('I enter the contents of {string} into the {string} field',
   async function (this: ScenarioWorld, fileName: string, name: string) {
     const { page } = this.getScreen();

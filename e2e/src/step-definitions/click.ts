@@ -1,30 +1,21 @@
 import playwright, { Page } from 'playwright';
 import { When } from '@cucumber/cucumber';
-import { ScenarioWorld } from './setup/world.js';
+import { ScenarioWorld } from './world.js';
 import { ValidAccessibilityRoles } from '../env/global.js';
-import { waitFor } from "../support/wait-for-behavior.js";
+import { waitFor, waitForRoleVisible } from "../support/wait-for-behavior.js";
 
 When(
   /^I click the "([^"]*)" with "([^"]*)" text$/,
   async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string) {
     const { page } = this.getScreen();
-
-    await waitFor(async() => {
-      const locator = page.getByRole(role, { name, exact: true });
-      const result = await locator.isVisible();
-      if (result) {
-        await locator.click();
-        return result;
-      }
-    });
+    const locator = await waitForRoleVisible(page, role, name);
+    await locator.click();
   }
 );
 
 When(
   /^I click the first "([^"]*)" with "([^"]*)" text$/,
   async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string) {
-    throw new Error("Not fully implemented yet - we don't use 'name'");
-
     const { page } = this.getScreen();
     await waitFor(async () => {
       const tableLocator = page.locator('table');
@@ -70,14 +61,7 @@ When(
   /^I click the "([^"]*)" (?:button|link)$/,
   async function(this: ScenarioWorld, name: string, role: ValidAccessibilityRoles) {
     const { page } = this.getScreen();
-
-    await waitFor(async() => {
-      const locator = page.getByRole(role, { name, exact: true });
-      const result = await locator.isVisible();
-      if (result) {
-        await locator.click();
-        return result;
-      }
-    });
+    const locator = await waitForRoleVisible(page, role, name);
+    await locator.click();
   }
 )

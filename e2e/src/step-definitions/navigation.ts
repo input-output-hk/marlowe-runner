@@ -5,7 +5,7 @@ import {
   navigateToPage,
   currentPathMatchesPageId,
 } from '../support/navigation-behavior.js';
-import { ScenarioWorld } from './setup/world.js';
+import { ScenarioWorld } from './world.js';
 import { waitFor } from '../support/wait-for-behavior.js'
 
 Given(
