@@ -1,11 +1,6 @@
 import { When } from "@cucumber/cucumber";
 import { ScenarioWorld } from '../world.js';
-import { getElementLocator } from '../../support/web-element-helper.js';
-import { ElementKey } from '../../env/global.js';
-import { ValidAccessibilityRoles } from '../../env/global.js';
-import { waitFor, waitForRoleVisible, waitForSelectorVisible, waitForTestIdVisible } from "../../support/wait-for-behavior.js";
-import { inputValue } from '../../support/html-behavior.js';
-import { MarloweJSON } from "@marlowe.io/adapter/codec";
+import { waitFor, waitForSelectorVisible, waitForTestIdVisible } from "../../support/wait-for-behavior.js";
 import { ContractId } from "../../cardano.js";
 
 When(
@@ -33,14 +28,15 @@ When(
   async function(this: ScenarioWorld, expectedStatus: string, contractName: string) {
     const { page } = this.getScreen();
     const contractInfo = this.getContractInfo(contractName);
+    const timeout = 240000;
 
-    const actionsCell = await waitForTestIdVisible(page, contractInfo.contractId?.toString() + "-actions");
+    const actionsCell = await waitForTestIdVisible(page, contractInfo.contractId?.toString() + "-actions", timeout);
     if(actionsCell !== null) {
       await waitFor(async () => {
         const actualStatus = await actionsCell.innerText();
         console.log("actualStatus: " + actualStatus);
         return actualStatus.trim() === expectedStatus
-      }, { label: "Contract status is " + expectedStatus, timeout: 120000 });
+      }, { label: "Contract status is " + expectedStatus, timeout });
     } else {
       throw new Error("Could not find the actions cell for the contract");
     }

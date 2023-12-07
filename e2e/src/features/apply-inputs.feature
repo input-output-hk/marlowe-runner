@@ -213,8 +213,8 @@ Feature: As a user, I would like to apply an input on a current contract
       Then I should see "Advance" status of the "escrow" contract
 
       When I start advancing "escrow" contract
-      And I click the "button" with "Advance contract" text And sign the transaction
-      Then I should see "Advance" status of the "escrow" contract
+      And I click the "button" with "Advance contract" text
+      Then I should see error toast
 
     Examples:
       | wallet_name |

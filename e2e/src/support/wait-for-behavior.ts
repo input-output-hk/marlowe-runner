@@ -41,8 +41,8 @@ export const waitForSelectorVisible = async (
   selector: string,
   timeout?: number,
 ): Promise<Locator> => {
-    const locator = page.locator(selector);
     console.log(`Waiting for ${selector} to be visible`);
+    const locator = page.locator(selector);
     await locator.waitFor({state: "visible", timeout: timeout!==undefined?timeout:10000});
     return locator;
 }
@@ -53,8 +53,8 @@ export const waitForRoleVisible = async (
   name?: string,
   timeout?: number,
 ): Promise<Locator> => {
-    const locator = page.getByRole(role, { name, exact: true });
     console.log(`Waiting for ${role} with ${name} text to be visible`);
+    const locator = page.getByRole(role, { name, exact: true });
     await locator.waitFor({state: "visible", timeout: timeout!==undefined?timeout:10000});
     return locator;
 }
@@ -64,8 +64,8 @@ export const waitForTestIdVisible = async (
   testId: string,
   timeout?: number,
 ): Promise<Locator> => {
-    const locator = page.getByTestId(testId);
     console.log(`Waiting for ${testId} to be visible`);
+    const locator = page.getByTestId(testId);
     await locator.waitFor({state: "visible", timeout: timeout!==undefined?timeout:10000});
     return locator;
 }

@@ -3,9 +3,6 @@ module Component.MessageHub where
 import Prelude
 
 import Component.Types (Message, MessageContent(..), MessageHub(..), MessageId)
-import ReactBootstrap (alert)
-import ReactBootstrap.Collapse (collapse, dimension)
-import ReactBootstrap.Types (variant)
 import Data.Array as Array
 import Data.List as List
 import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
@@ -22,23 +19,38 @@ import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_) as DOOM
 import React.Basic.Hooks (component, readRef, useContext, useEffect, useState, useState', (/\))
 import React.Basic.Hooks as R
+import ReactBootstrap (alert)
+import ReactBootstrap.Collapse (collapse, dimension)
+import ReactBootstrap.Types (variant)
 import Utils.React.Basic.Hooks (useEmitter, useStateRef')
 
-renderMsg :: (MessageId -> Effect Unit) -> String -> Message -> JSX
-renderMsg onClose extraClassName { id, msg } = case msg of
-  Info msg' -> alert { className, variant: variant.info, dismissible: true, transition: false, onClose: onClose' }
+data RenderingContext = InboxMessage | ToastMessage
+
+renderMsg :: (MessageId -> Effect Unit) -> String -> RenderingContext -> Message -> JSX
+renderMsg onClose extraClassName rCtx { id, msg } = case msg of
+  Info msg' -> alert { className, variant: variant.info, dismissible: true, transition: false, onClose: onClose', "data-testId": testId }
     -- [ icon Icons.infoCircleFill, msg' ]
     [ msg' ]
-  Success msg' -> alert { className, variant: variant.success, dismissible: true, onClose: onClose' }
+  Success msg' -> alert { className, variant: variant.success, dismissible: true, onClose: onClose', "data-testId": testId }
     -- [ icon Icons.checkCircleFill, msg' ]
     [ msg' ]
-  Warning msg' -> alert { className, variant: variant.warning, dismissible: true, onClose: onClose' }
+  Warning msg' -> alert { className, variant: variant.warning, dismissible: true, onClose: onClose', "data-testId": testId }
     -- [ icon Icons.exclamationTriangleFill, msg' ]
     [ msg' ]
-  Error msg' -> alert { className, variant: variant.danger, dismissible: true, onClose: onClose' }
+  Error msg' -> alert { className, variant: variant.danger, dismissible: true, onClose: onClose', "data-testId": testId }
     -- [ icon Icons.exclamationTriangleFill, msg' ]
     [ msg' ]
   where
+  rCtxPrefix = case rCtx of
+    InboxMessage -> "inbox"
+    ToastMessage -> "toast"
+
+  testId = case msg of
+    Info _ -> rCtxPrefix <> "-info-msg"
+    Success _ -> rCtxPrefix <> "-success-msg"
+    Warning _ -> rCtxPrefix <> "-warning-msg"
+    Error _ -> rCtxPrefix <> "-error-msg"
+
   colorClasses = case msg of
     Info _ -> "border-info"
     Success _ -> "border-success"
@@ -98,14 +110,14 @@ mkMessagePreview = component "MessageBox" \(MessageHub { ctx, remove }) -> R.do
         , timeout: Milliseconds 2000.0
         , mountOnEnter: true
         , unmountOnExit: true
-        } $ DOOM.div_ [ renderMsg onClose "" msg ]
+        } $ DOOM.div_ [ renderMsg onClose "" ToastMessage msg ]
 
 mkMessageBox :: Effect (MessageHub -> JSX)
 mkMessageBox = component "MessageBox" \(MessageHub { ctx, remove }) -> R.do
   msgs <- useContext ctx
   let
     onClose id = remove id
-  pure $ DOOM.fragment $ Array.fromFoldable $ map (renderMsg onClose "") $ msgs
+  pure $ DOOM.fragment $ Array.fromFoldable $ map (renderMsg onClose "" InboxMessage) $ msgs
 
 data Action
   = Add MessageContent

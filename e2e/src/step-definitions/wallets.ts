@@ -77,6 +77,7 @@ When(
       default:
         throw new Error('Unknown wallet type');
     }
+    console.log("SIGNING FINISHED");
   }
 );
 
