@@ -165,6 +165,7 @@ export class ScenarioWorld extends World {
           break;
       }
       if(address === null || address.toString() != expectedAddress.toString()) {
+        context.close();
         throw new Error("Wallet configuration failed - wallet address is not the same as expected: given " + address + " != expected " + expectedAddress);
       }
       const wallet = { address, name: walletName, mnemonic, url: walletURL, type: walletType };

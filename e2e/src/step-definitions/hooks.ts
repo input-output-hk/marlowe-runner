@@ -39,4 +39,3 @@ After(async function(this: ScenarioWorld, scenario) {
   }
 });
 
-

@@ -4,7 +4,7 @@ import {
   Contract,
   datetoTimeout,
 } from "@marlowe.io/language-core-v1";
-import { MarloweJSON } from "@marlowe.io/adapter/codec";
+// import { MarloweJSON } from "@marlowe.io/adapter/codec";
 import { Bech32 } from '../../cardano.js';
 
 const mkAddressBasedEscrow = (buyerAddress: Bech32, sellerAddress: Bech32, mediatorAddress: Bech32): Contract => {

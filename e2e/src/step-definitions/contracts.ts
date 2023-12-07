@@ -101,10 +101,6 @@ When(
     switch (contractName) {
       case "SimpleDeposit":
         const contract1 = mkSimpleDeposit(walletAddress);
-        console.log("contract1: ")
-        console.log(contract1)
-        console.log("contract1 JSON: ")
-        console.log(MarloweJSON.stringify(contract1, null, 4))
         globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract1, null, 4))
         break;
       case "SimpleChoice":
