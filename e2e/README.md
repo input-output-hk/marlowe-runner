@@ -7,16 +7,16 @@ Run the whole test suite:
 ./run_tests.sh '@regression'
 ```
 
-We provide a shorthand for that which is `./run_regression.sh`. We have it because it can be used together with `xvfb-run` to hide the popping up browser window:
+If you have `xvfb-run` installed you can also use:
 
 ```bash
-xvfb-run --server-args="-screen 0, 1024x768x24" ./run_regression.sh
+./run_invisible.sh '@regression'
 ```
 
 Additionally we have pretty granular set of tags in the features files. You can pick and match tests by using different tags - for example:
 
 ```bash
-./run_tests.sh '@lace-configure'
+./run_invisible.sh '@lace-configure'
 ```
 
 ## Wallets
