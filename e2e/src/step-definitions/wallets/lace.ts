@@ -144,12 +144,8 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
 export const signTx = async (page: Page, triggerSign: () => Promise<void>): Promise<void> => {
   var locator: Locator;
   const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
-  console.log("TRIGGERING SIGN");
   await triggerSign();
-  console.log("TRIGGERED SIGN");
-  console.log("WAITING FOR WALLET POPUP");
   const walletPopup = await walletPopupPromise;
-  console.log("WALLET POPUP LOADED");
   await walletPopup.reload();
 
   locator = await waitForRoleVisible(walletPopup, "button", "Confirm");

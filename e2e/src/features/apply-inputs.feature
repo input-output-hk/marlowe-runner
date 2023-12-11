@@ -190,7 +190,6 @@ Feature: As a user, I would like to apply an input on a current contract
       Given I use alice lace browser
       Then I should see "Complete" status of the "escrow" contract
 
-
     @submission-failure-with-empty-wallet
     Scenario Outline: Creating a deposit with a wallet
       Given I use alice <wallet_name> browser
