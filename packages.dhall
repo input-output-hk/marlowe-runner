@@ -225,7 +225,7 @@ in  upstream
       , "validation", "web-html"
       ]
       "https://github.com/paluh/purescript-react-bootstrap.git"
-      "v0.1.1"
+      "v0.1.2"
 
   with datetime-iso =
       mkPackage
@@ -322,7 +322,6 @@ in  upstream
         ]
         "https://github.com/input-output-hk/purescript-cardano-wallet-client.git"
         "v0.1.1"
-
   -- with marlowe-runtime-client = ../purescript-marlowe-runtime-client/spago.dhall as Location
   with marlowe-runtime-client =
      mkPackage

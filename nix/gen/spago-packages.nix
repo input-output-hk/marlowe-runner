@@ -1315,11 +1315,11 @@ let
 
     "react-bootstrap" = pkgs.stdenv.mkDerivation {
       name = "react-bootstrap";
-      version = "v0.1.1";
+      version = "v0.1.2";
       src = pkgs.fetchgit {
         url = "https://github.com/paluh/purescript-react-bootstrap.git";
-        rev = "106bd3114994f2aa78a3c76807ae84220f12dcef";
-        sha256 = "0mhss4anlnklpm61hf65im9pik7h4kxn0z5niqr5j8jlkc3n8a6x";
+        rev = "e805789e91a1754fc012e2c1ffc4141c93f146f1";
+        sha256 = "08lq6c2kfca5p6pndzvr8mrds7z0sxip4924msnjh901pqyazvxw";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";

@@ -1,14 +1,15 @@
 import { When } from '@cucumber/cucumber';
-import { ScenarioWorld } from './setup/world.js';
+import { ScenarioWorld } from './world.js';
 import {
   Contract,
   datetoTimeout,
 } from "@marlowe.io/language-core-v1";
 import { MarloweJSON } from "@marlowe.io/adapter/codec";
+import { Bech32 } from '../cardano.js';
 
 type ContractName = "SimpleDeposit" | "SimpleChoice" | "TimedOutSimpleChoice" | "SimpleNotify";
 
-const mkSimpleDeposit = (address: string): Contract => {
+const mkSimpleDeposit = (address: Bech32): Contract => {
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
   const inTwentyMinutes = datetoTimeout(new Date(Date.now() + twentyMinutesInMilliseconds));
   return {
@@ -16,10 +17,10 @@ const mkSimpleDeposit = (address: string): Contract => {
     timeout_continuation: "close",
     when: [
       { case: {
-          party: {address: address},
+          party: {address: address.toString()},
           deposits: 1n,
           of_token: { currency_symbol: "", token_name: "" },
-          into_account: {address: address}
+          into_account: {address: address.toString()}
         },
         then: "close",
       },
@@ -27,7 +28,7 @@ const mkSimpleDeposit = (address: string): Contract => {
   };
 }
 
-const mkSimpleChoice = (address: string): Contract => {
+const mkSimpleChoice = (address: Bech32): Contract => {
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
   const inTwentyMinutes = datetoTimeout(new Date(Date.now() + twentyMinutesInMilliseconds));
   return {
@@ -41,7 +42,7 @@ const mkSimpleChoice = (address: string): Contract => {
               to: 2n
             }],
           for_choice: {
-            choice_owner: {address: address},
+            choice_owner: {address: address.toString()},
             choice_name: "simpleChoice",
           }
         },
@@ -51,7 +52,7 @@ const mkSimpleChoice = (address: string): Contract => {
   };
 }
 
-const mkTimedOutSimpleChoice = (address: string): Contract => {
+const mkTimedOutSimpleChoice = (address: Bech32): Contract => {
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
   const inTwentyMinutes = datetoTimeout(new Date(Date.now() - twentyMinutesInMilliseconds));
   return {
@@ -65,7 +66,7 @@ const mkTimedOutSimpleChoice = (address: string): Contract => {
               to: 2n
             }],
           for_choice: {
-            choice_owner: {address: address},
+            choice_owner: {address: address.toString()},
             choice_name: "simpleChoice",
           }
         },
@@ -74,7 +75,7 @@ const mkTimedOutSimpleChoice = (address: string): Contract => {
     ]
   };
 }
-const mkSimpleNotify = (address: string): Contract => {
+const mkSimpleNotify = (): Contract => {
   const twentyMinutesInMilliseconds = 20 * 60 * 1000;
   const inTwentyMinutes = datetoTimeout(new Date(Date.now() - twentyMinutesInMilliseconds));
   return {
@@ -95,10 +96,8 @@ const mkSimpleNotify = (address: string): Contract => {
 When(
   /^I generate the contract "([^"]*)" and write it to "([^"]*)"/,
   async function(this: ScenarioWorld, contractName: ContractName, fileName: string) {
-    const {
-      globalStateManager
-    } = this;
-    const walletAddress = globalStateManager.getValue("wallet-address");
+    const walletAddress = await this.getWalletAddress();
+    const { globalStateManager } = this;
     switch (contractName) {
       case "SimpleDeposit":
         const contract1 = mkSimpleDeposit(walletAddress);
@@ -113,9 +112,13 @@ When(
         globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract3, null, 4))
         break;
       case "SimpleNotify":
-        const contract4 = mkSimpleNotify(walletAddress);
+        const contract4 = mkSimpleNotify();
         globalStateManager.appendValue(fileName, MarloweJSON.stringify(contract4, null, 4))
         break;
+      default:
+        throw new Error("Unknown contract type: " + contractName);
     }
   }
 );
+
+

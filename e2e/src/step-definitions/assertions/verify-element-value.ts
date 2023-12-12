@@ -1,6 +1,6 @@
 import { Then } from '@cucumber/cucumber';
 import { ElementKey, ValidAccessibilityRoles } from '../../env/global.js';
-import { ScenarioWorld } from '../setup/world.js'
+import { ScenarioWorld } from '../world.js'
 import { waitFor } from '../../support/wait-for-behavior.js';
 import { getElementLocator } from '../../support/web-element-helper.js';
 import moment from 'moment';
@@ -8,11 +8,9 @@ import moment from 'moment';
 Then(
   /^the "([^"]*)" should contain "([^"]*)" text$/,
   async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string) {
-    const {
-      screen: { page }
-    } = this;
+    const { page } = this.getScreen();
     await waitFor(async() => {
-      const locator = await page.getByRole(role, { name, exact: true });
+      const locator = page.getByRole(role, { name, exact: true });
       const elementText = await locator.textContent();
       return elementText?.includes(name);
     })
@@ -22,16 +20,14 @@ Then(
 Then(
   /^the "([^"]*)" input should contain "([^"]*)" value$/,
   async function(this: ScenarioWorld, elementKey: ElementKey, expectedValue: string) {
-    const {
-      screen: { page },
-      globalConfig
-    } = this;
+    const { globalConfig } = this;
+    const { page } = this.getScreen();
 
     const elementIdentifier = getElementLocator(page, elementKey, globalConfig);
     const { role, name } = elementIdentifier;
 
     await waitFor(async() => {
-      const locator = await page.getByRole(role as ValidAccessibilityRoles, { name, exact: true });
+      const locator = page.getByRole(role as ValidAccessibilityRoles, { name, exact: true });
       const actualValue = await locator.inputValue();
       return actualValue == expectedValue;
     })
@@ -43,12 +39,10 @@ Then(
 Then(
   /^the "([^"]*)" for "([^"]*)" should contain "([^"]*)" text$/,
   async function(this: ScenarioWorld, role: ValidAccessibilityRoles, name: string, expectedText: string) {
-    const {
-      screen: { page },
-      globalConfig
-    } = this;
+    const { globalConfig } = this;
+    const { page } = this.getScreen();
     await waitFor(async() => {
-      const locator = await page.getByRole(role, { name, exact: true });
+      const locator = page.getByRole(role, { name, exact: true });
       const elementText = await locator.textContent();
       return elementText?.includes(expectedText);
     })
@@ -58,11 +52,9 @@ Then(
 Then(
   /^the "([^"]*)" with "([^"]*)" text should have "([^"]*)" class$/, 
   async function (this: ScenarioWorld, role: ValidAccessibilityRoles, name: string, expectedClass: string) {
-    const {
-      screen: { page },
-    } = this;
+    const { page } = this.getScreen();
     await waitFor(async() => {
-      const locator = await page.getByRole(role, { name, exact: true });
+      const locator = page.getByRole(role, { name, exact: true });
       const result = await locator.isVisible();
       if (result) {
         const classNames = await locator.getAttribute('class');
@@ -76,11 +68,9 @@ Then(
 
 Then('the {string} with {string} text should contain {string} text',
   async function (this: ScenarioWorld, role: ValidAccessibilityRoles, name: string, expectedText: string) {
-    const {
-      screen: { page },
-    } = this;
+    const { page } = this.getScreen();
     await waitFor(async() => {
-      const locator = await page.getByRole(role, { name, exact: true });
+      const locator = page.getByRole(role, { name, exact: true });
       const result = await locator.isVisible();
       if (result) {
         const elementText = await locator.textContent();
@@ -92,11 +82,8 @@ Then('the {string} with {string} text should contain {string} text',
 Then(
   /^the "([^"]*)" time should be (greater\s+than|less\s+than|equal\s+to) the "([^"]*)" time$/, 
   async function (this: ScenarioWorld, firstTimeLabel: string, operator: string, secondTimeLabel: string) {
-    const {
-      screen: { page },
-      globalConfig: { simulatorDateFormat },
-      globalStateManager
-    } = this;
+    const { globalStateManager } = this;
+
     const firstTimeName = `${firstTimeLabel} time`;
     const secondTimeName = `${secondTimeLabel} time`;
     await waitFor(async() => {

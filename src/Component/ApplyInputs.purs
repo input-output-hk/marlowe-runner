@@ -231,7 +231,7 @@ mkDepositFormComponent = do
                         , onMouseOver: handler_ $ setSubmitting true
                         , onMouseOut: handler_ $ setSubmitting false
                         }
-                      [ R.text "Make deposit"
+                      [ R.text "Advance contract"
                       , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
                       ]
                   ]

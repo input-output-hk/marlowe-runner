@@ -9,4 +9,4 @@
 tag=$1
 
 # tsc && mv cucumber.js cucumber.mjs && cucumber-js --import --profile "$tag" || yarn run postcucumber
-(tsc && cucumber-js --tags "$tag") || yarn run postcucumber
+(tsc && cucumber-js --tags "$tag" -f summary) || yarn run postcucumber

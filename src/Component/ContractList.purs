@@ -299,8 +299,8 @@ mkContractList = do
                 [ "Successfully created and submitted the contract."
                 , "Contract transaction awaits to be included in the blockchain."
                 ]
-              resetModalAction
               notSyncedYetInserts.add contractCreated
+              resetModalAction
           , onError
           , possibleInitialContract
           }
@@ -409,11 +409,11 @@ mkContractList = do
                       thWithIcon src extraClassNames = th (DOOM.img { src }) extraClassNames
                       thWithLabel label extraClassNames = th (DOOM.text label) ("text-muted " <> extraClassNames)
                     [ DOM.tr {}
-                        [ thWithIcon "/images/calendar_month.svg" "rounded-top"
+                        [ thWithIcon "/images/calendar_month.svg" "rounded-top-left"
                         , thWithIcon "/images/event_available.svg" ""
                         , thWithIcon "/images/fingerprint.svg" ""
                         , thWithIcon "/images/sell.svg" ""
-                        , thWithIcon "/images/frame_65.svg" "rounded-top"
+                        , thWithIcon "/images/frame_65.svg" "rounded-top-right"
                         ]
                     , DOM.tr { className: "border-bottom-white border-bottom-4px" }
                         [ do
@@ -429,7 +429,7 @@ mkContractList = do
                         , thWithLabel "Actions" ""
                         ]
                     ]
-                mkTable tbody = table { striped: Table.striped.boolean false, hover: true }
+                mkTable tbody = table { striped: Table.striped.boolean false, hover: true, id: "contracts" }
                   [ tableHeader
                   , tbody
                   ]
@@ -532,7 +532,8 @@ mkContractList = do
                             ContractComplete _ -> "bg-secondary"
                             _ -> ""
 
-                          _data = Object.fromHomogeneous { testId: txOutRefToString contractId }
+                          mkTestId testId = Object.fromHomogeneous { testId }
+                          contractIdStr = txOutRefToString contractId
 
                           confirmedMarloweInfo = case someContract of
                             (SyncedConractInfo (ContractInfo { contractStatus })) -> contractStatusMarloweInfo contractStatus
@@ -541,13 +542,13 @@ mkContractList = do
                             (SyncedConractInfo (ContractInfo { contractStatus })) -> contractStatusTransactionsHeadersWithEndpoints contractStatus
                             _ -> Just []
 
-                        DOM.tr { className: trClassName, _data: _data } do
+                        DOM.tr { className: trClassName, _data: mkTestId contractIdStr }
                           [ tdInstant createdAt
                           , tdInstant $ updatedAt <|> createdAt
                           -- FIXME: We have to distinguish unconfirmed / unsynced creation as well
                           , tdContractId contractId confirmedMarloweInfo (fold transactionsEndpoints)
                           , tdTags
-                          , tdCentered case actionsContext of
+                          , DOM.td { className: "text-center border-0", _data: mkTestId $ contractIdStr <> "-actions" } case actionsContext of
                               SyncingContract sc -> buttonOutlinedInactive do
                                 let
                                   tooltipText = case sc of
