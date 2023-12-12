@@ -117,26 +117,18 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
   const grantAccess:Promise<void> = (async () => {
     const page = await walletPopupPromise;
     await page.reload();
-    await waitFor(async ():Promise<boolean> => {
-      const locator = page.getByRole("button", { name: "Authorize", exact: true });
-      const result = await locator.isVisible();
-      if (result) {
-        await locator.click();
-        return result;
-      }
-      return true
-    }, { label: "Authorize button" });
+    let locator: Locator;
 
-    await waitFor(async() => {
-      const locator = page.getByRole("button", { name: "Always", exact: true });
-      const result = await locator.isVisible();
-      if (result) {
-        await locator.click();
-        return result;
-      }
-    }, { label: "Always button" });
+    locator = await waitForRoleVisible(page, "button", "Authorize");
+    await locator.click();
+
+    locator = await waitForRoleVisible(page, "button", "Always");
+    await locator.click();
   })();
 
+  // Playwright `waitFor` doesn't support aborting the promise
+  // so the loosing one will run till the timeout and the result
+  // will be ignored.
   await Promise.any([isAuthorizedCheck(page), grantAccess]);
   await isAuthorizedCheck(page);
 }
@@ -154,10 +146,19 @@ export const signTx = async (page: Page, triggerSign: () => Promise<void>): Prom
   locator = await waitForTestIdVisible(walletPopup, "password-input");
   await inputValue(locator, SPENDING_PASSWORD);
 
-  locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
-  await locator.click();
+  const confirm = async function() {
+    locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
+    await locator.click();
+  }
 
-  locator = await waitForRoleVisible(walletPopup, "button", "Close");
+  await confirm();
+
+  // Sometimes we have to double confirm
+  locator = await waitForRoleVisible(walletPopup, "button", "Close").catch(async () => {
+    await confirm();
+    return await waitForRoleVisible(walletPopup, "button", "Close");
+  });
+
   await locator.click();
 }
 

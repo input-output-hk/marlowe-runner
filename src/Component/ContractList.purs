@@ -14,7 +14,7 @@ import Component.ContractTemplates.Escrow as Escrow
 import Component.ContractTemplates.Swap as Swap
 import Component.CreateContract (runnerTag)
 import Component.CreateContract as CreateContract
-import Component.InputHelper (addressesInContract, canInput, rolesInContract)
+import Component.InputHelper (addressesInContract, addressesInState, allInputs, canInput, rolesInContract, rolesInState)
 import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(..), MessageHub(..), MkComponentM, Page(..), WalletInfo)
 import Component.Types.ContractInfo (ContractStatus(..), MarloweInfo(..), SomeContractInfo(..), contractStatusMarloweInfo, contractStatusTransactionsHeadersWithEndpoints)
 import Component.Types.ContractInfo as ContractInfo
@@ -40,7 +40,7 @@ import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.DateTime.Instant (Instant, unInstant)
 import Data.DateTime.Instant as Instant
-import Data.Either (Either, hush)
+import Data.Either (Either(..), hush)
 import Data.Foldable (fold, for_, or)
 import Data.FormURLEncoded.Query (FieldId(..), Query)
 import Data.Function (on)
@@ -62,8 +62,9 @@ import Effect.Aff (Aff, delay, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now as Now
 import Foreign.Object as Object
+import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Address, Case(..), Contract(..), CurrencySymbol, Environment, Party(..), State) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
-import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web.Client (put')
 import Marlowe.Runtime.Web.Types (Payout(..), PutTransactionRequest(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
@@ -606,14 +607,15 @@ walletParties
   :: WalletContext
   -> Maybe V1.CurrencySymbol
   -> V1.Contract
+  -> V1.State
   -> Either String (Array V1.Party)
-walletParties walletContext@(WalletContext { changeAddress, usedAddresses }) possibleCurrencySymbol contract = do
+walletParties walletContext@(WalletContext { changeAddress, usedAddresses }) possibleCurrencySymbol contract state = do
   roleParties <- case possibleCurrencySymbol of
     Nothing -> pure []
     Just currencySymbol -> case Cardano.policyIdFromHexString currencySymbol of
       Just policyId -> do
         let
-          contractRoles = rolesInContract contract
+          contractRoles = Array.nub $ rolesInContract contract <> rolesInState state
           WalletContext { balance: Cardano.Value balanceValue } = walletContext
           assetsIds2Role = contractRoles <#> \tokenName -> do
             let
@@ -626,7 +628,7 @@ walletParties walletContext@(WalletContext { changeAddress, usedAddresses }) pos
 
   let
     contractAddresses :: Array V1.Address
-    contractAddresses = addressesInContract contract
+    contractAddresses = Array.nub $ addressesInContract contract <> addressesInState state
 
     addressParties :: Array V1.Party
     addressParties =
@@ -674,11 +676,28 @@ contractActionsContext env walletContext submittedPayouts sc@(SyncedConractInfo 
       let
         MarloweInfo { initialContract, currencySymbol, currentContract, state: currentState, unclaimedPayouts } = marloweInfo
 
-        possiblyParties = hush $ walletParties walletContext currencySymbol initialContract
+        possiblyParties = hush $ walletParties walletContext currencySymbol initialContract (fromMaybe V1.emptyState currentState)
         possiblyCanWithdraw = do
           parties <- possiblyParties
           payouts <- NonEmptyArray.fromArray $ remainingPayouts contractId parties submittedPayouts unclaimedPayouts
           pure $ CanWithdraw payouts
+
+        -- FIXME:
+        -- This is redunant and repetitive. We introduced this extra check because the `possiblyCanAdvance`
+        -- short circuits on non party user. In the future we would like to handle unrelated contracts as well.
+        -- Improve these two checks.
+        possiblyAnyoneCanAdvance = do
+          contract <- currentContract
+          state <- currentState
+          let
+            canAdvance = CanAdvance
+              { contract, state, transactionsEndpoint: endpoints.transactions, initialContract }
+          case allInputs env state contract of
+            Left _ -> pure canAdvance
+            Right { notifies } ->
+              if not $ Array.null notifies then pure canAdvance
+              else Nothing
+
         possiblyCanAdvance = do
           parties <- possiblyParties
           contract <- currentContract
@@ -690,7 +709,7 @@ contractActionsContext env walletContext submittedPayouts sc@(SyncedConractInfo 
 
         possiblyActions :: Maybe (These CanAdvance CanWithdraw)
         possiblyActions = maybeThese
-          possiblyCanAdvance
+          (possiblyCanAdvance <|> possiblyAnyoneCanAdvance)
           possiblyCanWithdraw
 
       case possiblyActions of

@@ -26,6 +26,7 @@ After(async function(this: ScenarioWorld, scenario) {
 
   if (scenarioStatus === 'FAILED' && screen) {
     const page = screen.page;
+    await page.evaluate(() => window.scrollTo(0, 0))
     const screenshot = await page.screenshot({
       path: `${env('SCREENSHOT_PATH')}${scenario.pickle.name}.png`
     });

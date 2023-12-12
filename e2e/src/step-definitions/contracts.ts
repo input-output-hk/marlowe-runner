@@ -121,4 +121,28 @@ When(
   }
 );
 
-
+// And I generate "SimpleNotify" and call it "notify"
+When(
+  /^I generate "([^"]*)" and call it "([^"]*)"$/,
+  async function(this: ScenarioWorld, contractName: string, contractNickname: string) {
+    const walletAddress = await this.getWalletAddress();
+    let contract: Contract;
+    switch (contractName) {
+      case "SimpleDeposit":
+        contract = mkSimpleDeposit(walletAddress);
+        break;
+      case "SimpleChoice":
+        contract = mkSimpleChoice(walletAddress);
+        break;
+      case "TimedOutSimpleChoice":
+        contract = mkTimedOutSimpleChoice(walletAddress);
+        break;
+      case "SimpleNotify":
+        contract = mkSimpleNotify();
+        break;
+      default:
+        throw new Error("Unknown contract type: " + contractName);
+    }
+    this.setContractInfo(contractNickname, { contract: contract, contractId: undefined });
+  }
+);
