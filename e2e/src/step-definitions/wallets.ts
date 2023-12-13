@@ -4,6 +4,7 @@ import { AccessibilityRole, waitForRoleVisible } from "../support/wait-for-behav
 import * as nami from "./wallets/nami.js";
 import * as lace from "./wallets/lace.js";
 import { Page } from 'playwright';
+import { WalletPopup } from './wallets/walletPopup.js';
 
 When(
   /^I use ([^ ]*) (nami|lace) browser$/,
@@ -67,12 +68,13 @@ When(
       const locator = await waitForRoleVisible(page, role, name);
       await locator.click();
     }
+    const walletPopup = await WalletPopup.fromTrigger(page, triggerSign);
     switch (wallet.type) {
       case 'nami':
-        await nami.signTx(page, triggerSign);
+        await nami.signTx(walletPopup);
         break;
       case 'lace':
-        await lace.signTx(page, triggerSign);
+        await lace.signTx(walletPopup);
         break;
       default:
         throw new Error('Unknown wallet type');
@@ -80,3 +82,46 @@ When(
   }
 );
 
+When(
+  /^I click the "([^"]*)" with "([^"]*)" text And grab wallet popup$/,
+  async function(this: ScenarioWorld, role: AccessibilityRole,  name: string) {
+    const { page } = this.getScreen();
+    const triggerSign = async () => {
+      const locator = await waitForRoleVisible(page, role, name);
+      await locator.click();
+    }
+    const walletPopup = await WalletPopup.fromTrigger(page, triggerSign);
+    this.setWalletPopup(walletPopup);
+  }
+);
+
+When(
+  /^I switch to "([^ ]*)" (nami|lace) browser and finally sign the transaction$/,
+  async function(this: ScenarioWorld, walletName: string, walletType: string) {
+    const { screens } = this;
+    switch (walletType) {
+      case 'nami':
+        this.screen = await screens('nami', walletName);
+        break;
+      case 'lace':
+        this.screen = await screens('lace', walletName);
+        break;
+      default:
+        throw new Error('Unknown wallet type');
+    }
+    const walletPopup:WalletPopup|undefined = this.getScreen().walletPopup;
+    if(walletPopup === undefined) {
+      throw new Error("Wallet popup was probably already closed");
+    }
+
+    switch (walletType) {
+      case 'nami':
+        await nami.signTx(walletPopup);
+        break;
+      case 'lace':
+        await lace.signTx(walletPopup);
+        break;
+      default:
+        throw new Error('Unknown wallet type');
+    }
+});

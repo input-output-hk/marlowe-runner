@@ -34,7 +34,7 @@ import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types (Ada(..)) as V1
-import Marlowe.Runtime.Web.Client (post', put')
+import Marlowe.Runtime.Web.Client (ClientError, post', put')
 import Marlowe.Runtime.Web.Types (Payout(..), PostWithdrawalsRequest(..), PostWithdrawalsResponseContent(..), PutWithdrawalRequest(..), Runtime(Runtime), ServerURL, TextEnvelope(..), TxOutRef, WithdrawalEndpoint, WithdrawalsEndpoint, toTextEnvelope)
 import Polyform.Validator (liftFn)
 import React.Basic (fragment)
@@ -192,7 +192,7 @@ submit
   :: CborHex TransactionWitnessSetObject
   -> ServerURL
   -> WithdrawalEndpoint
-  -> Aff (Either FetchError Unit)
+  -> Aff (Either (ClientError String) Unit)
 submit witnesses serverUrl contractEndpoint = do
   let
     textEnvelope = toTextEnvelope witnesses ""

@@ -187,11 +187,11 @@ let
 
     "cardano-multiplatform-lib" = pkgs.stdenv.mkDerivation {
       name = "cardano-multiplatform-lib";
-      version = "3929298b6a650f15d9d270b91b4415b9b5457601";
+      version = "v0.0.2";
       src = pkgs.fetchgit {
         url = "https://github.com/input-output-hk/purescript-cardano-multiplatform-lib.git";
-        rev = "3929298b6a650f15d9d270b91b4415b9b5457601";
-        sha256 = "1dm2gg1m3yallck3x6akzjkh7b2fyd1biwr9wgyb5ylb7nwqqxx4";
+        rev = "d06bdedf43a46f27484c040e7f30f213bebe2396";
+        sha256 = "1yqiy7n8giahsx59nsbzfbs5clwnw96bpj5yv575fxjw1cmfa691";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";
@@ -883,11 +883,11 @@ let
 
     "marlowe-runtime-client" = pkgs.stdenv.mkDerivation {
       name = "marlowe-runtime-client";
-      version = "v0.3.2";
+      version = "v0.3.7";
       src = pkgs.fetchgit {
         url = "https://github.com/input-output-hk/purescript-marlowe-runtime-client.git";
-        rev = "3c9b5af0adad6bd86233e015785dade783f968d8";
-        sha256 = "0mr8dfgd7gskbar4l31xfiq05ls4m7xbblksj5mjbc9f784hiwfv";
+        rev = "fb84dd40df1b261effb87db4440ae70ad381886c";
+        sha256 = "03j5cc4rvsa3k2hm7sbhbmpy2ri1qzkh38ppb4g72a0aqhkik5dx";
       };
       phases = "installPhase";
       installPhase = "ln -s $src $out";

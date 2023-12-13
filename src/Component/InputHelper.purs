@@ -14,15 +14,17 @@ import Data.Either (Either(..))
 import Data.Foldable (foldM)
 import Data.List (List)
 import Data.List as List
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Set as Set
 import Data.Time.Duration (Milliseconds(..), negateDuration)
+import Data.Tuple (fst)
 import Data.Tuple.Nested (type (/\), (/\))
 import Language.Marlowe.Core.V1.Folds (MapStep(..), foldMapContract)
 import Language.Marlowe.Core.V1.Semantics (applyCases, evalObservation, reduceContractStep) as V1
 import Language.Marlowe.Core.V1.Semantics (evalObservation, evalValue, reduceContractUntilQuiescent)
 import Language.Marlowe.Core.V1.Semantics.Types (AccountId, Action(..), Bound, Case(..), ChoiceId(..), Contract(..), Environment(..), Observation(..), Party(..), Payee(..), State, TimeInterval(..), Token, TokenName, Value(..), Address)
-import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State, TimeInterval(..)) as V1
-import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State, TimeInterval(..)) as V1
+import Language.Marlowe.Core.V1.Semantics.Types (ApplyResult(..), Contract, Environment(..), Input(..), InputContent(..), ReduceResult(..), ReduceStepResult(..), State(..), TimeInterval(..)) as V1
 
 data DepositInput = DepositInput AccountId Party Token BigInt.BigInt (Maybe Contract)
 
@@ -206,6 +208,34 @@ addressesInContract = Array.nub <<< foldMapContract
   addressesContract (If _ _ _) = []
   addressesContract (Let _ _ _) = []
   addressesContract (Assert _ _) = []
+
+rolesInState :: V1.State -> Array TokenName
+rolesInState (V1.State { accounts, choices }) = do
+  let
+    choiceParties = Set.map choiceIdToParty $ Map.keys choices
+    accountParties = Set.map fst (Map.keys accounts)
+  Array.catMaybes $ Set.toUnfoldable $ Set.map roleFromParty $ choiceParties `Set.union` accountParties
+  where
+  choiceIdToParty :: ChoiceId -> Party
+  choiceIdToParty (ChoiceId _ party) = party
+
+  roleFromParty :: Party -> Maybe TokenName
+  roleFromParty (Role t) = Just t
+  roleFromParty _ = Nothing
+
+addressesInState :: V1.State -> Array Address
+addressesInState (V1.State { accounts, choices }) = do
+  let
+    choiceParties = Set.map choiceIdToParty $ Map.keys choices
+    accountParties = Set.map fst (Map.keys accounts)
+  Array.catMaybes $ Set.toUnfoldable $ Set.map addressFromParty $ choiceParties `Set.union` accountParties
+  where
+  choiceIdToParty :: ChoiceId -> Party
+  choiceIdToParty (ChoiceId _ party) = party
+
+  addressFromParty :: Party -> Maybe Address
+  addressFromParty (Address t) = Just t
+  addressFromParty _ = Nothing
 
 data ExecutionBranch
   = WhenBranch (Maybe Int)

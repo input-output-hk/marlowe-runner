@@ -7,7 +7,6 @@ import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
 import Component.InputHelper (rolesInContract)
 import Component.Types (WalletInfo(..))
-import Contrib.Fetch (FetchError)
 import Control.Monad.Error.Class (catchError)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
@@ -305,7 +304,7 @@ submit
   :: CborHex TransactionWitnessSetObject
   -> ServerURL
   -> ContractEndpoint
-  -> Aff (Either FetchError Unit)
+  -> Aff (Either (ClientError String) Unit)
 submit witnesses serverUrl contractEndpoint = do
   let
     textEnvelope = toTextEnvelope witnesses ""

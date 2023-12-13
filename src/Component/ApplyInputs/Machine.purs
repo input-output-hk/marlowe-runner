@@ -477,8 +477,9 @@ requestToAffAction = case _ of
     SubmitTxRequest { txWitnessSet, createTxResponse, serverURL } -> do
       let
         action = submit txWitnessSet serverURL createTxResponse.links.transaction >>= case _ of
-          Right _ -> do
+          Right response -> do
             n <- liftEffect $ now
+
             pure $ SubmitTxSucceeded n
           Left err -> pure $ SubmitTxFailed $ show err
       action `catchError` (pure <<< SubmitTxFailed <<< show)
@@ -516,7 +517,7 @@ submit
   :: CborHex TransactionWitnessSetObject
   -> ServerURL
   -> TransactionEndpoint
-  -> Aff (Either FetchError Unit)
+  -> Aff (Either (ClientError String) Unit)
 submit witnesses serverUrl transactionEndpoint = do
   let
     textEnvelope = toTextEnvelope witnesses ""

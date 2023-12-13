@@ -2,6 +2,8 @@ import { Locator, Page } from 'playwright';
 import { waitFor, waitForRoleVisible, waitForSelectorVisible, waitForTestIdVisible } from "../../support/wait-for-behavior.js";
 import { inputValue } from '../../support/html-behavior.js';
 import { Bech32 } from '../../cardano.js';
+import { grabPopup } from '../popup.js';
+import { WalletPopup } from './walletPopup.js';
 
 var SPENDING_PASSWORD: string = "Runner test";
 
@@ -117,47 +119,47 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
   const grantAccess:Promise<void> = (async () => {
     const page = await walletPopupPromise;
     await page.reload();
-    await waitFor(async ():Promise<boolean> => {
-      const locator = page.getByRole("button", { name: "Authorize", exact: true });
-      const result = await locator.isVisible();
-      if (result) {
-        await locator.click();
-        return result;
-      }
-      return true
-    }, { label: "Authorize button" });
+    let locator: Locator;
 
-    await waitFor(async() => {
-      const locator = page.getByRole("button", { name: "Always", exact: true });
-      const result = await locator.isVisible();
-      if (result) {
-        await locator.click();
-        return result;
-      }
-    }, { label: "Always button" });
+    locator = await waitForRoleVisible(page, "button", "Authorize");
+    await locator.click();
+
+    locator = await waitForRoleVisible(page, "button", "Always");
+    await locator.click();
   })();
 
+  // Playwright `waitFor` doesn't support aborting the promise
+  // so the loosing one will run till the timeout and the result
+  // will be ignored.
   await Promise.any([isAuthorizedCheck(page), grantAccess]);
   await isAuthorizedCheck(page);
 }
 
-export const signTx = async (page: Page, triggerSign: () => Promise<void>): Promise<void> => {
+export const signTx = async (walletPopupWrapper: WalletPopup): Promise<void> => {
   var locator: Locator;
-  const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
-  await triggerSign();
-  const walletPopup = await walletPopupPromise;
-  await walletPopup.reload();
-
+  let possibleWalletPopup:Page|undefined = walletPopupWrapper.getPage();
+  if(possibleWalletPopup === undefined) {
+    throw new Error("Wallet popup was probably already closed");
+  }
+  let walletPopup:Page = possibleWalletPopup;
   locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
   await locator.click();
 
   locator = await waitForTestIdVisible(walletPopup, "password-input");
   await inputValue(locator, SPENDING_PASSWORD);
 
-  locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
-  await locator.click();
+  const confirm = async function() {
+    locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
+    await locator.click();
+  }
 
-  locator = await waitForRoleVisible(walletPopup, "button", "Close");
+  await confirm();
+  // Sometimes we have to double confirm or we will stuck on the popup
+  locator = await waitForRoleVisible(walletPopup, "button", "Close").catch(async () => {
+    await confirm().catch(async () => { return });
+    return await waitForRoleVisible(walletPopup, "button", "Close");
+  });
+
   await locator.click();
 }
 
