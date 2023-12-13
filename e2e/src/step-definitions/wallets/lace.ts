@@ -2,6 +2,8 @@ import { Locator, Page } from 'playwright';
 import { waitFor, waitForRoleVisible, waitForSelectorVisible, waitForTestIdVisible } from "../../support/wait-for-behavior.js";
 import { inputValue } from '../../support/html-behavior.js';
 import { Bech32 } from '../../cardano.js';
+import { grabPopup } from '../popup.js';
+import { WalletPopup } from './walletPopup.js';
 
 var SPENDING_PASSWORD: string = "Runner test";
 
@@ -133,13 +135,13 @@ export const authorizeApp = async function (page: Page, triggerAuthorization: ()
   await isAuthorizedCheck(page);
 }
 
-export const signTx = async (page: Page, triggerSign: () => Promise<void>): Promise<void> => {
+export const signTx = async (walletPopupWrapper: WalletPopup): Promise<void> => {
   var locator: Locator;
-  const walletPopupPromise:Promise<Page> = new Promise(resolve => page.context().once('page', resolve));
-  await triggerSign();
-  const walletPopup = await walletPopupPromise;
-  await walletPopup.reload();
-
+  let possibleWalletPopup:Page|undefined = walletPopupWrapper.getPage();
+  if(possibleWalletPopup === undefined) {
+    throw new Error("Wallet popup was probably already closed");
+  }
+  let walletPopup:Page = possibleWalletPopup;
   locator = await waitForRoleVisible(walletPopup, "button", "Confirm");
   await locator.click();
 
@@ -152,10 +154,9 @@ export const signTx = async (page: Page, triggerSign: () => Promise<void>): Prom
   }
 
   await confirm();
-
-  // Sometimes we have to double confirm
+  // Sometimes we have to double confirm or we will stuck on the popup
   locator = await waitForRoleVisible(walletPopup, "button", "Close").catch(async () => {
-    await confirm();
+    await confirm().catch(async () => { return });
     return await waitForRoleVisible(walletPopup, "button", "Close");
   });
 

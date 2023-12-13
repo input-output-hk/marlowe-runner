@@ -13,11 +13,13 @@ import { GlobalConfig } from '../env/global.js';
 import GlobalStateManager from "../support/globalStateManager.js";
 import { Bech32, ContractId } from '../cardano.js';
 import { Contract } from '@marlowe.io/language-core-v1';
+import { WalletPopup } from './wallets/walletPopup.js';
 
 export type WalletType = "nami" | "lace";
 
 type Screen = {
   page: Page
+  walletPopup: WalletPopup | undefined,
   // TODO: Hide contect and expose only page related methods
   context: BrowserContext,
   // getDefaultPage: () => Promise<Page>
@@ -87,6 +89,10 @@ export class ScenarioWorld extends World {
 
   public setContractInfo(contractName: string, contractInfo: ContractInfo): void {
     this.contracts[contractName] = contractInfo;
+  }
+
+  public setWalletPopup(walletPopup: WalletPopup): void {
+    this.getScreen().walletPopup = walletPopup;
   }
 
   public async getWalletAddress(walletName?:string): Promise<Bech32> {
@@ -169,7 +175,7 @@ export class ScenarioWorld extends World {
         throw new Error("Wallet configuration failed - wallet address is not the same as expected: given " + address + " != expected " + expectedAddress);
       }
       const wallet = { address, name: walletName, mnemonic, url: walletURL, type: walletType };
-      const screen = { context, page, wallet };
+      const screen = { context, page, wallet, walletPopup: undefined };
       cache[walletType][walletName] = screen;
       return screen;
     }

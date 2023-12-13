@@ -3,8 +3,7 @@ module Component.ContractList where
 import Prelude
 
 import Cardano as Cardano
-import CardanoMultiplatformLib (CborHex, bech32ToString)
-import CardanoMultiplatformLib.Transaction (TransactionWitnessSetObject)
+import CardanoMultiplatformLib (bech32ToString)
 import Component.ApplyInputs as ApplyInputs
 import Component.ApplyInputs.Machine (mkEnvironment)
 import Component.ApplyInputs.Machine as ApplyInputs.Machine
@@ -22,7 +21,6 @@ import Component.Widget.Table (orderingHeader) as Table
 import Component.Widgets (buttonOutlinedInactive, buttonOutlinedPrimary, buttonOutlinedWithdraw)
 import Component.Withdrawals as Withdrawals
 import Contrib.Data.JSDate (toLocaleDateString, toLocaleTimeString) as JSDate
-import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
 import Contrib.Polyform.FormSpecs.StatelessFormSpec (renderFormSpec)
 import Contrib.React.Svg (loadingSpinnerLogo)
@@ -58,15 +56,14 @@ import Data.Time.Duration as Duration
 import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\))
 import Effect (Effect)
-import Effect.Aff (Aff, delay, launchAff_)
+import Effect.Aff (delay, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now as Now
 import Foreign.Object as Object
 import Language.Marlowe.Core.V1.Semantics (emptyState) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Action(..), Address, Case(..), Contract(..), CurrencySymbol, Environment, Party(..), State) as V1
 import Language.Marlowe.Core.V1.Semantics.Types (Contract)
-import Marlowe.Runtime.Web.Client (put')
-import Marlowe.Runtime.Web.Types (Payout(..), PutTransactionRequest(..), ServerURL, Tags(..), TransactionEndpoint, TransactionsEndpoint, TxOutRef, toTextEnvelope, txOutRefToString)
+import Marlowe.Runtime.Web.Types (Payout(..), Tags(..), TransactionsEndpoint, TxOutRef, txOutRefToString)
 import Marlowe.Runtime.Web.Types as Runtime
 import Polyform.Validator (liftFnM)
 import Promise.Aff as Promise
@@ -130,14 +127,6 @@ data OrderBy
   | OrderByLastUpdateDate
 
 derive instance Eq OrderBy
-
-submit :: CborHex TransactionWitnessSetObject -> ServerURL -> TransactionEndpoint -> Aff (Either FetchError Unit)
-submit witnesses serverUrl transactionEndpoint = do
-  let
-    textEnvelope = toTextEnvelope witnesses ""
-
-    req = PutTransactionRequest textEnvelope
-  put' serverUrl transactionEndpoint req
 
 data ContractTemplate = Escrow | Swap | ContractForDifferencesWithOracle
 

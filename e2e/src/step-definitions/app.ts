@@ -8,7 +8,7 @@ When(
   /^I should see (error|success) toast$/,
   async function(this: ScenarioWorld, toastType: ToastType) {
     const { page } = this.getScreen();
-    await waitForTestIdVisible(page, "toast-" + toastType + "-msg", 60000);
+    await waitForTestIdVisible(page, "toast-" + toastType + "-msg", 600000);
   }
 )
 

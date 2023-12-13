@@ -17,7 +17,6 @@ import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (backToContractListLink, link, marlowePreview, marloweStatePreview)
 import Component.Widgets as Widgets
 import Contrib.Data.FunctorWithIndex (mapWithIndexFlipped)
-import Contrib.Fetch (FetchError)
 import Contrib.Polyform.FormSpecBuilder (evalBuilder')
 import Contrib.Polyform.FormSpecs.StatefulFormSpec as StatefulFormSpec
 import Contrib.Polyform.FormSpecs.StatelessFormSpec as StatelessFormSpec
@@ -98,7 +97,11 @@ create contractData serverUrl contractsEndpoint = do
 
   post' serverUrl contractsEndpoint req
 
-submit :: CborHex TransactionWitnessSetObject -> ServerURL -> TransactionEndpoint -> Aff (Either FetchError Unit)
+submit
+  :: CborHex TransactionWitnessSetObject
+  -> ServerURL
+  -> TransactionEndpoint
+  -> Aff (Either (ClientError String) Unit)
 submit witnesses serverUrl contractEndpoint = do
   let
     textEnvelope = toTextEnvelope witnesses ""
