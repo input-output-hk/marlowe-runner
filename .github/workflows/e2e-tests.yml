@@ -10,6 +10,11 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v3
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "20.x"
+
+
       - name: Run E2E tests
         run: |
           nix develop --command bash -c 'cd e2e && npm install && . ./run_invisible.sh @dev'
