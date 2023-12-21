@@ -21,7 +21,7 @@ footer = do
                             , href: "https://static.iohk.io/terms/iohktermsandconditions.pdf"
                             , target: "_blank"
                             , children:
-                                [ DOM.i { className: "h5 bi-github" }
+                                [ DOM.i { className: "h5 bi-file-earmark-text" }
                                 , DOM.text "  Terms and Conditions"
                                 ]
                             }
