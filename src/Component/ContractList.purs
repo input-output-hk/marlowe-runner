@@ -14,7 +14,8 @@ import Component.ContractTemplates.Swap as Swap
 import Component.CreateContract (runnerTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (addressesInContract, addressesInState, allInputs, canInput, rolesInContract, rolesInState)
-import Component.Types (ContractInfo(..), ContractJsonString, MessageContent(..), MessageHub(..), MkComponentM, Page(..), WalletInfo)
+import Component.Types (ContractInfo(..), ContractJsonString, MessageContent'(..), MessageHub(..), MkComponentM, Page(..), WalletInfo, errorReportToMessage)
+import Component.Types as MessageHub
 import Component.Types.ContractInfo (ContractStatus(..), MarloweInfo(..), SomeContractInfo(..), contractStatusMarloweInfo, contractStatusTransactionsHeadersWithEndpoints)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widget.Table (orderingHeader) as Table
@@ -70,6 +71,7 @@ import Promise.Aff as Promise
 import React.Basic (fragment)
 import React.Basic.DOM (br, img, text) as DOOM
 import React.Basic.DOM (text)
+import React.Basic.DOM as D
 import React.Basic.DOM.Events (targetValue)
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.DOM.Simplified.ToJSX (class ToJSX)
@@ -276,8 +278,17 @@ mkContractList = do
 
     pure do
       let
+        onError' errorReport = do
+          let
+            msg = errorReportToMessage errorReport
+          msgHubProps.add msg
+          resetModalAction
+
         onError error = do
-          msgHubProps.add $ Error $ DOOM.text $ fold [ "An error occured during contract submission: " <> error ]
+          let
+            errorReport = MessageHub.errorReportFromMsg $ D.text $ "An error occured during contract submission: " <> error
+            msg = errorReportToMessage errorReport
+          msgHubProps.add msg
           resetModalAction
       case possibleModalAction, submittedWithdrawalsInfo of
         Just (NewContract possibleInitialContract), _ -> createContractComponent
@@ -285,7 +296,7 @@ mkContractList = do
           , walletContext
           , onDismiss: resetModalAction
           , onSuccess: \contractCreated -> do
-              msgHubProps.add $ Success $ DOOM.text $ String.joinWith " "
+              msgHubProps.add $ MessageHub.Success $ DOOM.text $ String.joinWith " "
                 [ "Successfully created and submitted the contract."
                 , "Contract transaction awaits to be included in the blockchain."
                 ]
@@ -297,7 +308,7 @@ mkContractList = do
         Just (ApplyInputs contractInfo transactionsEndpoint marloweContext), _ -> do
           let
             onSuccess = \contractUpdated -> do
-              msgHubProps.add $ Success $ DOOM.text $ fold
+              msgHubProps.add $ MessageHub.Success $ DOOM.text $ fold
                 [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
               notSyncedYetInserts.update contractUpdated
               resetModalAction
@@ -305,7 +316,7 @@ mkContractList = do
             { transactionsEndpoint
             , contractInfo
             , marloweContext
-            , onError
+            , onError: onError'
             , connectedWallet: walletInfo
             , onSuccess
             , onDismiss: resetModalAction
@@ -313,7 +324,7 @@ mkContractList = do
         Just (Withdrawal _ contractId unclaimedPayouts), _ /\ updateSubmitted -> do
           let
             onSuccess = \_ -> do
-              msgHubProps.add $ Success $ DOOM.text $ fold
+              msgHubProps.add $ MessageHub.Success $ DOOM.text $ fold
                 [ "Successfully withdrawed the funds. Withdrawal transaction awaits to be included in the blockchain." ]
               resetModalAction
           withdrawalsComponent

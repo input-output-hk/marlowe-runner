@@ -7,12 +7,15 @@ import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Types (Bech32)
 import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
+import Component.CreateContract.Machine (PostContractsResponseContent'(..))
 import Component.CreateContract.Machine as Machine
-import Component.Types (MkComponentM, WalletInfo, ContractJsonString(..))
+import Component.Types (ContractJsonString(..), ErrorReport, MkComponentM, WalletInfo, mkErrorReport, mkJSXErrorReport)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (OutlineColoring(..), backToContractListLink, buttonOutlinedClassNames)
 import Component.Widgets (submitButton) as DOM
 import Component.Widgets as Widgets
+import Contrib.ErrorToJson (errorToJson)
+import Contrib.Fetch as Fetch
 import Contrib.Polyform.Batteries.UrlEncoded (requiredV')
 import Contrib.Polyform.FormSpecBuilder (FormSpecBuilderT)
 import Contrib.Polyform.FormSpecBuilder as FormSpecBuilder
@@ -56,20 +59,23 @@ import Data.Tuple (snd)
 import Data.Tuple.Nested (type (/\))
 import Data.Undefined.NoProblem as NoProblem
 import Data.Validation.Semigroup (V(..))
+import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
 import Marlowe.Runtime.Web (Runtime)
+import Marlowe.Runtime.Web as R
 import Marlowe.Runtime.Web.Client (ClientError)
-import Marlowe.Runtime.Web.Types (PostContractsError, PostContractsResponseContent(..), RoleTokenConfig(..), RolesConfig(..), Tags(..))
+import Marlowe.Runtime.Web.Client as Client
+import Marlowe.Runtime.Web.Types (PostContractsError, RoleTokenConfig(..), RolesConfig(..), Tags(..))
 import Partial.Unsafe (unsafeCrashWith)
 import Polyform.Validator (liftFn)
 import Polyform.Validator (liftFnEither, liftFnMMaybe) as Validator
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (div_, hr, img, input, text) as DOOM
-import React.Basic.DOM as R
+import React.Basic.DOM as D
 import React.Basic.DOM.Simplified.Generated (button, div, h3, label, p, span) as DOM
 import React.Basic.Events (handler_)
 import React.Basic.Hooks (JSX, Ref, component, fragment, readRef, useRef, (/\))
@@ -90,7 +96,7 @@ import Web.HTML.HTMLInputElement as HTMLInputElement
 
 type Props =
   { onDismiss :: Effect Unit
-  , onError :: String -> Effect Unit
+  , onError :: ErrorReport JSX -> Effect Unit
   , onSuccess :: ContractInfo.ContractCreated -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , walletContext :: WalletContext
@@ -280,7 +286,7 @@ mkRoleTokensComponent = do
                         , onClick: onSubmit'
                         , disabled
                         }
-                      [ R.text "Mint and send tokens"
+                      [ D.text "Mint and send tokens"
                       , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
                       ]
                   ]
@@ -295,16 +301,23 @@ runnerTag = "run-lite"
 runnerCreatorTag :: Bech32 -> String
 runnerCreatorTag creator = runnerTag <> "-" <> bech32ToString creator
 
+data ContractRelatedError
+  = SafetyErrors (NonEmptyArray R.SafetyErrorInfo)
+  -- Runtime reports poorely problems with invalid Contract values.
+  -- But we can get at least two values which indicate problems:
+  | PossibleContractDecodingProblem
+
 -- We want to construct `ContractInfo.ContractCreated` and call `onSuccess` only
 mkOnStateTransition
   :: (ContractInfo.ContractCreated -> Effect Unit)
-  -> (String -> Effect Unit)
+  -> (ErrorReport JSX -> Effect Unit)
+  -> (ContractRelatedError -> Effect Unit)
   -> Machine.State
   -> Machine.State
   -> Effect Unit
-mkOnStateTransition onSuccess _ _ (Machine.ContractCreated { contract, createTxResponse, submittedAt, tags }) = do
+mkOnStateTransition onSuccess _ _ _ (Machine.ContractCreated { contract, createTxResponse, submittedAt, tags }) = do
   let
-    { resource: PostContractsResponseContent { contractId }
+    { resource: PostContractsResponseContent' { contractId }
     , links: { contract: contractEndpoint }
     } = createTxResponse
 
@@ -316,8 +329,71 @@ mkOnStateTransition onSuccess _ _ (Machine.ContractCreated { contract, createTxR
       , tags
       }
   onSuccess contractCreated
-mkOnStateTransition _ onErrors _ next = do
-  void $ for (Machine.stateErrors next) onErrors
+mkOnStateTransition _ onErrors onContractError _ next = do
+  let
+    communicationError = D.text "Server communication error. Please try again later."
+  void $ for (Machine.stateErrors next) case _ of
+    Machine.CreateError (Machine.SafetyErrors safetyErrors) -> do
+      onContractError $ SafetyErrors safetyErrors
+    Machine.CreateError (Machine.ClientError clientError) -> case clientError of
+      -- Possibly invalid address format:
+      -- body: RequestBodyParseError: Error in $.contract: key "assert" not found (ReqBody')
+      -- InvalidBodyEncoding
+      --  { body :: String
+      --  , parsingError :: ParsingError
+      --  , statusCode :: StatusCode
+      --  }
+      --
+      Client.FetchError (Fetch.InvalidBodyEncoding _) ->
+        onContractError PossibleContractDecodingProblem
+      -- Wrong currency symbol:
+      --  {"message":"Unable to compute min Ada deposit bound","error":"Internal error: null","details":null}
+      -- | ServerApiError
+      --   { error :: ApiError err
+      --   , statusCode :: StatusCode
+      --   , body :: Json
+      --   }
+      --
+      -- newtype ApiError error = ApiError
+      --   { message :: String
+      --   , error :: error
+      --   , details :: Json
+      --   }
+      R.ServerApiError { error: R.ApiError { message: "Internal error:null" } } ->
+        onContractError PossibleContractDecodingProblem
+      R.ServerApiError { error: R.ApiError { message, details }, body } -> do
+        let
+          error' = Just $ encodeJson { body, details }
+        onErrors $ mkJSXErrorReport message Nothing error'
+      R.ResponseDecodingError json decodingError -> do
+        onErrors $ mkErrorReport
+          communicationError
+          Nothing
+          (Just $ encodeJson { body: json, error: show decodingError })
+      R.HealthCheckError msg -> do
+        let
+          json = encodeJson { "healthCheckError": msg }
+        onErrors $ mkErrorReport
+          communicationError
+          Nothing
+          (Just json)
+      R.MerkleizationError -> do
+        onErrors $ mkErrorReport
+          communicationError
+          Nothing
+          (Just $ encodeJson { "merkleizationError": true })
+      R.FetchError (Fetch.InvalidStatusCode response) -> do
+        onErrors $ mkErrorReport
+          communicationError
+          Nothing
+          (Just $ encodeJson { "invalidStatusCode": Fetch.responseToJson response })
+      R.FetchError (Fetch.FetchError error) -> do
+        onErrors $ mkErrorReport
+          communicationError
+          Nothing
+          (Just $ encodeJson { "fetchError": errorToJson error })
+
+    Machine.OtherError errorReport -> onErrors errorReport
 
 mkComponent :: MkComponentM (Props -> JSX)
 mkComponent = do
@@ -334,7 +410,10 @@ mkComponent = do
 
   liftEffect $ component "CreateContract" \{ walletContext, connectedWallet, onSuccess, onError, onDismiss, possibleInitialContract } -> React.do
     let
-      onStateTransition = mkOnStateTransition onSuccess onError
+      onContractError error = do
+        traceM "Either safety errors or contract decoding problem"
+        traceM error
+      onStateTransition = mkOnStateTransition onSuccess onError onContractError
 
     _ /\ setCurrentRun <- React.useState' Nothing
     { state: submissionState, applyAction, reset: resetStateMachine } <- do
@@ -391,7 +470,7 @@ mkComponent = do
             $ do
                 let inputId = "contract-file-upload"
                 [ DOM.label { htmlFor: inputId, className: buttonOutlinedClassNames OutlinePrimaryColoring "", role: "button" }
-                    [ R.text "Upload JSON" ]
+                    [ D.text "Upload JSON" ]
                 , loadFileHiddenInputComponent
                     { onFileload: case _ of
                         Just str -> do
@@ -423,7 +502,7 @@ mkComponent = do
                   , disabled
                   }
                   $ fragment
-                      [ R.text "Submit contract"
+                      [ D.text "Submit contract"
                       , DOM.span {} $ DOOM.img { src: "/images/arrow_right_alt.svg" }
                       ]
             , backToContractListLink onDismiss

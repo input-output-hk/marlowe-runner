@@ -11,6 +11,7 @@
     "browser-or-node": "^2.1.1",
     "decimal.js": "^10.4.2",
     "domready": "^1.0.8",
+    "error-to-json": "^2.0.0",
     "hex-string": "^1.0.3",
     "js-yaml": "^4.1.0",
     "json-bigint": "^1.0.0",

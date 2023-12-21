@@ -71,9 +71,9 @@ mkLandingPage = do
               , onError: case _ of
                   ConnectWallet.NoWallets -> pure unit -- setErrors $ Just NoWallets
                   ConnectWallet.ConnectionError _ ->
-                    msgHubProps.add $ MessageHub.Error $ DOOM.text $ "Wallet connection failed with unknown error. Please try another wallet"
+                    msgHubProps.add $ MessageHub.errorMsg "Wallet connection failed with unknown error. Please try another wallet"
                   ConnectWallet.TimeoutReached ->
-                    msgHubProps.add $ MessageHub.Error $ DOOM.text "Timeout reached while connecting to wallet"
+                    msgHubProps.add $ MessageHub.errorMsg "Timeout reached while connecting to wallet"
               , onDismiss: pure unit
               , overlay
               }

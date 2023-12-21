@@ -6,12 +6,13 @@ import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
 import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
 import Component.InputHelper (ChoiceInput, DepositInput, NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
-import Component.Types (WalletInfo(..))
+import Component.Types (ErrorReport, WalletInfo(..), mkJSXErrorReport)
 import Contrib.Data.DateTime.Instant (unsafeInstant)
-import Contrib.Fetch (FetchError)
+import Contrib.ErrorToJson (errorToJson)
 import Control.Alt ((<|>))
 import Control.Alternative as Alternative
 import Control.Monad.Error.Class (catchError)
+import Data.Argonaut (encodeJson)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmpty
@@ -27,12 +28,16 @@ import Effect.Class (liftEffect)
 import Effect.Now (now)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Runtime.Web.Client (ClientError, post', put')
-import Marlowe.Runtime.Web.Types (PostContractsError, PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), ResourceWithLinks, Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
+import Marlowe.Runtime.Web (PostTransactionsError, apiErrorToJson) as R
+import Marlowe.Runtime.Web.Client (ClientError) as Runtime
+import Marlowe.Runtime.Web.Client (post', put')
+import Marlowe.Runtime.Web.Client (clientErrorToJson) as R
+import Marlowe.Runtime.Web.Types (PostTransactionsRequest(..), PostTransactionsResponse(..), PutTransactionRequest(..), ResourceWithLinks, Runtime(Runtime), ServerURL, TextEnvelope(TextEnvelope), TransactionEndpoint, TransactionsEndpoint, toTextEnvelope)
+import React.Basic (JSX)
 import Wallet as Wallet
 import WalletContext (WalletContext(..), walletContext)
 
-type ClientError' = ClientError PostContractsError
+type ClientError' = Runtime.ClientError R.PostTransactionsError
 
 type WalletAddresses = { usedAddresses :: Array Bech32, changeAddress :: Bech32 }
 
@@ -78,11 +83,11 @@ data State
       { autoRun :: AutoRun
       , marloweContext :: MarloweContext
       , transactionsEndpoint :: TransactionsEndpoint
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       }
   | ChoosingInputType
       { autoRun :: AutoRun
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       , marloweContext :: MarloweContext
       , allInputsChoices :: AllInputsChoices
       , environment :: V1.Environment
@@ -91,7 +96,7 @@ data State
       }
   | PickingInput
       { autoRun :: AutoRun
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       , marloweContext :: MarloweContext
       , allInputsChoices :: AllInputsChoices
       , environment :: V1.Environment
@@ -101,7 +106,7 @@ data State
       }
   | CreatingTx
       { autoRun :: AutoRun
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       , allInputsChoices :: AllInputsChoices
       , environment :: V1.Environment
       , transactionsEndpoint :: TransactionsEndpoint
@@ -112,7 +117,7 @@ data State
       }
   | SigningTx
       { autoRun :: AutoRun
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       , allInputsChoices :: AllInputsChoices
       , environment :: V1.Environment
       , inputChoices :: InputChoices
@@ -122,7 +127,7 @@ data State
       }
   | SubmittingTx
       { autoRun :: AutoRun
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       , allInputsChoices :: AllInputsChoices
       , environment :: V1.Environment
       , inputChoices :: InputChoices
@@ -153,7 +158,7 @@ stateInputChoices = case _ of
   SubmittingTx { inputChoices } -> Just inputChoices
   InputApplied { inputChoices } -> Just inputChoices
 
-stateErrors :: State -> Maybe String
+stateErrors :: State -> Maybe (ErrorReport JSX)
 stateErrors = case _ of
   FetchingRequiredWalletContext { errors } -> errors
   ChoosingInputType { errors } -> errors
@@ -190,45 +195,37 @@ data Action
       , marloweContext :: MarloweContext
       , transactionsEndpoint :: TransactionsEndpoint
       }
-  | FetchRequiredWalletContextFailed String
+  | FetchRequiredWalletContextFailed (ErrorReport JSX)
   | FetchRequiredWalletContextSucceeded
       { allInputsChoices :: AllInputsChoices
       , requiredWalletContext :: RequiredWalletContext
       , environment :: V1.Environment
       }
   | ChooseInputType
-  | ChooseInputTypeFailed String
+  | ChooseInputTypeFailed (ErrorReport JSX)
   | ChooseInputTypeSucceeded InputChoices
   | PickInput
-  | PickInputFailed String
+  | PickInputFailed (ErrorReport JSX)
   | PickInputSucceeded { input :: Maybe V1.Input, newMarloweContext :: MarloweContext }
   | CreateTx
-  | CreateTxFailed String
+  | CreateTxFailed (ErrorReport JSX)
   | CreateTxSucceeded (ResourceWithLinks PostTransactionsResponse (transaction :: TransactionEndpoint))
   | SignTx
-  | SignTxFailed String
+  | SignTxFailed (ErrorReport JSX)
   | SignTxSucceeded (CborHex TransactionWitnessSetObject)
   | SubmitTx
-  | SubmitTxFailed String
+  | SubmitTxFailed (ErrorReport JSX)
   | SubmitTxSucceeded Instant
 
 step :: State -> Action -> State
 step state action = do
   case state of
-    -- PresentingContractDetails _ -> case action of
-    --   FetchRequiredWalletContext { autoRun, marloweContext, transactionsEndpoint } -> FetchingRequiredWalletContext
-    --     { autoRun
-    --     , marloweContext
-    --     , transactionsEndpoint
-    --     , errors: Nothing
-    --     }
-    --   _ -> state
     FetchingRequiredWalletContext { errors: Just _ } -> case action of
       FetchRequiredWalletContext { autoRun, marloweContext, transactionsEndpoint } ->
         FetchingRequiredWalletContext $ { autoRun, marloweContext, transactionsEndpoint, errors: Nothing }
       _ -> state
     FetchingRequiredWalletContext r@{ autoRun, transactionsEndpoint, marloweContext } -> case action of
-      FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
+      FetchRequiredWalletContextFailed errors -> FetchingRequiredWalletContext $ r { errors = Just errors }
       FetchRequiredWalletContextSucceeded { requiredWalletContext, allInputsChoices, environment } -> case allInputsChoices of
         Left contract -> do
           let inputChoices = AdvanceContract contract
@@ -281,7 +278,7 @@ step state action = do
       ChooseInputType -> ChoosingInputType r { errors = Nothing }
       _ -> state
     ChoosingInputType r@{ allInputsChoices, environment, marloweContext, autoRun, requiredWalletContext, transactionsEndpoint } -> case action of
-      ChooseInputTypeFailed error -> ChoosingInputType $ r { errors = Just error }
+      ChooseInputTypeFailed errors -> ChoosingInputType $ r { errors = Just errors }
       ChooseInputTypeSucceeded inputChoices -> PickingInput
         { autoRun
         , errors: Nothing
@@ -297,7 +294,7 @@ step state action = do
       PickInput -> PickingInput $ r { errors = Nothing }
       _ -> state
     PickingInput r@{ allInputsChoices, environment, autoRun, inputChoices, requiredWalletContext, transactionsEndpoint } -> case action of
-      PickInputFailed error -> PickingInput $ r { errors = Just error }
+      PickInputFailed errors -> PickingInput $ r { errors = Just errors }
       PickInputSucceeded { input, newMarloweContext } -> CreatingTx
         { autoRun
         , errors: Nothing
@@ -314,7 +311,7 @@ step state action = do
       CreateTx -> CreatingTx $ r { errors = Nothing }
       _ -> state
     CreatingTx r@{ allInputsChoices, newMarloweContext, environment, autoRun, inputChoices, input } -> case action of
-      CreateTxFailed error -> CreatingTx $ r { errors = Just error }
+      CreateTxFailed errors -> CreatingTx $ r { errors = Just errors }
       CreateTxSucceeded createTxResponse -> SigningTx
         { autoRun, errors: Nothing, allInputsChoices, newMarloweContext, environment, inputChoices, input, createTxResponse }
       _ -> state
@@ -322,7 +319,8 @@ step state action = do
       SignTx -> SigningTx $ r { errors = Nothing }
       _ -> state
     SigningTx r@{ allInputsChoices, environment, newMarloweContext, autoRun, inputChoices, input, createTxResponse } -> case action of
-      SignTxFailed error -> SigningTx $ r { errors = Just error }
+      SignTxFailed errors -> do
+        SigningTx $ r { errors = Just errors }
       SignTxSucceeded txWitnessSet -> SubmittingTx
         { autoRun, errors: Nothing, allInputsChoices, newMarloweContext, environment, inputChoices, input, createTxResponse, txWitnessSet }
       _ -> state
@@ -330,7 +328,7 @@ step state action = do
       SubmitTx -> SubmittingTx $ r { errors = Nothing }
       _ -> state
     SubmittingTx r@{ allInputsChoices, environment, newMarloweContext, autoRun, inputChoices, input, createTxResponse, txWitnessSet } -> case action of
-      SubmitTxFailed error -> SubmittingTx $ r { errors = Just error }
+      SubmitTxFailed errors -> SubmittingTx $ r { errors = Just errors }
       SubmitTxSucceeded submittedAt ->
         InputApplied { allInputsChoices, environment, newMarloweContext, autoRun, inputChoices, input, txWitnessSet, createTxResponse, submittedAt }
       _ -> state
@@ -438,8 +436,14 @@ requestToAffAction = case _ of
         WalletInfo { wallet } = walletInfo
       possibleWalletAddresses <- (Right <$> walletContext cardanoMultiplatformLib wallet) `catchError` (pure <<< Left)
       case possibleWalletAddresses of
-        Left err -> pure $ FetchRequiredWalletContextFailed $ show err
-        Right Nothing -> pure $ FetchRequiredWalletContextFailed "Wallet does not have a change address"
+        Left err -> do
+          let
+            json = errorToJson err
+            err' = mkJSXErrorReport "Failed to fetch wallet context" Nothing (Just json)
+          -- err' = D.text <$> mkErrorReport "Wallet doesn't have change address" Nothing (Just json)
+          pure $ FetchRequiredWalletContextFailed err'
+        Right Nothing -> pure $ FetchRequiredWalletContextFailed $
+          mkJSXErrorReport "Wallet does not have a change address" Nothing Nothing
         Right (Just (WalletContext { changeAddress, usedAddresses })) -> liftEffect $ do
           environment <- mkEnvironment
           let
@@ -462,27 +466,34 @@ requestToAffAction = case _ of
     SignTxRequest { walletInfo, tx } -> do
       let
         WalletInfo { wallet } = walletInfo
-        action = sign wallet tx >>= case _ of
-          Left err -> pure $ SignTxFailed $ unsafeStringify err
-          Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
-      action `catchError` (pure <<< SignTxFailed <<< show)
+      sign wallet tx >>= case _ of
+        Left err -> do
+          let
+            json = encodeJson { "strigified": unsafeStringify err }
+            err' = mkJSXErrorReport "Failed to sign transaction" Nothing (Just json)
+          pure $ SignTxFailed err'
+        Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
   RuntimeRequest runtimeRequest -> case runtimeRequest of
     CreateTxRequest { input, requiredWalletContext, serverURL, transactionsEndpoint } -> do
       let
         inputs = foldMap Array.singleton input
-        action = create inputs requiredWalletContext serverURL transactionsEndpoint >>= case _ of
-          Right res -> pure $ CreateTxSucceeded res
-          Left err -> pure $ CreateTxFailed $ show err
-      action `catchError` (pure <<< CreateTxFailed <<< show)
+      create inputs requiredWalletContext serverURL transactionsEndpoint >>= case _ of
+        Right res -> pure $ CreateTxSucceeded res
+        Left err -> do
+          let
+            json = R.clientErrorToJson R.apiErrorToJson err
+            err' = mkJSXErrorReport "Failed to create transaction" Nothing (Just json)
+          pure $ CreateTxFailed err'
     SubmitTxRequest { txWitnessSet, createTxResponse, serverURL } -> do
-      let
-        action = submit txWitnessSet serverURL createTxResponse.links.transaction >>= case _ of
-          Right response -> do
-            n <- liftEffect $ now
-
-            pure $ SubmitTxSucceeded n
-          Left err -> pure $ SubmitTxFailed $ show err
-      action `catchError` (pure <<< SubmitTxFailed <<< show)
+      submit txWitnessSet serverURL createTxResponse.links.transaction >>= case _ of
+        Right _ -> do
+          n <- liftEffect $ now
+          pure $ SubmitTxSucceeded n
+        Left err -> do
+          let
+            json = R.clientErrorToJson R.apiErrorToJson err
+            err' = mkJSXErrorReport "Failed to submit transaction" Nothing (Just json)
+          pure $ SubmitTxFailed err'
 
 driver :: Env -> State -> Maybe (Aff Action)
 driver env state = do
@@ -517,7 +528,7 @@ submit
   :: CborHex TransactionWitnessSetObject
   -> ServerURL
   -> TransactionEndpoint
-  -> Aff (Either (ClientError String) Unit)
+  -> Aff (Either ClientError' Unit)
 submit witnesses serverUrl transactionEndpoint = do
   let
     textEnvelope = toTextEnvelope witnesses ""

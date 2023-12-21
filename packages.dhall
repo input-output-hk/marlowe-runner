@@ -164,6 +164,21 @@ in  upstream
         "https://github.com/purescript-polyform/batteries-core.git"
         "v0.3.0"
 
+  with polyform-batteries-env =
+      mkPackage
+        [ "arrays"
+        , "identity"
+        , "maybe"
+        , "ordered-collections"
+        , "polyform"
+        , "polyform-batteries-core"
+        , "prelude"
+        , "psci-support"
+        , "typelevel-prelude"
+        ]
+        "https://github.com/purescript-polyform/batteries-env.git"
+        "v0.2.0"
+
   with polyform-batteries-urlencoded =
       mkPackage
         [ "argonaut"
@@ -322,7 +337,8 @@ in  upstream
         ]
         "https://github.com/input-output-hk/purescript-cardano-wallet-client.git"
         "v0.1.1"
-  with marlowe-runtime-client =
+  with marlowe-runtime-client = ../purescript-marlowe-runtime-client/spago.dhall as Location
+  with marlowe-runtime-client-orig =
      mkPackage
        [ "aff"
        , "aff-promise"
@@ -415,7 +431,7 @@ in  upstream
        , "web-html"
        ]
        "https://github.com/input-output-hk/purescript-marlowe-runtime-client.git"
-       "v0.3.7"
+       "v0.4.2"
   with
     errors =
       mkPackage

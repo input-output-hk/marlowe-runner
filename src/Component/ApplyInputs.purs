@@ -12,7 +12,7 @@ import Component.BodyLayout (wrappedContentWithFooter)
 import Component.BodyLayout as BodyLayout
 import Component.InputHelper (ChoiceInput, DepositInput(..), ExecutionPath, NotifyInput, StartPathSelection(..), toIDeposit)
 import Component.InputHelper as InputHelper
-import Component.Types (ContractInfo, MkComponentM, WalletInfo(..))
+import Component.Types (ContractInfo, ErrorReport, MkComponentM, WalletInfo(..), mkJSXErrorReport)
 import Component.Types.ContractInfo as ContractInfo
 import Component.Widgets (backToContractListLink, link, marlowePreview, marloweStatePreview)
 import Component.Widgets as Widgets
@@ -26,6 +26,7 @@ import Contrib.React.Basic.Hooks.UseStatefulFormSpec (useStatefulFormSpec)
 import Contrib.React.MarloweGraph (marloweGraph)
 import Contrib.ReactBootstrap.FormSpecBuilders.StatelessFormSpecBuilders (ChoiceFieldChoices(..), choiceField, radioFieldChoice)
 import Control.Monad.Reader.Class (asks)
+import Data.Argonaut (encodeJson)
 import Data.Array.ArrayAL as ArrayAL
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.BigInt.Argonaut (toString)
@@ -437,7 +438,7 @@ type ContractDetailsProps =
 type Props =
   { onDismiss :: Effect Unit
   , onSuccess :: ContractInfo.ContractUpdated -> Effect Unit
-  , onError :: String -> Effect Unit
+  , onError :: ErrorReport JSX -> Effect Unit
   , connectedWallet :: WalletInfo Wallet.Api
   , transactionsEndpoint :: TransactionsEndpoint
   , marloweContext :: Machine.MarloweContext
@@ -460,7 +461,7 @@ applyInputBodyLayout (UseSpinnerOverlay useSpinnerOverlay) content = do
 mkOnStateTransition
   :: ContractInfo
   -> (ContractInfo.ContractUpdated -> Effect Unit)
-  -> (String -> Effect Unit)
+  -> (ErrorReport JSX -> Effect Unit)
   -> Moore.OnStateTransition Machine.State
 mkOnStateTransition contractInfo onSuccess _ _ (Machine.InputApplied ia) = do
   let
@@ -621,8 +622,11 @@ mkComponent = do
                     let
                       newMarloweContext = { initialContract, state: t.txOutState, contract: t.txOutContract }
                     machine.applyAction <<< Machine.PickInputSucceeded $ { input, newMarloweContext }
-                  V1.Error err -> do
-                    machine.applyAction <<< Machine.PickInputFailed $ show err
+                  err@(V1.Error _) -> do
+                    let
+                      json = encodeJson err
+                      err' = mkJSXErrorReport "Error while computing Marlowe Transaction" Nothing (Just json)
+                    machine.applyAction <<< Machine.PickInputFailed $ err'
             case inputChoices of
               ChoiceInputs choiceInputs -> applyInputBodyLayout shouldUseSpinner $ choiceFormComponent
                 { choiceInputs

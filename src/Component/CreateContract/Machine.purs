@@ -4,10 +4,13 @@ import Prelude
 
 import CardanoMultiplatformLib (Bech32, CborHex)
 import CardanoMultiplatformLib as CardanoMultiplatformLib
+import CardanoMultiplatformLib.Transaction (TransactionObject) as R
 import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnessSetObject)
 import Component.InputHelper (rolesInContract)
-import Component.Types (WalletInfo(..))
+import Component.Types (ErrorReport, WalletInfo(..), mkErrorReport)
+import Contrib.ErrorToJson (errorToJson)
 import Control.Monad.Error.Class (catchError)
+import Data.Argonaut (encodeJson)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as Array.NonEmpty
@@ -22,14 +25,32 @@ import Effect.Class (liftEffect)
 import Effect.Now as Instant
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Runtime.Web.Client (ClientError, post', put')
-import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsError, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), ResourceWithLinks, RolesConfig, Runtime(Runtime), ServerURL, Tags, TextEnvelope(TextEnvelope), toTextEnvelope)
+import Marlowe.Runtime.Web (SafetyErrorInfo) as R
+import Marlowe.Runtime.Web.Client (ClientError, clientErrorToJson, post', put')
+import Marlowe.Runtime.Web.Types (ContractEndpoint, ContractsEndpoint, PostContractsError, PostContractsRequest(..), PostContractsResponseContent(..), PutContractRequest(PutContractRequest), ResourceWithLinks, RolesConfig, Runtime(Runtime), ServerURL, Tags, TextEnvelope(TextEnvelope), encodeApiError, toTextEnvelope)
+import Marlowe.Runtime.Web.Types (TextEnvelope, TxOutRef) as R
+import React.Basic (JSX)
+import React.Basic.DOM as D
 import Record as Record
 import Type.Prelude (Proxy(..))
 import Wallet as Wallet
 import WalletContext (WalletContext(..), walletContext)
 
 type ClientError' = ClientError PostContractsError
+
+newtype PostContractsResponseContent' =
+  PostContractsResponseContent'
+    { contractId :: R.TxOutRef
+    , tx :: R.TextEnvelope R.TransactionObject
+    }
+
+data CreateError
+  = SafetyErrors (NonEmptyArray R.SafetyErrorInfo)
+  | ClientError ClientError'
+
+data MachineError
+  = CreateError CreateError
+  | OtherError (ErrorReport JSX)
 
 data ContractData = ContractData
   { contract :: V1.Contract
@@ -54,70 +75,70 @@ data State
       { contract :: V1.Contract
       , tags :: Tags
       , roleNames :: NonEmptyArray V1.TokenName
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       }
   | FetchingRequiredWalletContext
       { contract :: V1.Contract
       , tags :: Tags
       , rolesConfig :: Maybe RolesConfig
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       }
   | CreatingTx
       { contract :: V1.Contract
       , tags :: Tags
       , rolesConfig :: Maybe RolesConfig
-      , errors :: Maybe String
+      , errors :: Maybe CreateError
       , reqWalletContext :: RequiredWalletContext
       }
   | SigningTx
       { contract :: V1.Contract
       , rolesConfig :: Maybe RolesConfig
       , tags :: Tags
-      , errors :: Maybe String
-      , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
+      , errors :: Maybe (ErrorReport JSX)
+      , createTxResponse :: ResourceWithLinks PostContractsResponseContent' (contract :: ContractEndpoint)
       }
   | SubmittigTx
       { contract :: V1.Contract
       , rolesConfig :: Maybe RolesConfig
-      , errors :: Maybe String
+      , errors :: Maybe (ErrorReport JSX)
       , tags :: Tags
       , txWitnessSet :: CborHex TransactionWitnessSetObject
-      , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
+      , createTxResponse :: ResourceWithLinks PostContractsResponseContent' (contract :: ContractEndpoint)
       }
   | ContractCreated
       { contract :: V1.Contract
       , rolesConfig :: Maybe RolesConfig
       , tags :: Tags
-      , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
+      , createTxResponse :: ResourceWithLinks PostContractsResponseContent' (contract :: ContractEndpoint)
       , submittedAt :: Instant
       }
 
-stateErrors :: State -> Maybe String
+stateErrors :: State -> Maybe MachineError
 stateErrors DefiningContract = Nothing
-stateErrors (DefiningRoleTokens { errors }) = errors
-stateErrors (FetchingRequiredWalletContext { errors }) = errors
-stateErrors (CreatingTx { errors }) = errors
-stateErrors (SigningTx { errors }) = errors
-stateErrors (SubmittigTx { errors }) = errors
+stateErrors (DefiningRoleTokens { errors }) = OtherError <$> errors
+stateErrors (FetchingRequiredWalletContext { errors }) = OtherError <$> errors
+stateErrors (CreatingTx { errors }) = CreateError <$> errors
+stateErrors (SigningTx { errors }) = OtherError <$> errors
+stateErrors (SubmittigTx { errors }) = OtherError <$> errors
 stateErrors (ContractCreated {}) = Nothing
 
 data Action
   = TriggerSubmission V1.Contract Tags
   | DefineRoleTokens
-  | DefineRoleTokensFailed String
+  | DefineRoleTokensFailed (ErrorReport JSX)
   | DefineRoleTokensSucceeded RolesConfig
   | FetchRequiredWalletContext
-  | FetchRequiredWalletContextFailed String
+  | FetchRequiredWalletContextFailed (ErrorReport JSX)
   | FetchRequiredWalletContextSucceeded RequiredWalletContext
   | CreateTx
-  | CreateTxFailed String
+  | CreateTxFailed CreateError
   | CreateTxSucceeded
-      (ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint))
+      (ResourceWithLinks PostContractsResponseContent' (contract :: ContractEndpoint))
   | SignTx
-  | SignTxFailed String
+  | SignTxFailed (ErrorReport JSX)
   | SignTxSucceeded (CborHex TransactionWitnessSetObject)
   | SubmitTx
-  | SubmitTxFailed String
+  | SubmitTxFailed (ErrorReport JSX)
   | SubmitTxSucceeded Instant
 
 type Env =
@@ -140,7 +161,7 @@ step state action = do
       DefineRoleTokens -> DefiningRoleTokens { contract, tags, roleNames, errors: Nothing }
       _ -> state
     DefiningRoleTokens { contract, tags, roleNames, errors: Nothing } -> case action of
-      DefineRoleTokensFailed error -> DefiningRoleTokens { contract, tags, roleNames, errors: Just error }
+      DefineRoleTokensFailed error -> DefiningRoleTokens { contract, tags, roleNames, errors: Just $ error }
       DefineRoleTokensSucceeded rolesConfig -> FetchingRequiredWalletContext { contract, tags, rolesConfig: Just rolesConfig, errors: Nothing }
       _ -> state
     FetchingRequiredWalletContext r@{ errors: Just _ } -> case action of
@@ -148,15 +169,18 @@ step state action = do
       _ -> state
     FetchingRequiredWalletContext r -> case action of
       FetchRequiredWalletContextFailed error -> FetchingRequiredWalletContext $ r { errors = Just error }
-      FetchRequiredWalletContextSucceeded reqWalletContext -> CreatingTx $ Record.insert (Proxy :: Proxy "reqWalletContext") reqWalletContext r
+      FetchRequiredWalletContextSucceeded reqWalletContext -> CreatingTx
+        $ Record.set (Proxy :: Proxy "errors") Nothing
+        $ Record.insert (Proxy :: Proxy "reqWalletContext") reqWalletContext
+            r
       _ -> state
     CreatingTx r@{ errors: Just _ } -> case action of
       CreateTx -> CreatingTx $ r { errors = Nothing }
       _ -> state
     CreatingTx r@{ contract, rolesConfig, tags } -> case action of
-      CreateTxFailed err -> CreatingTx $ r { errors = Just err }
-      CreateTxSucceeded res -> do
-        SigningTx $ { contract, createTxResponse: res, errors: Nothing, rolesConfig, tags }
+      CreateTxFailed errors -> CreatingTx $ r { errors = Just errors }
+      CreateTxSucceeded createTxResponse ->
+        SigningTx $ { contract, createTxResponse, errors: Nothing, rolesConfig, tags }
       _ -> state
     SigningTx r@{ errors: Just _ } -> case action of
       SignTx -> SigningTx $ r { errors = Nothing }
@@ -203,7 +227,7 @@ data RuntimeRequest
       }
   | SubmitTxRequest
       { txWitnessSet :: CborHex TransactionWitnessSetObject
-      , createTxResponse :: ResourceWithLinks PostContractsResponseContent (contract :: ContractEndpoint)
+      , createTxResponse :: ResourceWithLinks PostContractsResponseContent' (contract :: ContractEndpoint)
       , runtime :: Runtime
       }
 
@@ -221,7 +245,7 @@ nextRequest env = do
       Just $ WalletRequest $ FetchWalletContextRequest { cardanoMultiplatformLib, walletInfo }
     CreatingTx { contract, tags, reqWalletContext, errors: Nothing, rolesConfig } ->
       Just $ RuntimeRequest $ CreateTxRequest { contract, tags, reqWalletContext, runtime, rolesConfig }
-    SigningTx { createTxResponse: { resource: PostContractsResponseContent response }, errors: Nothing } -> do
+    SigningTx { createTxResponse: { resource: PostContractsResponseContent' response }, errors: Nothing } -> do
       let
         { tx } = response
       Just $ WalletRequest $ SignTxRequest { walletInfo, tx }
@@ -238,15 +262,26 @@ requestToAffAction = case _ of
         WalletInfo { wallet } = walletInfo
       possibleWalletAddresses <- liftAff $ (Right <$> walletContext cardanoMultiplatformLib wallet) `catchError` (pure <<< Left)
       case possibleWalletAddresses of
-        Left err -> pure $ FetchRequiredWalletContextFailed $ show err
-        Right Nothing -> pure $ FetchRequiredWalletContextFailed "Wallet does not have a change address"
+        Left err -> do
+          let
+            json = errorToJson err
+            err' = D.text <$> mkErrorReport "Failed to fetch wallet context" Nothing (Just json)
+          pure $ FetchRequiredWalletContextFailed err'
+        Right Nothing -> do
+          let
+            err = D.text <$> mkErrorReport "Wallet doesn't have change address" Nothing Nothing
+          pure $ FetchRequiredWalletContextFailed err
         Right (Just (WalletContext { changeAddress, usedAddresses })) -> do
           pure $ FetchRequiredWalletContextSucceeded { changeAddress, usedAddresses }
     SignTxRequest { walletInfo, tx } -> do
       let
         WalletInfo { wallet } = walletInfo
       liftAff $ sign wallet tx >>= case _ of
-        Left err -> pure $ SignTxFailed $ unsafeStringify err
+        Left err -> do
+          let
+            json = encodeJson { "strigified": unsafeStringify err }
+            err' = D.text <$> mkErrorReport "Failed to sign transaction" Nothing (Just json)
+          pure $ SignTxFailed err'
         Right txWitnessSet -> pure $ SignTxSucceeded txWitnessSet
   RuntimeRequest runtimeRequest -> case runtimeRequest of
     CreateTxRequest { contract, tags, reqWalletContext, runtime, rolesConfig } -> do
@@ -258,10 +293,16 @@ requestToAffAction = case _ of
           , rolesConfig
           , walletAddresses: reqWalletContext
           }
-        action = liftAff $ create contractData serverURL root >>= case _ of
-          Right res -> pure $ CreateTxSucceeded res
-          Left err -> pure $ CreateTxFailed $ show err
-      action `catchError` \err -> pure $ CreateTxFailed $ show err
+      -- FIXME: Handle aff excpetions
+      liftAff $ create contractData serverURL root >>= case _ of
+        Right { links, resource } -> case resource of
+          PostContractsResponseSafetyErrors errors ->
+            pure $ CreateTxFailed $ SafetyErrors errors
+          PostContractsResponseContent res -> do
+            let
+              resource' = PostContractsResponseContent' res
+            pure $ CreateTxSucceeded { links, resource: resource' }
+        Left err -> pure $ CreateTxFailed $ ClientError err
     SubmitTxRequest { txWitnessSet, createTxResponse, runtime } -> do
       let
         Runtime { serverURL } = runtime
@@ -269,9 +310,16 @@ requestToAffAction = case _ of
           Right _ -> do
             now <- liftEffect $ Instant.now
             pure $ SubmitTxSucceeded now
-          Left err -> pure $ SubmitTxFailed $ show err
-      action `catchError` \err ->
-        pure $ SubmitTxFailed $ show err
+          Left err -> do
+            let
+              json = clientErrorToJson encodeApiError err
+              err' = D.text <$> mkErrorReport "Failed to submit transaction" Nothing (Just json)
+            pure $ SubmitTxFailed err'
+      action `catchError` \err -> do
+        let
+          json = errorToJson err
+          err' = D.text <$> mkErrorReport "Failed to submit transaction" Nothing (Just json)
+        pure $ SubmitTxFailed err'
 
 driver :: Env -> State -> Maybe (Aff Action)
 driver env state = do
