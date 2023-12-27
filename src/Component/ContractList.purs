@@ -14,7 +14,7 @@ import Component.ContractTemplates.Swap as Swap
 import Component.CreateContract (runnerTag)
 import Component.CreateContract as CreateContract
 import Component.InputHelper (addressesInContract, addressesInState, allInputs, canInput, rolesInContract, rolesInState)
-import Component.Types (ContractInfo(..), ContractJsonString, MessageContent'(..), MessageHub(..), MkComponentM, Page(..), WalletInfo, errorReportToMessage)
+import Component.Types (ContractInfo(..), ContractJsonString, MessageHub(..), MkComponentM, Page(..), WalletInfo, errorReportToMessage)
 import Component.Types as MessageHub
 import Component.Types.ContractInfo (ContractStatus(..), MarloweInfo(..), SomeContractInfo(..), contractStatusMarloweInfo, contractStatusTransactionsHeadersWithEndpoints)
 import Component.Types.ContractInfo as ContractInfo
@@ -296,20 +296,22 @@ mkContractList = do
           , walletContext
           , onDismiss: resetModalAction
           , onSuccess: \contractCreated -> do
-              msgHubProps.add $ MessageHub.Success $ DOOM.text $ String.joinWith " "
-                [ "Successfully created and submitted the contract."
-                , "Contract transaction awaits to be included in the blockchain."
-                ]
+              let
+                msg = DOOM.text $ String.joinWith " "
+                  [ "Successfully created and submitted the contract."
+                  , "Contract transaction awaits to be included in the blockchain."
+                  ]
+              msgHubProps.add $ MessageHub.Success $ { msg, description: Nothing, details: Nothing }
               notSyncedYetInserts.add contractCreated
               resetModalAction
-          , onError
+          , onError: onError'
           , possibleInitialContract
           }
         Just (ApplyInputs contractInfo transactionsEndpoint marloweContext), _ -> do
           let
+            msg = DOOM.text "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain."
             onSuccess = \contractUpdated -> do
-              msgHubProps.add $ MessageHub.Success $ DOOM.text $ fold
-                [ "Successfully applied the inputs. Input application transaction awaits to be included in the blockchain." ]
+              msgHubProps.add $ MessageHub.Success { msg, description: Nothing, details: Nothing }
               notSyncedYetInserts.update contractUpdated
               resetModalAction
           applyInputsComponent
@@ -323,9 +325,9 @@ mkContractList = do
             }
         Just (Withdrawal _ contractId unclaimedPayouts), _ /\ updateSubmitted -> do
           let
+            msg = DOOM.text "Successfully withdrawed the funds. Withdrawal transaction awaits to be included in the blockchain."
             onSuccess = \_ -> do
-              msgHubProps.add $ MessageHub.Success $ DOOM.text $ fold
-                [ "Successfully withdrawed the funds. Withdrawal transaction awaits to be included in the blockchain." ]
+              msgHubProps.add $ MessageHub.Success { msg, description: Nothing, details: Nothing }
               resetModalAction
           withdrawalsComponent
             { connectedWallet: walletInfo

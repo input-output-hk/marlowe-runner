@@ -12,7 +12,7 @@ import Component.Footer (footer)
 import Component.LandingPage (mkLandingPage)
 import Component.MessageHub (mkMessageBox, mkMessagePreview)
 import Component.Testing (mkDataTestAttrs)
-import Component.Types (ConfigurationError(..), ContractInfo(..), ContractJsonString, MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..))
+import Component.Types (ConfigurationError(..), ContractInfo(..), ContractJsonString, MessageHub(MessageHub), MkComponentMBase, Page(..), WalletInfo(..), errorMsg)
 import Component.Types as MessageHub
 import Component.Types.ContractInfo (ContractCreated(..), ContractUpdated(..)) as ContractInfo
 import Component.Types.ContractInfo (SomeContractInfo)
@@ -285,7 +285,9 @@ mkApp = do
               liftEffect $ props.setPage ContractListPage
           case res of
             Nothing -> liftEffect do
-              msgHubProps.add $ MessageHub.Error $ DOOM.text "Wallet is not responding. Please check its configuration or try another wallet"
+              let
+                msg = DOOM.text "Wallet is not responding. Please check its configuration or try another wallet"
+              msgHubProps.add $ errorMsg msg
               setWalletInfo Nothing
             Just _ -> pure unit
 

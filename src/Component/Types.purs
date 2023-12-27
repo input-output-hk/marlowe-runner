@@ -71,8 +71,8 @@ data Message
   | Warning MessageContent'
   | Error MessageContent'
 
-errorMsg :: String -> Message
-errorMsg = Error <<< { msg: _, description: Nothing, details: Nothing } <<< D.text
+errorMsg :: JSX -> Message
+errorMsg = Error <<< { msg: _, description: Nothing, details: Nothing }
 
 type MessageId = Int
 

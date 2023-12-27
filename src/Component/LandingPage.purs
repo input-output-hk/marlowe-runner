@@ -15,7 +15,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (JSX)
-import React.Basic.DOM (text, img) as DOOM
+import React.Basic.DOM (text, img) as D
 import React.Basic.DOM.Simplified.Generated as DOM
 import React.Basic.Hooks (component)
 import Type.Row (type (+))
@@ -54,12 +54,12 @@ mkLandingPage = do
     let
       title =
         DOM.div { className: "pe-4 fw-bold" }
-          [ DOOM.img { src: "/images/twotone_wallet.svg" }
-          , DOM.h3 { className: "fw-bold" } $ DOOM.text "Choose a wallet to deploy a Marlowe smart contract"
+          [ D.img { src: "/images/twotone_wallet.svg" }
+          , DOM.h3 { className: "fw-bold" } $ D.text "Choose a wallet to deploy a Marlowe smart contract"
           ]
       description =
         DOM.div { className: "pe-4" }
-          $ DOM.p {} [ DOOM.text "Selecting a wallet is your first step in deploying a smart contract, your choice should be compatible with the blockchain network you want to deploy your contract on." ]
+          $ DOM.p {} [ D.text "Selecting a wallet is your first step in deploying a smart contract, your choice should be compatible with the blockchain network you want to deploy your contract on." ]
 
       content =
         DOM.div { className: "container-fluid" }
@@ -71,9 +71,9 @@ mkLandingPage = do
               , onError: case _ of
                   ConnectWallet.NoWallets -> pure unit -- setErrors $ Just NoWallets
                   ConnectWallet.ConnectionError _ ->
-                    msgHubProps.add $ MessageHub.errorMsg "Wallet connection failed with unknown error. Please try another wallet"
+                    msgHubProps.add $ MessageHub.errorMsg $ D.text "Wallet connection failed with unknown error. Please try another wallet"
                   ConnectWallet.TimeoutReached ->
-                    msgHubProps.add $ MessageHub.errorMsg "Timeout reached while connecting to wallet"
+                    msgHubProps.add $ MessageHub.errorMsg $ D.text "Timeout reached while connecting to wallet"
               , onDismiss: pure unit
               , overlay
               }
