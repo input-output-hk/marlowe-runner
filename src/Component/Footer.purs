@@ -18,11 +18,11 @@ footer = do
                     , children:
                         [ DOM.a
                             { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
-                            , href: "http://marlowescan.com"
+                            , href: "https://static.iohk.io/terms/iohktermsandconditions.pdf"
                             , target: "_blank"
                             , children:
-                                [ DOM.i { className: "h5 bi-globe2" }
-                                , DOM.text "  Marlowe Scan"
+                                [ DOM.i { className: "h5 bi-github" }
+                                , DOM.text "  Terms and Conditions"
                                 ]
                             }
                         , DOM.a
@@ -36,20 +36,20 @@ footer = do
                             }
                         , DOM.a
                             { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
-                            , href: "https://github.com/input-output-hk/marlowe-cardano"
-                            , target: "_blank"
-                            , children:
-                                [ DOM.i { className: "h5 bi-github" }
-                                , DOM.text "  Marlowe Cardano Github"
-                                ]
-                            }
-                        , DOM.a
-                            { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
                             , href: "https://play.marlowe.iohk.io"
                             , target: "_blank"
                             , children:
                                 [ DOM.i { className: "h5 bi-play-circle" }
                                 , DOM.text "  Marlowe Playground"
+                                ]
+                            }
+                        , DOM.a
+                            { className: "btn btn-link text-muted text-primary-hover text-decoration-none"
+                            , href: "http://marlowescan.com"
+                            , target: "_blank"
+                            , children:
+                                [ DOM.i { className: "h5 bi-globe2" }
+                                , DOM.text "  Marlowe Scan"
                                 ]
                             }
                         ]
