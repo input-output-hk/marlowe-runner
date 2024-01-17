@@ -2,7 +2,7 @@
   description = "Marlowe Runner";
 
   inputs = {
-    iogx.url = "github:input-output-hk/iogx";
+    iogx.url = "github:input-output-hk/iogx?ref=custom-precommit-hooks";
 
     spago2nix = {
       url = "github:justinwoo/spago2nix";
