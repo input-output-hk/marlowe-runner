@@ -276,8 +276,9 @@ mkApp = do
         Nothing, Nothing -> pure unit
         Nothing, Just _ -> do
           liftEffect $ setWalletContext Nothing
-        Just (WalletInfo walletInfo), _ -> do
-          res <- withTimeout (Milliseconds 7000.0) do
+        Just (WalletInfo walletInfo), Nothing -> do
+          -- This only checks if the internal effect finished successfully
+          (res :: Maybe Unit) <- withTimeout (Milliseconds 10000.0) do
             walletContext <- WalletContext.walletContext cardanoMultiplatformLib walletInfo.wallet
             liftEffect $ setWalletContext walletContext
             -- FIXME: Another work around the rounting issue.
@@ -288,6 +289,7 @@ mkApp = do
               msgHubProps.add $ MessageHub.Error $ DOOM.text "Wallet is not responding. Please check its configuration or try another wallet"
               setWalletInfo Nothing
             Just _ -> pure unit
+        _, _ -> pure unit
 
     disconnectingWallet /\ setDisconnectingWallet <- useState' false
     checkingNotifications /\ setCheckingNotifications <- useState' false
