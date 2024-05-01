@@ -19,6 +19,9 @@
     inherit inputs;
     repoRoot = ./.;
     systems = [ "x86_64-linux" "x86_64-darwin" ];
+    flake = {
+      nixosModules.default = import ./nix/nixos.nix inputs.self;
+    };
     outputs = import ./nix/outputs.nix;
   };
 
