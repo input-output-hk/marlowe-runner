@@ -297,6 +297,7 @@ create contractData serverUrl contractsEndpoint = do
       , changeAddress: changeAddress
       , addresses: usedAddresses <> [ changeAddress ]
       , collateralUTxOs: []
+      , accounts: {}
       }
   post' serverUrl contractsEndpoint req
 

@@ -2,7 +2,7 @@ module Contrib.JsonBigInt where
 
 import Prelude
 
-import Contrib.Data.Argonaut (JsonString, Reviver)
+import Data.BigInt.Argonaut (JsonString, Reviver)
 import Data.Argonaut (Json, fromString)
 import Data.BigInt (BigInt)
 import Data.Either (Either(..))

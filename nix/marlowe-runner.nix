@@ -43,8 +43,8 @@ pkgs.buildNpmPackage {
     spago-pkgs.buildSpagoStyle
     repoRoot.nix.purescript.purs-0_15_10
     repoRoot.nix.purescript.spago2nix
-    pkgs.nodejs_18
-    pkgs.nodejs_18.pkgs.webpack-cli
+    pkgs.nodejs
+    pkgs.nodejs.pkgs.webpack-cli
   ];
 
   buildPhase = ''

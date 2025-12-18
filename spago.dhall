@@ -71,6 +71,7 @@
   , "strings"
   , "strings-extra"
   , "tailrec"
+  , "test-unit"
   , "these"
   , "transformers"
   , "tuples"

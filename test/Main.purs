@@ -2,6 +2,7 @@ module Test.Main where
 
 import Prelude
 
+import Contrib.JsonBigInt as JsonBigInt
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
@@ -18,8 +19,11 @@ import Test.Spec.Runner (defaultConfig, runSpec')
 
 main :: Effect Unit
 main = do
-
   serverUrlStr <- getEnv <#> Object.lookup _MARLOWE_WEB_SERVER_URL >>> map ServerURL
+
+  JsonBigInt.patchers.patchStringify
+  JsonBigInt.patchers.patchParse
+
   launchAff_ $ do
     let
       config = defaultConfig { timeout = Just (Milliseconds 10000.0) }

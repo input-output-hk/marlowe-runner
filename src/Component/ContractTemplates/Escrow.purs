@@ -42,7 +42,7 @@ type Props =
   , onDismiss :: Effect Unit
   }
 
-mkEscrowContract
+mkRoleBaseEscrowContract
   :: { complaintDeadline :: Instant
      , complaintResponseDeadline :: Instant
      , mediationDeadline :: Instant
@@ -50,17 +50,71 @@ mkEscrowContract
      , price :: BigInt
      }
   -> V1.Contract
-mkEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline, complaintResponseDeadline } =
+mkRoleBaseEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline, complaintResponseDeadline } = do
+  let
+    seller = V1.Role "Seller"
+    buyer = V1.Role "Buyer"
+    mediator = V1.Role "Mediator"
+  mkEscrowContract
+    { price
+    , mediationDeadline
+    , paymentDeadline
+    , complaintDeadline
+    , complaintResponseDeadline
+    , seller
+    , buyer
+    , mediator
+    }
+
+mkAddressBasedEscrowContract
+  :: { complaintDeadline :: Instant
+     , complaintResponseDeadline :: Instant
+     , mediationDeadline :: Instant
+     , paymentDeadline :: Instant
+     , price :: BigInt
+     , sellerAddress :: String
+     , buyerAddress :: String
+     , mediatorAddress :: String
+     }
+  -> V1.Contract
+mkAddressBasedEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline, complaintResponseDeadline, sellerAddress, buyerAddress, mediatorAddress } = do
+  let
+    seller = V1.Address sellerAddress
+    buyer = V1.Address buyerAddress
+    mediator = V1.Address mediatorAddress
+  mkEscrowContract
+    { price
+    , mediationDeadline
+    , paymentDeadline
+    , complaintDeadline
+    , complaintResponseDeadline
+    , seller
+    , buyer
+    , mediator
+    }
+
+mkEscrowContract
+  :: { complaintDeadline :: Instant
+     , complaintResponseDeadline :: Instant
+     , mediationDeadline :: Instant
+     , paymentDeadline :: Instant
+     , price :: BigInt
+     , buyer :: V1.Party
+     , seller :: V1.Party
+     , mediator :: V1.Party
+     }
+  -> V1.Contract
+mkEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline, complaintResponseDeadline, seller, buyer, mediator } = do
   V1.When
     [ ( V1.Case
-          ( V1.Deposit (V1.Role "Seller") (V1.Role "Buyer")
+          ( V1.Deposit seller buyer
               (V1.Token "" "")
               (V1.Constant price)
           )
           ( V1.When
               [ ( V1.Case
                     ( V1.Choice
-                        (V1.ChoiceId "Everything is alright" (V1.Role "Buyer"))
+                        (V1.ChoiceId "Everything is alright" buyer)
                         [ (V1.Bound zero zero)
                         ]
                     )
@@ -68,18 +122,18 @@ mkEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline,
                 )
               , ( V1.Case
                     ( V1.Choice
-                        (V1.ChoiceId "Report problem" (V1.Role "Buyer"))
+                        (V1.ChoiceId "Report problem" buyer)
                         [ (V1.Bound one one)
                         ]
                     )
-                    ( V1.Pay (V1.Role "Seller")
-                        (V1.Account (V1.Role "Buyer"))
+                    ( V1.Pay seller
+                        (V1.Account buyer)
                         (V1.Token "" "")
                         (V1.Constant price)
                         ( V1.When
                             [ ( V1.Case
                                   ( V1.Choice
-                                      (V1.ChoiceId "Confirm problem" (V1.Role "Seller"))
+                                      (V1.ChoiceId "Confirm problem" seller)
                                       [ (V1.Bound one one)
                                       ]
                                   )
@@ -87,19 +141,19 @@ mkEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline,
                               )
                             , ( V1.Case
                                   ( V1.Choice
-                                      (V1.ChoiceId "Dispute problem" (V1.Role "Seller"))
+                                      (V1.ChoiceId "Dispute problem" seller)
                                       [ (V1.Bound zero zero)
                                       ]
                                   )
                                   ( V1.When
                                       [ ( V1.Case
                                             ( V1.Choice
-                                                (V1.ChoiceId "Dismiss claim" (V1.Role "Mediator"))
+                                                (V1.ChoiceId "Dismiss claim" mediator)
                                                 [ (V1.Bound zero zero)
                                                 ]
                                             )
-                                            ( V1.Pay (V1.Role "Buyer")
-                                                (V1.Party (V1.Role "Seller"))
+                                            ( V1.Pay buyer
+                                                (V1.Party seller)
                                                 (V1.Token "" "")
                                                 (V1.Constant price)
                                                 V1.Close
@@ -107,7 +161,7 @@ mkEscrowContract { price, mediationDeadline, paymentDeadline, complaintDeadline,
                                         )
                                       , ( V1.Case
                                             ( V1.Choice
-                                                (V1.ChoiceId "Confirm problem" (V1.Role "Mediator"))
+                                                (V1.ChoiceId "Confirm problem" mediator)
                                                 [ (V1.Bound one one)
                                                 ]
                                             )
@@ -232,7 +286,7 @@ mkComponent = do
     let
       onSubmit :: _ -> Effect Unit
       onSubmit = _.result >>> case _ of
-        Just (V (Right escrowParams) /\ _) -> setContract $ Just $ mkEscrowContract escrowParams
+        Just (V (Right escrowParams) /\ _) -> setContract $ Just $ mkRoleBaseEscrowContract escrowParams
         _ -> pure unit
 
     { formState, onSubmit: onSubmit', result } <- useStatelessFormSpec

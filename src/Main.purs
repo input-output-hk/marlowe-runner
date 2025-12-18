@@ -24,7 +24,6 @@ import Data.String as String
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
 import Data.Undefined.NoProblem as NoProblem
-import Debug (traceM)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)

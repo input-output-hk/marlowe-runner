@@ -1,5 +1,4 @@
 import yaml from 'js-yaml'
-import { util } from 'js-yaml'
 
 
 export const dumpImpl = yaml.dump;

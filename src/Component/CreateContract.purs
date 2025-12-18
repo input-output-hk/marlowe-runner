@@ -302,20 +302,25 @@ mkOnStateTransition
   -> Machine.State
   -> Machine.State
   -> Effect Unit
-mkOnStateTransition onSuccess _ _ (Machine.ContractCreated { contract, createTxResponse, submittedAt, tags }) = do
+mkOnStateTransition onSuccess onErrors _ (Machine.ContractCreated { contract, createTxResponse, submittedAt, tags }) = do
   let
-    { resource: PostContractsResponseContent { contractId }
+    { resource: responseContent
+
     , links: { contract: contractEndpoint }
     } = createTxResponse
-
-    contractCreated = ContractInfo.ContractCreated
-      { contract
-      , contractEndpoint
-      , contractId
-      , submittedAt
-      , tags
-      }
-  onSuccess contractCreated
+  case responseContent of
+    PostContractsResponseContent { contractId } -> do
+      let
+        contractCreated = ContractInfo.ContractCreated
+          { contract
+          , contractEndpoint
+          , contractId
+          , submittedAt
+          , tags
+          }
+      onSuccess contractCreated
+    PostContractsResponseSafetyErrors _errors -> do
+      onErrors $ "Contract creation had safety errors - TODO: add more details!"
 mkOnStateTransition _ onErrors _ next = do
   void $ for (Machine.stateErrors next) onErrors
 

@@ -26,7 +26,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import JS.Unsafe.Stringify (unsafeStringify)
 import Language.Marlowe.Core.V1.Semantics.Types as V1
-import Marlowe.Runtime.Web.Types (NetworkId(..), NetworkMagic(..))
+import Marlowe.Runtime.Web.Types (NetworkId(..), NetworkMagic(..), TxId(..), TxOutRef(..))
 import Marlowe.Runtime.Web.Types as Runtime
 import React.Basic (fragment) as DOOM
 import React.Basic.DOM (img, span_, text, i, a) as DOOM
@@ -38,6 +38,7 @@ import ReactBootstrap.Tab (tab)
 import ReactBootstrap.Tabs (tabs)
 import ReactBootstrap.Tabs as Tabs
 import ReactBootstrap.Types (eventKey)
+import Web.DOM.Document (doctype)
 
 type AppliedInputs = Array (V1.InputContent /\ V1.TimeInterval)
 
@@ -145,11 +146,14 @@ mkComponent = do
         ]
       -- TODO: Eventually use purescript-js-uri or move this to the contrib folder.
       urlEncode = String.replaceAll (Pattern "#") (Replacement "%23")
-      runnerUrl = case networkId of
-        Mainnet -> "https://mainnet.marlowescan.com/"
-        Testnet (NetworkMagic 1) -> "https://preprod.marlowescan.com/"
-        Testnet (NetworkMagic 2) -> "https://preview.marlowescan.com/"
-        _ -> ""
+      mkCardanoScanUrl (TxOutRef { txId: TxId txId }) = do
+        let
+          baseUrl = case networkId of
+            Mainnet -> "https://cardanoscan.io/transaction/"
+            Testnet (NetworkMagic 1) -> "https://preprod.cardanoscan.io/transaction/"
+            _ -> "https://preview.cardanoscan.io/transaction/"
+        baseUrl <> txId <> "?tab=utxo"
+
       playgroundUrl = "https://play.marlowe.iohk.io/#/"
       urlEncodedContract = LZString.compressToURI $ stringify $ encodeJson initialContract
     pure $ BodyLayout.component
@@ -163,11 +167,11 @@ mkComponent = do
           , DOM.p {}
               [ DOOM.a
                   { className: "btn-link text-muted text-primary-hover text-decoration-none"
-                  , href: runnerUrl <> "/contractView?tab=info&contractId=" <> urlEncode (Runtime.txOutRefToString contractId)
+                  , href: urlEncode $ mkCardanoScanUrl contractId
                   , target: "_blank"
                   , children:
                       [ DOOM.i { className: "h5 bi-globe2" }
-                      , DOOM.text $ "  View on Marlowe Scan "
+                      , DOOM.text $ "  View on Cardano Scan "
                       ]
                   }
               ]

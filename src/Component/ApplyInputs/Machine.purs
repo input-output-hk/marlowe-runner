@@ -8,7 +8,6 @@ import CardanoMultiplatformLib.Transaction (TransactionObject, TransactionWitnes
 import Component.InputHelper (ChoiceInput, DepositInput, NotifyInput, nextChoice, nextDeposit, nextNotify, nextTimeoutAdvance)
 import Component.Types (WalletInfo(..))
 import Contrib.Data.DateTime.Instant (unsafeInstant)
-import Contrib.Fetch (FetchError)
 import Control.Alt ((<|>))
 import Control.Alternative as Alternative
 import Control.Monad.Error.Class (catchError)

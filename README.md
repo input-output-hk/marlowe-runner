@@ -6,6 +6,8 @@ A simple web app which allows you to deploy and progress through Marlowe contrac
 
 The application itself is a fully static JS app which requires Marlowe Runtime for running. A release package is providing a directory which could be served by your favorite HTTP server but in order to use it you should setup a minimal configuration.
 
+## Deployment
+
 ### Configuration
 
 In order to configure the application your HTTP server should serve a `config.json`. To do so, create the file `public/config.json` with the following structure:
