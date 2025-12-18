@@ -44,7 +44,7 @@ pkgs.buildNpmPackage {
     repoRoot.nix.purescript.purs-0_15_10
     repoRoot.nix.purescript.spago2nix
     pkgs.nodejs
-    pkgs.nodejs.pkgs.webpack-cli
+    # pkgs.nodejs.pkgs.webpack-cli
   ];
 
   buildPhase = ''
@@ -54,7 +54,7 @@ pkgs.buildNpmPackage {
     build-spago-style "./src/**/*.purs"
 
     # This will create the public/*bundle.js* and public/*.module.wasm files.   
-    webpack-cli --mode=production -c webpack.js --progress=profile
+    ./node_modules/.bin/webpack-cli --mode=production -c webpack.js --progress=profile
 
     cp -r public/* $out
   '';
